@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: theme('fontFamily.body');
+    background: #f8f2ee;
+    color: #2b1a14;
+  }
+
+  body {
+    @apply min-h-screen bg-cream text-ink antialiased;
+  }
+
+  a {
+    @apply transition-colors;
+  }
+}
+
+@layer components {
+  .section-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .surface-card {
+    @apply rounded-[32px] bg-white shadow-soft;
+  }
+
+  .button-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-blush px-6 py-3 text-base font-semibold text-ink transition hover:bg-rose;
+  }
+
+  .button-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-line bg-white px-6 py-3 text-base font-semibold text-ink transition hover:bg-cream;
+  }
+
+  .button-ghost {
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 font-medium text-ink-soft transition hover:text-ink;
+  }
+
+  .chip-button {
+    @apply inline-flex items-center justify-center rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-soft transition hover:border-rose hover:bg-blush hover:text-ink;
+  }
+
+  .icon-button {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink-soft transition hover:bg-blush hover:text-ink;
+  }
+
+  .field {
+    @apply h-12 w-full rounded-full border border-line bg-cream px-4 text-ink placeholder:text-muted;
+  }
+
+  .field-panel {
+    @apply w-full rounded-[24px] border border-line bg-cream px-4 py-3 text-ink placeholder:text-muted;
+  }
+}
