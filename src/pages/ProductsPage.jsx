@@ -32,7 +32,7 @@ const sortProducts = (productList, sortBy) => {
   }
 };
 
-const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = false, errorMessage = '' }) => {
+const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = false, errorMessage = '', onRefreshProducts }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categories = getCatalogCategories(products);
   const query = searchParams.get('q') ?? '';
@@ -97,7 +97,32 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
 
   return (
     <div className="section-shell space-y-10 pb-6 pt-8">
-      <SectionTitle title="All products" description="The gallery syncs with the live Athar products API while preserving the premium catalog layout." />
+      <div className="flex justify-between items-start">
+        <SectionTitle title="All products" description="The gallery syncs with the live Athar products API while preserving the premium catalog layout." />
+        {onRefreshProducts && (
+          <button
+            onClick={onRefreshProducts}
+            disabled={isLoading}
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-ink-soft hover:border-line hover:bg-blush/60 hover:text-ink transition disabled:opacity-50 mt-2"
+            title="Refresh products"
+          >
+            <svg
+              aria-hidden="true"
+              className={`h-5 w-5 transition-transform ${isLoading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path d="M1 4v6h6M23 20v-6h-6" />
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+            </svg>
+            <span className="sr-only">Refresh products</span>
+          </button>
+        )}
+      </div>
 
       {isLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest collection from the Athar API...</div> : null}
       {errorMessage ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{errorMessage} Showing the last available catalog while the connection is restored.</div> : null}

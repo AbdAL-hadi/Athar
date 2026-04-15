@@ -31,6 +31,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const [myOrders, setMyOrders] = useState([]);
   const [myOrdersError, setMyOrdersError] = useState('');
   const [isLoadingMyOrders, setIsLoadingMyOrders] = useState(false);
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [deliveryConfirmationError, setDeliveryConfirmationError] = useState('');
+  const [deliveryIssueMessage, setDeliveryIssueMessage] = useState('');
 
   useEffect(() => {
     setInputValue(initialOrder);
@@ -132,6 +135,41 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
   const handleTrack = (orderIdentifier) => {
     setSearchParams(orderIdentifier ? { order: orderIdentifier } : {});
+  };
+
+  const handleConfirmDelivery = async (confirmed) => {
+    if (!trackedOrder) return;
+
+    setIsConfirmingDelivery(true);
+    setDeliveryConfirmationError('');
+
+    try {
+      const activeToken = getActiveAuthToken(authToken);
+      const orderIdentifier = trackedOrder.orderNumber ?? trackedOrder._id;
+      
+      const response = await apiRequest(
+        `/api/orders/${encodeURIComponent(orderIdentifier)}/confirm-delivery`,
+        {
+          method: 'PATCH',
+          body: {
+            confirmed,
+            message: deliveryIssueMessage,
+          },
+          token: activeToken,
+        },
+      );
+
+      if (response?.success) {
+        setTrackedOrder(response?.data ?? null);
+        setDeliveryIssueMessage('');
+      } else {
+        setDeliveryConfirmationError(response?.message || 'Failed to confirm delivery');
+      }
+    } catch (error) {
+      setDeliveryConfirmationError(error.message || 'Failed to confirm delivery');
+    } finally {
+      setIsConfirmingDelivery(false);
+    }
   };
 
   return (
@@ -246,6 +284,69 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                   <p className="mt-2 text-lg text-ink">{getEstimatedDelivery(trackedOrder.status)}</p>
                 </div>
               </div>
+
+              {trackedOrder.status === 'Shipped' && !trackedOrder.deliveryConfirmedByCustomer ? (
+                <div className="rounded-[24px] bg-blue-50 border-2 border-blue-300 px-5 py-5">
+                  <p className="text-base font-semibold text-blue-900 mb-4">
+                    📦 Your order has been shipped! Did you receive it?
+                  </p>
+                  {deliveryConfirmationError && (
+                    <div className="mb-4 rounded-lg bg-red-100 px-3 py-2 text-sm text-red-800">
+                      {deliveryConfirmationError}
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handleConfirmDelivery(true)}
+                      disabled={isConfirmingDelivery}
+                      className="w-full button-primary bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {isConfirmingDelivery ? 'Processing...' : '✓ Yes, I received it'}
+                    </button>
+                    <button
+                      onClick={() => setDeliveryIssueMessage(deliveryIssueMessage ? '' : 'enter')}
+                      disabled={isConfirmingDelivery}
+                      className="w-full button-secondary border-2 border-orange-400 text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      ⚠ No, I have an issue
+                    </button>
+
+                    {deliveryIssueMessage === 'enter' && (
+                      <div className="rounded-lg bg-orange-50 px-3 py-3 space-y-2">
+                        <textarea
+                          placeholder="Please describe the issue with your delivery..."
+                          value={deliveryIssueMessage === 'enter' ? '' : deliveryIssueMessage}
+                          onChange={(e) => setDeliveryIssueMessage(e.target.value)}
+                          className="field w-full h-20 resize-none"
+                        />
+                        <button
+                          onClick={() => handleConfirmDelivery(false)}
+                          disabled={isConfirmingDelivery}
+                          className="w-full button-primary bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          {isConfirmingDelivery ? 'Reporting...' : '📢 Report Issue'}
+                        </button>
+                        <button
+                          onClick={() => setDeliveryIssueMessage('')}
+                          disabled={isConfirmingDelivery}
+                          className="w-full button-secondary border-2 border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : trackedOrder.deliveryConfirmedByCustomer && trackedOrder.deliveryConfirmationMessage ? (
+                <div className="rounded-[24px] bg-green-50 border-2 border-green-400 px-5 py-5">
+                  <p className="text-base font-semibold text-green-900">
+                    {trackedOrder.deliveryConfirmationMessage.includes('✓')
+                      ? '✅ Delivery Confirmed'
+                      : '⚠️ Delivery Issue Reported'}
+                  </p>
+                  <p className="mt-2 text-sm text-green-800">{trackedOrder.deliveryConfirmationMessage}</p>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4 border-t border-line pt-8">

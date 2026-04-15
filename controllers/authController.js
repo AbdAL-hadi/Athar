@@ -196,6 +196,17 @@ export const registerUser = async (req, res) => {
   }
 };
 
+// Hardcoded employee credentials (temporary - to be replaced with database)
+const EMPLOYEE_CREDENTIALS = {
+  email: 'employee@athar.com',
+  password: 'Employee@123',
+};
+
+const DELIVERY_CREDENTIALS = {
+  email: 'delivery@athar.com',
+  password: 'Delivery@123',
+};
+
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body ?? {};
@@ -208,6 +219,71 @@ export const loginUser = async (req, res) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+
+    // Check for employee login first
+    if (normalizedEmail === EMPLOYEE_CREDENTIALS.email && password === EMPLOYEE_CREDENTIALS.password) {
+      const employeeUser = {
+        _id: 'employee-001',
+        name: 'Employee',
+        email: EMPLOYEE_CREDENTIALS.email,
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'employee',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const token = createAuthToken(employeeUser);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged in successfully as employee.',
+        data: {
+          token,
+          user: sanitizeUser(employeeUser),
+        },
+      });
+    }
+
+    // Check for delivery login
+    if (normalizedEmail === DELIVERY_CREDENTIALS.email && password === DELIVERY_CREDENTIALS.password) {
+      const deliveryUser = {
+        _id: 'delivery-001',
+        name: 'Delivery',
+        email: DELIVERY_CREDENTIALS.email,
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'delivery',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const token = createAuthToken(deliveryUser);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged in successfully as delivery personnel.',
+        data: {
+          token,
+          user: sanitizeUser(deliveryUser),
+        },
+      });
+    }
+
     const user = await findLegacyUnverifiedUserByEmail(normalizedEmail);
 
     if (user && (await verifyPassword(password, user.password))) {

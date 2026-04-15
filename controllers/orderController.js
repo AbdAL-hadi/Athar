@@ -157,9 +157,23 @@ export const createOrder = async (req, res) => {
 
 export const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
+    console.log('getMyOrders called - User:', {
+      _id: req.user?._id,
+      role: req.user?.role,
+      email: req.user?.email,
+    });
+
+    // Employees and delivery personnel can see all orders, customers can only see their own
+    const query = (req.user.role === 'employee' || req.user.role === 'delivery') ? {} : { user: req.user._id };
+    
+    console.log('Query for orders:', query);
+    
+    const orders = await Order.find(query)
       .sort({ createdAt: -1 })
-      .populate('items.product');
+      .populate('items.product')
+      .populate('user', 'name email phone');
+
+    console.log('Orders found:', orders.length);
 
     for (const order of orders) {
       await ensureOrderNumber(order);
@@ -171,9 +185,61 @@ export const getMyOrders = async (req, res) => {
       data: orders,
     });
   } catch (error) {
+    console.error('getMyOrders error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch your orders.',
+      message: 'Failed to fetch orders.',
+      error: error.message,
+    });
+  }
+};
+
+export const getConfirmedOrdersForDelivery = async (req, res) => {
+  try {
+    console.log('getConfirmedOrdersForDelivery called - User:', {
+      _id: req.user?._id,
+      role: req.user?.role,
+      email: req.user?.email,
+    });
+
+    if (req.user?.role !== 'delivery') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only delivery personnel can access this endpoint',
+      });
+    }
+
+    console.log('Fetching all orders from database...');
+    
+    // Get ALL orders first to debug
+    const allOrders = await Order.find({})
+      .sort({ createdAt: -1 })
+      .populate('items.product')
+      .populate('user', 'name email phone');
+
+    console.log('Total orders in database:', allOrders.length);
+
+    // Filter to confirmed orders
+    const confirmedOrders = allOrders.filter(order => order.status === 'Confirmed');
+    
+    console.log('Confirmed orders:', confirmedOrders.length);
+
+    for (const order of confirmedOrders) {
+      await ensureOrderNumber(order);
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: confirmedOrders.length,
+      totalOrdersInSystem: allOrders.length,
+      data: confirmedOrders,
+    });
+  } catch (error) {
+    console.error('getConfirmedOrdersForDelivery error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch confirmed orders',
+      error: error.message,
     });
   }
 };
@@ -238,7 +304,7 @@ export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body ?? {};
 
-    if (!['Pending', 'Confirmed', 'Shipped', 'Delivered'].includes(status)) {
+    if (!['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'].includes(status)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid order status.',
@@ -271,6 +337,73 @@ export const updateOrderStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to update order status.',
+    });
+  }
+};
+
+export const confirmDeliveryByCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { confirmed = false, message = '' } = req.body ?? {};
+
+    if (!['true', 'false', true, false].includes(confirmed)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid confirmation value.',
+      });
+    }
+
+    const query = mongoose.isValidObjectId(id) ? { _id: id } : { orderNumber: id };
+    const order = await Order.findOne(query);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    if (!canAccessOrder(order, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this order',
+      });
+    }
+
+    if (order.status !== 'Shipped') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order must be in Shipped status to confirm delivery',
+      });
+    }
+
+    const confirmationMessage = confirmed
+      ? `✓ Customer confirmed delivery received at ${new Date().toLocaleString()}`
+      : `✗ Customer reported delivery issue: ${message || 'Order not received'}`;
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      order._id,
+      {
+        deliveryConfirmedByCustomer: confirmed,
+        deliveryConfirmedAt: new Date(),
+        deliveryConfirmationMessage: confirmationMessage,
+        status: confirmed ? 'Delivered' : 'Shipped',
+      },
+      { new: true, runValidators: true },
+    )
+      .populate('user', 'name email role')
+      .populate('items.product');
+
+    return res.status(200).json({
+      success: true,
+      message: confirmed ? 'Delivery confirmed successfully.' : 'Delivery issue reported.',
+      data: updatedOrder,
+    });
+  } catch (error) {
+    console.error('Error confirming delivery:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to confirm delivery.',
     });
   }
 };

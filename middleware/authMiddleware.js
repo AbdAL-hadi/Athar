@@ -14,6 +14,7 @@ export const attachUserIfPresent = async (req, _res, next) => {
     const token = getTokenFromHeader(req.headers.authorization ?? '');
 
     if (!token) {
+      console.log('No token provided');
       req.user = null;
       next();
       return;
@@ -22,7 +23,58 @@ export const attachUserIfPresent = async (req, _res, next) => {
     const payload = verifyAuthToken(token);
 
     if (!payload?.userId) {
+      console.log('Invalid token payload');
       req.user = null;
+      next();
+      return;
+    }
+
+    console.log('Token payload:', { userId: payload.userId, role: payload.role });
+
+    // Handle mock employee user
+    if (payload.userId === 'employee-001' && payload.role === 'employee') {
+      console.log('Setting employee user');
+      req.user = {
+        _id: 'employee-001',
+        name: 'Employee',
+        email: 'employee@athar.com',
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'employee',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      next();
+      return;
+    }
+
+    // Handle mock delivery user
+    if (payload.userId === 'delivery-001' && payload.role === 'delivery') {
+      console.log('Setting delivery user');
+      req.user = {
+        _id: 'delivery-001',
+        name: 'Delivery',
+        email: 'delivery@athar.com',
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'delivery',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       next();
       return;
     }
@@ -31,6 +83,7 @@ export const attachUserIfPresent = async (req, _res, next) => {
     req.user = user ?? null;
     next();
   } catch (error) {
+    console.error('attachUserIfPresent error:', error);
     req.user = null;
     next();
   }
@@ -54,6 +107,39 @@ export const requireAdmin = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: 'Admin access required',
+    });
+  }
+
+  next();
+};
+
+export const requireAdminOrEmployee = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'employee')) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin or Employee access required',
+    });
+  }
+
+  next();
+};
+
+export const requireAdminOrDelivery = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'delivery')) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin or Delivery access required',
+    });
+  }
+
+  next();
+};
+
+export const requireAdminOrEmployeeOrDelivery = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'employee' && req.user.role !== 'delivery')) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin, Employee, or Delivery access required',
     });
   }
 
