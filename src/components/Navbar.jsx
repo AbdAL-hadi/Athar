@@ -1,4 +1,5 @@
-import { Link, NavLink } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
@@ -42,9 +43,40 @@ const AboutIcon = () => (
   </svg>
 );
 
-const Navbar = ({ cartCount = 0, authUser, authLoading = false }) => {
+const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
+  const navigate = useNavigate();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const productIcon = resolveApiAssetUrl('products/icons8-product-80.png');
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+    setDropdownOpen(false);
+  };
+
+  const handleLogoutClick = () => {
+    onLogout();
+    setDropdownOpen(false);
+    navigate('/');
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
@@ -84,9 +116,71 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false }) => {
             ))}
           </nav>
 
-          <Link to="/auth" className="button-primary whitespace-nowrap">
-            {authLoading ? 'Checking...' : authUser ? `Hi, ${authUser.name.split(' ')[0]}` : 'Create Account / Log In'}
-          </Link>
+          {authLoading ? (
+            <div className="button-primary whitespace-nowrap">Checking...</div>
+          ) : authUser ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-3 rounded-full border-2 border-rose px-2 py-2 transition hover:bg-blush"
+              >
+                {authUser.profilePicture ? (
+                  <img
+                    src={authUser.profilePicture}
+                    alt={authUser.name}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-rose to-pink-400 text-sm font-bold text-white">
+                    {authUser.name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+                <span className="max-w-[100px] truncate font-semibold text-ink hidden sm:block">
+                  {authUser.name.split(' ')[0]}
+                </span>
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-line bg-white shadow-lg z-50">
+                  {/* Profile Header in Dropdown */}
+                  <div className="border-b border-line/30 px-4 py-4 flex items-center gap-3">
+                    {authUser.profilePicture ? (
+                      <img
+                        src={authUser.profilePicture}
+                        alt={authUser.name}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose to-pink-400 text-lg font-bold text-white">
+                        {authUser.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-semibold text-ink text-sm">{authUser.name}</p>
+                      <p className="text-xs text-ink-soft capitalize">{authUser.role}</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={handleProfileClick}
+                    className="block w-full px-4 py-3 text-left text-sm text-ink hover:bg-blush first:rounded-t-lg transition"
+                  >
+                    📋 Profile
+                  </button>
+                  <button
+                    onClick={handleLogoutClick}
+                    className="block w-full px-4 py-3 text-left text-sm text-ink hover:bg-rose/10 last:rounded-b-lg transition text-rose"
+                  >
+                    🚪 Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link to="/auth" className="button-primary whitespace-nowrap">
+              Create Account / Log In
+            </Link>
+          )}
         </div>
       </div>
     </header>

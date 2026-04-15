@@ -105,22 +105,49 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite }) => {
         </div>
       </section>
 
-      <section className="section-shell">
-        <SectionTitle
-          eyebrow="View all"
-          title="Featured pieces"
-          description="A first selection from the collection, styled around the visual language of the Athar storefront."
-          action={
-            <Link to="/products" className="text-sm font-semibold text-ink-soft transition hover:text-ink">
-              See full catalog
-            </Link>
-          }
-        />
+      <section className="relative left-1/2 right-1/2 -mx-[50vw] w-screen bg-gradient-to-b from-white via-blush/30 to-cream py-20">
+        <div className="section-shell">
+          <div className="mb-16">
+            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+              <div className="flex-1">
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose mb-3">✨ View all</p>
+                <h2 className="font-display text-5xl font-bold text-ink sm:text-6xl mb-4">
+                  Featured Pieces
+                </h2>
+                <p className="max-w-2xl text-lg leading-8 text-ink-soft font-medium">
+                  A first selection from the collection, styled around the visual language of the Athar storefront. Discover our handpicked favorites.
+                </p>
+              </div>
+              <Link to="/products" className="inline-flex items-center gap-2 rounded-full bg-rose px-6 py-3 font-semibold text-white transition hover:bg-rose/90 hover:shadow-lg">
+                See full catalog →
+              </Link>
+            </div>
+          </div>
 
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} isFavorite={favoriteIds.includes(product.id)} onToggleFavorite={onToggleFavorite} />
-          ))}
+          <div className="grid gap-10 md:grid-cols-2 lg:gap-12 xl:grid-cols-5">
+            {featuredProducts.map((product, index) => (
+              <div key={product.id} className="group transform transition hover:scale-105">
+                <div className="relative overflow-hidden rounded-3xl bg-white shadow-lg transition hover:shadow-2xl h-full">
+                  <ProductCard 
+                    product={product} 
+                    isFavorite={favoriteIds.includes(product.id)} 
+                    onToggleFavorite={onToggleFavorite} 
+                  />
+                  {index < 2 && (
+                    <div className="absolute top-4 right-4 inline-block rounded-full bg-gradient-to-r from-rose to-pink-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg">
+                      🔥 Popular
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-16 text-center">
+            <p className="text-lg text-ink-soft font-medium">
+              ⭐ Curated with care • 🛍️ Premium quality • 💚 Customer favorites
+            </p>
+          </div>
         </div>
       </section>
 

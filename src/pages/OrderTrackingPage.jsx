@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import SectionTitle from '../components/SectionTitle';
 import StatusTracker from '../components/StatusTracker';
+import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -16,9 +16,45 @@ const trackerSteps = [
 
 const getEstimatedDelivery = (status) => {
   if (status === 'Delivered') return 'Delivered';
+  if (status === 'Cancelled') return 'Cancelled';
   if (status === 'Shipped') return '2-3 days';
   if (status === 'Confirmed') return '3-5 days';
   return 'Awaiting confirmation';
+};
+
+const getOrderStatusStyles = (status) => {
+  switch (status) {
+    case 'Delivered':
+      return {
+        badge: 'bg-green-100 text-green-800',
+        dot: 'bg-green-500',
+        card: 'border-l-[6px] border-green-500',
+      };
+    case 'Cancelled':
+      return {
+        badge: 'bg-red-100 text-red-800',
+        dot: 'bg-red-500',
+        card: 'border-l-[6px] border-red-500',
+      };
+    case 'Shipped':
+      return {
+        badge: 'bg-sky-100 text-sky-800',
+        dot: 'bg-sky-500',
+        card: 'border-l-[6px] border-sky-500',
+      };
+    case 'Confirmed':
+      return {
+        badge: 'bg-amber-100 text-amber-800',
+        dot: 'bg-amber-500',
+        card: 'border-l-[6px] border-amber-500',
+      };
+    default:
+      return {
+        badge: 'bg-stone-200 text-stone-700',
+        dot: 'bg-stone-500',
+        card: 'border-l-[6px] border-stone-400',
+      };
+  }
 };
 
 const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
@@ -31,6 +67,14 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const [myOrders, setMyOrders] = useState([]);
   const [myOrdersError, setMyOrdersError] = useState('');
   const [isLoadingMyOrders, setIsLoadingMyOrders] = useState(false);
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [deliveryConfirmationError, setDeliveryConfirmationError] = useState('');
+  const [deliveryIssueMessage, setDeliveryIssueMessage] = useState('');
+  const [showDeliveryIssueForm, setShowDeliveryIssueForm] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [issueReported, setIssueReported] = useState(false);
+  const [deliveryComments, setDeliveryComments] = useState('');
+  const trackedOrderSectionRef = useRef(null);
 
   useEffect(() => {
     setInputValue(initialOrder);
@@ -80,6 +124,11 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       setTrackedOrder(null);
       setTrackError('');
       setIsTracking(false);
+      setDeliveryIssueMessage('');
+      setDeliveryComments('');
+      setDeliveryConfirmationError('');
+      setShowDeliveryIssueForm(false);
+      setIssueReported(false);
       return;
     }
 
@@ -103,6 +152,10 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
         if (!isCancelled) {
           setTrackedOrder(response?.data ?? null);
+          setDeliveryIssueMessage('');
+          setDeliveryConfirmationError('');
+          setShowDeliveryIssueForm(false);
+          setIssueReported(false);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -124,6 +177,14 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
   const recentOrders = useMemo(() => loadRecentOrders(authUser), [authUser]);
 
+  useEffect(() => {
+    if (trackedOrder && trackedOrderSectionRef.current) {
+      setTimeout(() => {
+        trackedOrderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [trackedOrder]);
+
   const handleSubmit = (event) => {
     event.preventDefault();
     const trimmedValue = inputValue.trim();
@@ -134,12 +195,64 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
     setSearchParams(orderIdentifier ? { order: orderIdentifier } : {});
   };
 
+  const handleConfirmDelivery = async (confirmed) => {
+    if (!trackedOrder) return;
+
+    if (!confirmed && !deliveryIssueMessage.trim()) {
+      setDeliveryConfirmationError('Please describe the issue before sending it.');
+      return;
+    }
+
+    setIsConfirmingDelivery(true);
+    setDeliveryConfirmationError('');
+
+    try {
+      const activeToken = getActiveAuthToken(authToken);
+      const orderIdentifier = trackedOrder.orderNumber ?? trackedOrder._id;
+
+      const response = await apiRequest(
+        `/api/orders/${encodeURIComponent(orderIdentifier)}/confirm-delivery`,
+        {
+          method: 'PATCH',
+          body: {
+            confirmed,
+            message: confirmed ? deliveryComments.trim() : deliveryIssueMessage.trim(),
+          },
+          token: activeToken,
+        },
+      );
+
+      if (response?.success) {
+        setTrackedOrder(response?.data ?? null);
+        setDeliveryIssueMessage('');
+        setDeliveryComments('');
+        setDeliveryConfirmationError('');
+        setShowDeliveryIssueForm(false);
+        if (!confirmed) {
+          setIssueReported(true);
+          setShowSuccessMessage(true);
+        }
+      } else {
+        setDeliveryConfirmationError(response?.message || 'Failed to confirm delivery');
+      }
+    } catch (error) {
+      setDeliveryConfirmationError(error.message || 'Failed to confirm delivery');
+    } finally {
+      setIsConfirmingDelivery(false);
+    }
+  };
+
   return (
     <div className="section-shell space-y-8 pb-6 pt-8">
       <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft">
         <h1 className="font-display text-6xl text-ink">Track Your Order</h1>
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 lg:flex-row">
-          <input className="field flex-1" placeholder="Enter your order number" value={inputValue} onChange={(event) => setInputValue(event.target.value)} />
+          <input
+            className="field flex-1"
+            placeholder="Enter your order number"
+            value={inputValue}
+            onChange={(event) => setInputValue(event.target.value)}
+          />
           <button type="submit" className="button-primary min-w-[11rem]">
             Track order
           </button>
@@ -179,14 +292,21 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
             <div className="mt-6 grid gap-4">
               {myOrders.map((order) => {
                 const orderIdentifier = order.orderNumber ?? order._id;
+                const statusStyles = getOrderStatusStyles(order.status);
 
                 return (
-                  <article key={orderIdentifier} className="rounded-[24px] bg-cream px-5 py-5">
+                  <article key={orderIdentifier} className={`rounded-[24px] bg-cream px-5 py-5 ${statusStyles.card}`}>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="space-y-2">
                         <p className="text-sm uppercase tracking-[0.18em] text-muted">Order #{orderIdentifier}</p>
                         <p className="text-base text-ink-soft">Placed {formatDate(order.createdAt)}</p>
-                        <p className="text-base text-ink-soft">Status: {order.status}</p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`h-3 w-3 rounded-full ${statusStyles.dot}`} aria-hidden="true" />
+                          <p className="text-base text-ink-soft">Status:</p>
+                          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusStyles.badge}`}>
+                            {order.status}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-3 text-left lg:items-end">
                         <p className="font-display text-3xl text-ink">{formatCurrency(order.total)}</p>
@@ -205,7 +325,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
         ) : null}
       </section>
 
-      <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft">
+      <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft" ref={trackedOrderSectionRef}>
         {isTracking ? (
           <div className="text-center">
             <h2 className="font-display text-5xl text-ink">Loading your order...</h2>
@@ -240,12 +360,140 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Status</p>
                   <p className="mt-2 text-lg text-ink">{trackedOrder.status}</p>
+                  {trackedOrder.status === 'Delivered' ? (
+                    <p className="mt-2 text-sm font-semibold text-green-700">Order tracking completed.</p>
+                  ) : trackedOrder.status === 'Cancelled' ? (
+                    <p className="mt-2 text-sm font-semibold text-red-700">This order has been cancelled.</p>
+                  ) : null}
                 </div>
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Estimated Delivery</p>
                   <p className="mt-2 text-lg text-ink">{getEstimatedDelivery(trackedOrder.status)}</p>
                 </div>
               </div>
+
+              {trackedOrder.status === 'Shipped' && !trackedOrder.deliveryConfirmedByCustomer && !issueReported ? (
+                <div className="rounded-[24px] border-2 border-blue-300 bg-blue-50 px-5 py-5">
+                  <p className="mb-4 text-base font-semibold text-blue-900">
+                    Your order has been shipped. Please confirm once it is delivered.
+                  </p>
+                  {deliveryConfirmationError ? (
+                    <div className="mb-4 rounded-lg bg-red-100 px-3 py-2 text-sm text-red-800">
+                      {deliveryConfirmationError}
+                    </div>
+                  ) : null}
+                  
+                  {/* Optional Comments Box */}
+                  <div className="mb-4 rounded-lg bg-white border border-blue-200 px-4 py-3">
+                    <label className="text-sm font-semibold text-blue-900 block mb-2">
+                      💬 Add Comments (Optional)
+                    </label>
+                    <textarea
+                      placeholder="Share your feedback about the package, delivery experience, or product condition..."
+                      value={deliveryComments}
+                      onChange={(event) => setDeliveryComments(event.target.value)}
+                      className="field w-full resize-none text-sm"
+                      rows={3}
+                    />
+                    <p className="mt-2 text-xs text-blue-700">
+                      Your feedback helps us improve our service.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmDelivery(true)}
+                      disabled={isConfirmingDelivery}
+                      className="w-full button-primary bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {isConfirmingDelivery ? 'Processing...' : 'Confirm Delivery'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDeliveryIssueForm((currentValue) => !currentValue);
+                        setDeliveryConfirmationError('');
+                      }}
+                      disabled={isConfirmingDelivery}
+                      className="w-full button-secondary border-2 border-orange-400 text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      I have an issue
+                    </button>
+
+                    {showDeliveryIssueForm ? (
+                      <div className="space-y-2 rounded-lg bg-orange-50 px-3 py-3">
+                        <label className="text-sm font-semibold text-orange-900 block">
+                          📝 Describe the Issue
+                        </label>
+                        <textarea
+                          placeholder="Please describe the issue with your delivery..."
+                          value={deliveryIssueMessage}
+                          onChange={(event) => setDeliveryIssueMessage(event.target.value)}
+                          className="field h-20 w-full resize-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmDelivery(false)}
+                          disabled={isConfirmingDelivery}
+                          className="w-full button-primary bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          {isConfirmingDelivery ? 'Reporting...' : 'Report Issue'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeliveryIssueMessage('');
+                            setShowDeliveryIssueForm(false);
+                            setDeliveryConfirmationError('');
+                          }}
+                          disabled={isConfirmingDelivery}
+                          className="w-full button-secondary border-2 border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : trackedOrder.deliveryConfirmationMessage ? (
+                <div
+                  className={`rounded-[24px] border-2 px-5 py-5 ${
+                    trackedOrder.status === 'Delivered'
+                      ? 'border-green-400 bg-green-50'
+                      : trackedOrder.status === 'Cancelled'
+                        ? 'border-red-300 bg-red-50'
+                        : 'border-orange-300 bg-orange-50'
+                  }`}
+                >
+                  <p
+                    className={`text-base font-semibold ${
+                      trackedOrder.status === 'Delivered'
+                        ? 'text-green-900'
+                        : trackedOrder.status === 'Cancelled'
+                          ? 'text-red-900'
+                          : 'text-orange-900'
+                    }`}
+                  >
+                    {trackedOrder.status === 'Delivered'
+                      ? 'Delivery Confirmed'
+                      : trackedOrder.status === 'Cancelled'
+                        ? 'Order Cancelled'
+                        : 'Delivery Issue Reported'}
+                  </p>
+                  <p
+                    className={`mt-2 text-sm ${
+                      trackedOrder.status === 'Delivered'
+                        ? 'text-green-800'
+                        : trackedOrder.status === 'Cancelled'
+                          ? 'text-red-800'
+                          : 'text-orange-800'
+                    }`}
+                  >
+                    {trackedOrder.deliveryConfirmationMessage}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4 border-t border-line pt-8">
@@ -293,6 +541,15 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
           </div>
         )}
       </section>
+
+      <Toast
+        open={showSuccessMessage}
+        variant="success"
+        title="Report Delivered"
+        message="Your delivery issue report has been sent successfully. Our team will review it shortly."
+        onClose={() => setShowSuccessMessage(false)}
+        autoHideDuration={5000}
+      />
     </div>
   );
 };

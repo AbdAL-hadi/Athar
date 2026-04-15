@@ -81,7 +81,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered'],
+      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Pending',
     },
     paymentMethod: {
@@ -96,6 +96,19 @@ const orderSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: true,
+      trim: true,
+    },
+    deliveryConfirmedByCustomer: {
+      type: Boolean,
+      default: false,
+    },
+    deliveryConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+    deliveryConfirmationMessage: {
+      type: String,
+      default: null,
       trim: true,
     },
   },

@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
 import AuthPage from './pages/AuthPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
+import DeliveryDashboard from './pages/DeliveryDashboard';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import FavoritesPage from './pages/FavoritesPage';
 import HomePage from './pages/HomePage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
 import ProductDetailsPage from './pages/ProductDetailsPage';
 import ProductsPage from './pages/ProductsPage';
+import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
@@ -21,6 +24,7 @@ import { mergeCatalogProducts, normalizeProducts } from './utils/productCatalog'
 const fallbackProducts = normalizeProducts(mockProducts);
 
 const App = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState(fallbackProducts);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState('');
@@ -29,6 +33,23 @@ const App = () => {
   const [authToken, setAuthToken] = useState(() => loadAuthToken());
   const [authUser, setAuthUser] = useState(() => loadAuthUser());
   const [authLoading, setAuthLoading] = useState(() => Boolean(loadAuthToken()));
+
+  // Function to refresh products from API
+  const refreshProducts = async () => {
+    setProductsLoading(true);
+    setProductsError('');
+
+    try {
+      const response = await apiRequest('/api/products');
+      const remoteProducts = mergeCatalogProducts(response?.data ?? [], fallbackProducts);
+      setProducts(remoteProducts);
+    } catch (error) {
+      setProducts(fallbackProducts);
+      setProductsError(error.message || 'Unable to load products from the Athar API right now.');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isCancelled = false;
@@ -139,6 +160,15 @@ const App = () => {
     setAuthToken(token);
     setAuthUser(user);
     setAuthLoading(false);
+
+    // Redirect based on user role
+    if (user?.role === 'employee') {
+      navigate('/employee-dashboard');
+    } else if (user?.role === 'delivery') {
+      navigate('/delivery-dashboard');
+    } else {
+      navigate('/');
+    }
   };
 
   const handleLogout = () => {
@@ -148,13 +178,18 @@ const App = () => {
     setAuthLoading(false);
   };
 
+  const handleUpdateProfile = (updatedUser) => {
+    setAuthUser(updatedUser);
+    saveAuthSession({ token: authToken, user: updatedUser });
+  };
+
   const cartCount = getCartItemCount(cartItems);
 
   return (
     <Routes>
-      <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} />}>
+      <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />}>
         <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} />} />
-        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} />} />
+        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} />} />
         <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} />} />
         <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} />} />
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} />} />
@@ -162,9 +197,12 @@ const App = () => {
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
+        <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
       </Route>
+      <Route path="/employee-dashboard" element={<EmployeeDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
+      <Route path="/delivery-dashboard" element={<DeliveryDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
     </Routes>
   );
 };
