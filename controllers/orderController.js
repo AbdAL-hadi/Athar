@@ -326,20 +326,36 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true },
-    )
-      .populate('user', 'name email role')
-      .populate('items.product');
+    const existingOrder = await Order.findById(req.params.id);
 
-    if (!order) {
+    if (!existingOrder) {
       return res.status(404).json({
         success: false,
         message: 'Order not found',
       });
     }
+
+    const updatePayload = { status };
+
+    if (status === 'Cancelled') {
+      updatePayload.deliveryConfirmedByCustomer = false;
+      updatePayload.deliveryConfirmedAt = new Date();
+      updatePayload.deliveryConfirmationMessage = existingOrder.deliveryConfirmationMessage
+        ? `${existingOrder.deliveryConfirmationMessage} Delivery team cancelled this order.`
+        : 'Delivery team cancelled this order.';
+    }
+
+    if (status === 'Delivered' && !existingOrder.deliveryConfirmationMessage) {
+      updatePayload.deliveryConfirmationMessage = 'Delivery team marked this order as delivered.';
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      updatePayload,
+      { new: true, runValidators: true },
+    )
+      .populate('user', 'name email role')
+      .populate('items.product');
 
     await ensureOrderNumber(order);
 
@@ -419,6 +435,115 @@ export const confirmDeliveryByCustomer = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to confirm delivery.',
+    });
+  }
+};
+
+export const refuseDelivery = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body ?? {};
+
+    if (req.user?.role !== 'delivery') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only delivery personnel can refuse deliveries',
+      });
+    }
+
+    const query = mongoose.isValidObjectId(id) ? { _id: id } : { orderNumber: id };
+    const order = await Order.findOne(query);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'Shipped') {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only refuse delivery for orders in Shipped status',
+      });
+    }
+
+    const refusalMessage = `✗ Delivery refused by delivery personnel${reason ? ': ' + reason : ''}`;
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      order._id,
+      {
+        status: 'Cancelled',
+        deliveryConfirmationMessage: refusalMessage,
+        deliveryConfirmedAt: new Date(),
+      },
+      { new: true, runValidators: true },
+    )
+      .populate('user', 'name email role')
+      .populate('items.product');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Delivery refused and order cancelled.',
+      data: updatedOrder,
+    });
+  } catch (error) {
+    console.error('Error refusing delivery:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to refuse delivery.',
+    });
+  }
+};
+
+export const acceptIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.user?.role !== 'delivery') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only delivery personnel can accept issues',
+      });
+    }
+
+    const query = mongoose.isValidObjectId(id) ? { _id: id } : { orderNumber: id };
+    const order = await Order.findOne(query);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'Shipped' || !order.deliveryConfirmationMessage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only accept issues for orders with pending customer reports',
+      });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      order._id,
+      {
+        deliveryConfirmationMessage: order.deliveryConfirmationMessage + '\n✓ Issue received and acknowledged by delivery personnel.',
+      },
+      { new: true, runValidators: true },
+    )
+      .populate('user', 'name email role')
+      .populate('items.product');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Issue accepted and customer will be notified.',
+      data: updatedOrder,
+    });
+  } catch (error) {
+    console.error('Error accepting issue:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to accept issue.',
     });
   }
 };

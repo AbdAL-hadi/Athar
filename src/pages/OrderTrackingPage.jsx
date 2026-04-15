@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import StatusTracker from '../components/StatusTracker';
+import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -15,9 +16,45 @@ const trackerSteps = [
 
 const getEstimatedDelivery = (status) => {
   if (status === 'Delivered') return 'Delivered';
+  if (status === 'Cancelled') return 'Cancelled';
   if (status === 'Shipped') return '2-3 days';
   if (status === 'Confirmed') return '3-5 days';
   return 'Awaiting confirmation';
+};
+
+const getOrderStatusStyles = (status) => {
+  switch (status) {
+    case 'Delivered':
+      return {
+        badge: 'bg-green-100 text-green-800',
+        dot: 'bg-green-500',
+        card: 'border-l-[6px] border-green-500',
+      };
+    case 'Cancelled':
+      return {
+        badge: 'bg-red-100 text-red-800',
+        dot: 'bg-red-500',
+        card: 'border-l-[6px] border-red-500',
+      };
+    case 'Shipped':
+      return {
+        badge: 'bg-sky-100 text-sky-800',
+        dot: 'bg-sky-500',
+        card: 'border-l-[6px] border-sky-500',
+      };
+    case 'Confirmed':
+      return {
+        badge: 'bg-amber-100 text-amber-800',
+        dot: 'bg-amber-500',
+        card: 'border-l-[6px] border-amber-500',
+      };
+    default:
+      return {
+        badge: 'bg-stone-200 text-stone-700',
+        dot: 'bg-stone-500',
+        card: 'border-l-[6px] border-stone-400',
+      };
+  }
 };
 
 const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
@@ -34,6 +71,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const [deliveryConfirmationError, setDeliveryConfirmationError] = useState('');
   const [deliveryIssueMessage, setDeliveryIssueMessage] = useState('');
   const [showDeliveryIssueForm, setShowDeliveryIssueForm] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [issueReported, setIssueReported] = useState(false);
+  const trackedOrderSectionRef = useRef(null);
 
   useEffect(() => {
     setInputValue(initialOrder);
@@ -86,6 +126,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       setDeliveryIssueMessage('');
       setDeliveryConfirmationError('');
       setShowDeliveryIssueForm(false);
+      setIssueReported(false);
       return;
     }
 
@@ -112,6 +153,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
           setDeliveryIssueMessage('');
           setDeliveryConfirmationError('');
           setShowDeliveryIssueForm(false);
+          setIssueReported(false);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -132,6 +174,14 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   }, [authToken, initialOrder]);
 
   const recentOrders = useMemo(() => loadRecentOrders(authUser), [authUser]);
+
+  useEffect(() => {
+    if (trackedOrder && trackedOrderSectionRef.current) {
+      setTimeout(() => {
+        trackedOrderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [trackedOrder]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -175,6 +225,10 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
         setDeliveryIssueMessage('');
         setDeliveryConfirmationError('');
         setShowDeliveryIssueForm(false);
+        if (!confirmed) {
+          setIssueReported(true);
+          setShowSuccessMessage(true);
+        }
       } else {
         setDeliveryConfirmationError(response?.message || 'Failed to confirm delivery');
       }
@@ -235,14 +289,21 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
             <div className="mt-6 grid gap-4">
               {myOrders.map((order) => {
                 const orderIdentifier = order.orderNumber ?? order._id;
+                const statusStyles = getOrderStatusStyles(order.status);
 
                 return (
-                  <article key={orderIdentifier} className="rounded-[24px] bg-cream px-5 py-5">
+                  <article key={orderIdentifier} className={`rounded-[24px] bg-cream px-5 py-5 ${statusStyles.card}`}>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="space-y-2">
                         <p className="text-sm uppercase tracking-[0.18em] text-muted">Order #{orderIdentifier}</p>
                         <p className="text-base text-ink-soft">Placed {formatDate(order.createdAt)}</p>
-                        <p className="text-base text-ink-soft">Status: {order.status}</p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`h-3 w-3 rounded-full ${statusStyles.dot}`} aria-hidden="true" />
+                          <p className="text-base text-ink-soft">Status:</p>
+                          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusStyles.badge}`}>
+                            {order.status}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-3 text-left lg:items-end">
                         <p className="font-display text-3xl text-ink">{formatCurrency(order.total)}</p>
@@ -261,7 +322,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
         ) : null}
       </section>
 
-      <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft">
+      <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft" ref={trackedOrderSectionRef}>
         {isTracking ? (
           <div className="text-center">
             <h2 className="font-display text-5xl text-ink">Loading your order...</h2>
@@ -298,6 +359,8 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                   <p className="mt-2 text-lg text-ink">{trackedOrder.status}</p>
                   {trackedOrder.status === 'Delivered' ? (
                     <p className="mt-2 text-sm font-semibold text-green-700">Order tracking completed.</p>
+                  ) : trackedOrder.status === 'Cancelled' ? (
+                    <p className="mt-2 text-sm font-semibold text-red-700">This order has been cancelled.</p>
                   ) : null}
                 </div>
                 <div className="rounded-[24px] bg-cream px-5 py-4">
@@ -306,7 +369,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 </div>
               </div>
 
-              {trackedOrder.status === 'Shipped' && !trackedOrder.deliveryConfirmedByCustomer ? (
+              {trackedOrder.status === 'Shipped' && !trackedOrder.deliveryConfirmedByCustomer && !issueReported ? (
                 <div className="rounded-[24px] border-2 border-blue-300 bg-blue-50 px-5 py-5">
                   <p className="mb-4 text-base font-semibold text-blue-900">
                     Your order has been shipped. Please confirm once it is delivered.
@@ -374,19 +437,33 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                   className={`rounded-[24px] border-2 px-5 py-5 ${
                     trackedOrder.status === 'Delivered'
                       ? 'border-green-400 bg-green-50'
-                      : 'border-orange-300 bg-orange-50'
+                      : trackedOrder.status === 'Cancelled'
+                        ? 'border-red-300 bg-red-50'
+                        : 'border-orange-300 bg-orange-50'
                   }`}
                 >
                   <p
                     className={`text-base font-semibold ${
-                      trackedOrder.status === 'Delivered' ? 'text-green-900' : 'text-orange-900'
+                      trackedOrder.status === 'Delivered'
+                        ? 'text-green-900'
+                        : trackedOrder.status === 'Cancelled'
+                          ? 'text-red-900'
+                          : 'text-orange-900'
                     }`}
                   >
-                    {trackedOrder.status === 'Delivered' ? 'Delivery Confirmed' : 'Delivery Issue Reported'}
+                    {trackedOrder.status === 'Delivered'
+                      ? 'Delivery Confirmed'
+                      : trackedOrder.status === 'Cancelled'
+                        ? 'Order Cancelled'
+                        : 'Delivery Issue Reported'}
                   </p>
                   <p
                     className={`mt-2 text-sm ${
-                      trackedOrder.status === 'Delivered' ? 'text-green-800' : 'text-orange-800'
+                      trackedOrder.status === 'Delivered'
+                        ? 'text-green-800'
+                        : trackedOrder.status === 'Cancelled'
+                          ? 'text-red-800'
+                          : 'text-orange-800'
                     }`}
                   >
                     {trackedOrder.deliveryConfirmationMessage}
@@ -440,6 +517,15 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
           </div>
         )}
       </section>
+
+      <Toast
+        open={showSuccessMessage}
+        variant="success"
+        title="Report Delivered"
+        message="Your delivery issue report has been sent successfully. Our team will review it shortly."
+        onClose={() => setShowSuccessMessage(false)}
+        autoHideDuration={5000}
+      />
     </div>
   );
 };

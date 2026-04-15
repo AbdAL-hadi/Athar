@@ -6,6 +6,8 @@ import {
   getOrderById,
   updateOrderStatus,
   confirmDeliveryByCustomer,
+  refuseDelivery,
+  acceptIssue,
 } from '../controllers/orderController.js';
 import { attachUserIfPresent, protect, requireAdminOrEmployeeOrDelivery } from '../middleware/authMiddleware.js';
 
@@ -17,5 +19,7 @@ router.get('/confirmed/awaiting-shipment', protect, getConfirmedOrdersForDeliver
 router.get('/:id', attachUserIfPresent, getOrderById);
 router.patch('/:id/status', protect, requireAdminOrEmployeeOrDelivery, updateOrderStatus);
 router.patch('/:id/confirm-delivery', protect, confirmDeliveryByCustomer);
+router.patch('/:id/refuse-delivery', protect, refuseDelivery);
+router.patch('/:id/accept-issue', protect, acceptIssue);
 
 export default router;

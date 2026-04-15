@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { formatDate } from '../utils/format';
 import SectionTitle from '../components/SectionTitle';
+import Toast from '../components/Toast';
 
 const LogoutIcon = () => (
   <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
@@ -13,11 +14,14 @@ const LogoutIcon = () => (
 const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
-  const [shippedOrders, setShippedOrders] = useState([]);
+  const [issueOrders, setIssueOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedOrder, setExpandedOrder] = useState(null);
-  const [expandedShippedOrder, setExpandedShippedOrder] = useState(null);
+  const [expandedIssueOrder, setExpandedIssueOrder] = useState(null);
+  const [processingOrderId, setProcessingOrderId] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastOpen, setToastOpen] = useState(false);
 
   useEffect(() => {
     if (!authToken) {
@@ -37,7 +41,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
         }
 
         setOrders(response?.data ?? []);
-        setShippedOrders(response?.issueReports ?? []);
+        setIssueOrders(response?.issueReports ?? []);
       } catch (err) {
         setError(err.message || 'Failed to fetch delivery orders');
       } finally {
@@ -48,25 +52,42 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
     loadOrders();
   }, [authToken, navigate]);
 
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastOpen(true);
+  };
+
+  const handleUpdateOrderStatus = async (orderId, status, listKey) => {
     try {
+      setProcessingOrderId(orderId);
+      setError('');
+
       const response = await apiRequest(
         `/api/orders/${orderId}/status`,
         {
           method: 'PATCH',
-          body: { status: newStatus },
+          body: { status },
           token: authToken,
         },
       );
 
-      if (response.success) {
-        setOrders((prev) => prev.filter((order) => order._id !== orderId));
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to update order status');
+      }
+
+      if (listKey === 'confirmed') {
+        setOrders((current) => current.filter((order) => order._id !== orderId));
         setExpandedOrder(null);
+        showToast(status === 'Shipped' ? 'Order marked as shipped.' : 'Order updated.');
       } else {
-        setError(response.message || 'Failed to update order status');
+        setIssueOrders((current) => current.filter((order) => order._id !== orderId));
+        setExpandedIssueOrder(null);
+        showToast(status === 'Delivered' ? 'Order marked as delivered.' : 'Order refused successfully.');
       }
     } catch (err) {
       setError(err.message || 'Failed to update order status');
+    } finally {
+      setProcessingOrderId(null);
     }
   };
 
@@ -74,7 +95,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Redirecting...</div>;
   }
 
-  const hasNoOrders = !isLoading && !error && orders.length === 0 && shippedOrders.length === 0;
+  const hasNoOrders = !isLoading && !error && orders.length === 0 && issueOrders.length === 0;
 
   return (
     <div className="min-h-screen bg-cream">
@@ -82,7 +103,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
         <div className="section-shell flex items-center justify-between py-5">
           <div>
             <h1 className="font-display text-5xl text-ink">Delivery Dashboard</h1>
-            <p className="mt-1 text-sm text-muted">Manage deliveries, shipments, and customer issue reports</p>
+            <p className="mt-1 text-sm text-muted">Manage deliveries, shipments, and temporary customer reports</p>
           </div>
           <button
             onClick={onLogout}
@@ -95,6 +116,26 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
       </header>
 
       <div className="section-shell space-y-8 py-8">
+        {issueOrders.length > 0 ? (
+          <div className="rounded-[24px] border-2 border-orange-400 bg-orange-50 px-6 py-4">
+            <div className="flex items-start gap-4">
+              <div className="mt-1 flex-shrink-0">
+                <svg className="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-900">
+                  Temporary Message: There {issueOrders.length === 1 ? 'is' : 'are'} {issueOrders.length} report{issueOrders.length === 1 ? '' : 's'}
+                </h3>
+                <p className="mt-1 text-sm text-orange-800">
+                  A customer sent a report after shipment. Review the message below, then deliver the order or refuse it.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <SectionTitle
           title="Orders Awaiting Shipment"
           description="Confirmed orders ready for delivery. Mark them as shipped when they leave for the customer."
@@ -122,7 +163,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
         {hasNoOrders ? (
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
             <h3 className="font-display text-4xl text-ink">No delivery tasks right now.</h3>
-            <p className="mt-2 text-muted">There are no confirmed shipments or temporary customer issue messages.</p>
+            <p className="mt-2 text-muted">There are no confirmed shipments or temporary messages waiting.</p>
           </div>
         ) : null}
 
@@ -132,9 +173,9 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
               <div key={order._id} className="overflow-hidden rounded-[24px] bg-white shadow-card">
                 <button
                   onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
-                  className="flex w-full items-center justify-between p-6 transition hover:bg-cream"
+                  className="flex w-full items-center justify-between p-6 text-left transition hover:bg-cream"
                 >
-                  <div className="text-left">
+                  <div>
                     <p className="font-semibold text-ink">Order #{order.orderNumber ?? order._id?.slice(-6).toUpperCase()}</p>
                     <p className="text-sm text-muted">Customer: {order.address?.fullName || 'N/A'}</p>
                     <p className="text-sm text-muted">Total: {order.total || 0}JD</p>
@@ -189,15 +230,14 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateOrderStatus(order._id, 'Shipped')}
-                        className="flex-1 rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600"
-                      >
-                        Mark as Shipped
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateOrderStatus(order._id, 'Shipped', 'confirmed')}
+                      disabled={processingOrderId === order._id}
+                      className="w-full rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600 disabled:opacity-50"
+                    >
+                      {processingOrderId === order._id ? 'Processing...' : 'Mark as Shipped'}
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -208,23 +248,23 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
         {!isLoading && !error ? (
           <section className="space-y-4">
             <SectionTitle
-              title="Temporary Customer Messages"
-              description="Issue reports sent after shipment. These are highlighted so delivery can react quickly."
+              title="Temporary Messages"
+              description="These are customer reports on shipped orders. Delivery can review the message and finish the order from here."
             />
 
-            {shippedOrders.length > 0 ? (
+            {issueOrders.length > 0 ? (
               <div className="space-y-4">
-                {shippedOrders.map((order) => (
+                {issueOrders.map((order) => (
                   <div key={order._id} className="overflow-hidden rounded-[24px] border-2 border-orange-300 bg-[#fff4e8] shadow-card">
                     <button
-                      onClick={() => setExpandedShippedOrder(expandedShippedOrder === order._id ? null : order._id)}
+                      onClick={() => setExpandedIssueOrder(expandedIssueOrder === order._id ? null : order._id)}
                       className="flex w-full items-center justify-between p-6 text-left transition hover:bg-[#ffe8d2]"
                     >
                       <div className="space-y-1">
                         <p className="font-semibold text-[#8a4b18]">Order #{order.orderNumber ?? order._id?.slice(-6).toUpperCase()}</p>
-                        <p className="text-sm text-[#9f6334]">Customer: {order.address?.fullName || 'N/A'}</p>
+                        <p className="text-sm text-[#9f6334]">There is a report for this order.</p>
                         <p className="text-sm text-[#9f6334]">
-                          Temporary message sent {order.deliveryConfirmedAt ? formatDate(order.deliveryConfirmedAt) : 'recently'}
+                          Sent {order.deliveryConfirmedAt ? formatDate(order.deliveryConfirmedAt) : 'recently'} by {order.address?.fullName || 'the customer'}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
@@ -232,7 +272,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                           Temporary Message
                         </span>
                         <svg
-                          className={`h-5 w-5 text-[#8a4b18] transition ${expandedShippedOrder === order._id ? 'rotate-180' : ''}`}
+                          className={`h-5 w-5 text-[#8a4b18] transition ${expandedIssueOrder === order._id ? 'rotate-180' : ''}`}
                           fill="none"
                           stroke="currentColor"
                           strokeLinecap="round"
@@ -245,10 +285,10 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                       </div>
                     </button>
 
-                    {expandedShippedOrder === order._id ? (
+                    {expandedIssueOrder === order._id ? (
                       <div className="space-y-4 border-t border-orange-200 bg-[#fff8ef] px-6 py-6">
                         <div className="rounded-lg border border-orange-200 bg-white px-4 py-4">
-                          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-orange-700">Customer Report</p>
+                          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-orange-700">Temporary Report</p>
                           <p className="text-sm text-[#7b4a21]">{order.deliveryConfirmationMessage}</p>
                         </div>
 
@@ -271,6 +311,25 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                             ))}
                           </div>
                         </div>
+
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(order._id, 'Delivered', 'issue')}
+                            disabled={processingOrderId === order._id}
+                            className="flex-1 rounded-lg bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600 disabled:opacity-50"
+                          >
+                            {processingOrderId === order._id ? 'Processing...' : 'Deliver Order'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(order._id, 'Cancelled', 'issue')}
+                            disabled={processingOrderId === order._id}
+                            className="flex-1 rounded-lg bg-red-500 px-4 py-3 font-semibold text-white transition hover:bg-red-600 disabled:opacity-50"
+                          >
+                            {processingOrderId === order._id ? 'Processing...' : 'Refuse Order'}
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -278,12 +337,14 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
               </div>
             ) : (
               <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">
-                No temporary customer issue messages right now.
+                No temporary messages right now.
               </div>
             )}
           </section>
         ) : null}
       </div>
+
+      <Toast open={toastOpen} message={toastMessage} variant="success" onClose={() => setToastOpen(false)} />
     </div>
   );
 };
