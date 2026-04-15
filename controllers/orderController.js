@@ -219,12 +219,26 @@ export const getConfirmedOrdersForDelivery = async (req, res) => {
 
     console.log('Total orders in database:', allOrders.length);
 
-    // Filter to confirmed orders
-    const confirmedOrders = allOrders.filter(order => order.status === 'Confirmed');
-    
+    // Orders ready to be handed to delivery
+    const confirmedOrders = allOrders.filter((order) => order.status === 'Confirmed');
+
+    // Temporary issue reports sent by customers after shipment
+    const reportedIssueOrders = allOrders.filter(
+      (order) =>
+        order.status === 'Shipped' &&
+        !order.deliveryConfirmedByCustomer &&
+        Boolean(order.deliveryConfirmedAt) &&
+        Boolean(order.deliveryConfirmationMessage),
+    );
+
     console.log('Confirmed orders:', confirmedOrders.length);
+    console.log('Customer issue reports:', reportedIssueOrders.length);
 
     for (const order of confirmedOrders) {
+      await ensureOrderNumber(order);
+    }
+
+    for (const order of reportedIssueOrders) {
       await ensureOrderNumber(order);
     }
 
@@ -233,6 +247,7 @@ export const getConfirmedOrdersForDelivery = async (req, res) => {
       count: confirmedOrders.length,
       totalOrdersInSystem: allOrders.length,
       data: confirmedOrders,
+      issueReports: reportedIssueOrders,
     });
   } catch (error) {
     console.error('getConfirmedOrdersForDelivery error:', error);

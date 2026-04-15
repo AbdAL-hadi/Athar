@@ -37,14 +37,11 @@ const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '
         {steps.map((step, index) => {
           const label = typeof step === 'string' ? step : step.label;
           const isActive = index <= currentIndex;
-          const isOrdered = label === 'Ordered';
-          const isBeingProcessed = label === 'Being Processed';
-          const isShipped = label === 'Shipped';
 
           return (
             <div key={label} className="flex flex-col items-center gap-3 text-center">
-              <div className={`h-6 w-6 rounded-full ${isActive ? (isOrdered || isBeingProcessed || isShipped ? 'bg-green-500' : 'bg-blush') : 'bg-line'}`} />
-              <p className="text-sm text-ink">{label}</p>
+              <div className={`h-6 w-6 rounded-full ${isActive ? 'bg-green-500' : 'bg-line'}`} />
+              <p className={`text-sm ${isActive ? 'font-semibold text-green-700' : 'text-ink'}`}>{label}</p>
             </div>
           );
         })}

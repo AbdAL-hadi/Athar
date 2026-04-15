@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import SectionTitle from '../components/SectionTitle';
 import StatusTracker from '../components/StatusTracker';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
@@ -34,6 +33,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
   const [deliveryConfirmationError, setDeliveryConfirmationError] = useState('');
   const [deliveryIssueMessage, setDeliveryIssueMessage] = useState('');
+  const [showDeliveryIssueForm, setShowDeliveryIssueForm] = useState(false);
 
   useEffect(() => {
     setInputValue(initialOrder);
@@ -83,6 +83,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       setTrackedOrder(null);
       setTrackError('');
       setIsTracking(false);
+      setDeliveryIssueMessage('');
+      setDeliveryConfirmationError('');
+      setShowDeliveryIssueForm(false);
       return;
     }
 
@@ -106,6 +109,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
         if (!isCancelled) {
           setTrackedOrder(response?.data ?? null);
+          setDeliveryIssueMessage('');
+          setDeliveryConfirmationError('');
+          setShowDeliveryIssueForm(false);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -140,20 +146,25 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const handleConfirmDelivery = async (confirmed) => {
     if (!trackedOrder) return;
 
+    if (!confirmed && !deliveryIssueMessage.trim()) {
+      setDeliveryConfirmationError('Please describe the issue before sending it.');
+      return;
+    }
+
     setIsConfirmingDelivery(true);
     setDeliveryConfirmationError('');
 
     try {
       const activeToken = getActiveAuthToken(authToken);
       const orderIdentifier = trackedOrder.orderNumber ?? trackedOrder._id;
-      
+
       const response = await apiRequest(
         `/api/orders/${encodeURIComponent(orderIdentifier)}/confirm-delivery`,
         {
           method: 'PATCH',
           body: {
             confirmed,
-            message: deliveryIssueMessage,
+            message: deliveryIssueMessage.trim(),
           },
           token: activeToken,
         },
@@ -162,6 +173,8 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       if (response?.success) {
         setTrackedOrder(response?.data ?? null);
         setDeliveryIssueMessage('');
+        setDeliveryConfirmationError('');
+        setShowDeliveryIssueForm(false);
       } else {
         setDeliveryConfirmationError(response?.message || 'Failed to confirm delivery');
       }
@@ -177,7 +190,12 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       <section className="rounded-[36px] bg-white px-8 py-8 shadow-soft">
         <h1 className="font-display text-6xl text-ink">Track Your Order</h1>
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 lg:flex-row">
-          <input className="field flex-1" placeholder="Enter your order number" value={inputValue} onChange={(event) => setInputValue(event.target.value)} />
+          <input
+            className="field flex-1"
+            placeholder="Enter your order number"
+            value={inputValue}
+            onChange={(event) => setInputValue(event.target.value)}
+          />
           <button type="submit" className="button-primary min-w-[11rem]">
             Track order
           </button>
@@ -278,6 +296,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Status</p>
                   <p className="mt-2 text-lg text-ink">{trackedOrder.status}</p>
+                  {trackedOrder.status === 'Delivered' ? (
+                    <p className="mt-2 text-sm font-semibold text-green-700">Order tracking completed.</p>
+                  ) : null}
                 </div>
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Estimated Delivery</p>
@@ -286,65 +307,90 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
               </div>
 
               {trackedOrder.status === 'Shipped' && !trackedOrder.deliveryConfirmedByCustomer ? (
-                <div className="rounded-[24px] bg-blue-50 border-2 border-blue-300 px-5 py-5">
-                  <p className="text-base font-semibold text-blue-900 mb-4">
-                    📦 Your order has been shipped! Did you receive it?
+                <div className="rounded-[24px] border-2 border-blue-300 bg-blue-50 px-5 py-5">
+                  <p className="mb-4 text-base font-semibold text-blue-900">
+                    Your order has been shipped. Please confirm once it is delivered.
                   </p>
-                  {deliveryConfirmationError && (
+                  {deliveryConfirmationError ? (
                     <div className="mb-4 rounded-lg bg-red-100 px-3 py-2 text-sm text-red-800">
                       {deliveryConfirmationError}
                     </div>
-                  )}
+                  ) : null}
                   <div className="space-y-3">
                     <button
+                      type="button"
                       onClick={() => handleConfirmDelivery(true)}
                       disabled={isConfirmingDelivery}
                       className="w-full button-primary bg-green-600 hover:bg-green-700 disabled:opacity-50"
                     >
-                      {isConfirmingDelivery ? 'Processing...' : '✓ Yes, I received it'}
+                      {isConfirmingDelivery ? 'Processing...' : 'Confirm Delivery'}
                     </button>
                     <button
-                      onClick={() => setDeliveryIssueMessage(deliveryIssueMessage ? '' : 'enter')}
+                      type="button"
+                      onClick={() => {
+                        setShowDeliveryIssueForm((currentValue) => !currentValue);
+                        setDeliveryConfirmationError('');
+                      }}
                       disabled={isConfirmingDelivery}
                       className="w-full button-secondary border-2 border-orange-400 text-orange-600 hover:bg-orange-50 disabled:opacity-50"
                     >
-                      ⚠ No, I have an issue
+                      I have an issue
                     </button>
 
-                    {deliveryIssueMessage === 'enter' && (
-                      <div className="rounded-lg bg-orange-50 px-3 py-3 space-y-2">
+                    {showDeliveryIssueForm ? (
+                      <div className="space-y-2 rounded-lg bg-orange-50 px-3 py-3">
                         <textarea
                           placeholder="Please describe the issue with your delivery..."
-                          value={deliveryIssueMessage === 'enter' ? '' : deliveryIssueMessage}
-                          onChange={(e) => setDeliveryIssueMessage(e.target.value)}
-                          className="field w-full h-20 resize-none"
+                          value={deliveryIssueMessage}
+                          onChange={(event) => setDeliveryIssueMessage(event.target.value)}
+                          className="field h-20 w-full resize-none"
                         />
                         <button
+                          type="button"
                           onClick={() => handleConfirmDelivery(false)}
                           disabled={isConfirmingDelivery}
                           className="w-full button-primary bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
                         >
-                          {isConfirmingDelivery ? 'Reporting...' : '📢 Report Issue'}
+                          {isConfirmingDelivery ? 'Reporting...' : 'Report Issue'}
                         </button>
                         <button
-                          onClick={() => setDeliveryIssueMessage('')}
+                          type="button"
+                          onClick={() => {
+                            setDeliveryIssueMessage('');
+                            setShowDeliveryIssueForm(false);
+                            setDeliveryConfirmationError('');
+                          }}
                           disabled={isConfirmingDelivery}
                           className="w-full button-secondary border-2 border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                         >
                           Cancel
                         </button>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-              ) : trackedOrder.deliveryConfirmedByCustomer && trackedOrder.deliveryConfirmationMessage ? (
-                <div className="rounded-[24px] bg-green-50 border-2 border-green-400 px-5 py-5">
-                  <p className="text-base font-semibold text-green-900">
-                    {trackedOrder.deliveryConfirmationMessage.includes('✓')
-                      ? '✅ Delivery Confirmed'
-                      : '⚠️ Delivery Issue Reported'}
+              ) : trackedOrder.deliveryConfirmationMessage ? (
+                <div
+                  className={`rounded-[24px] border-2 px-5 py-5 ${
+                    trackedOrder.status === 'Delivered'
+                      ? 'border-green-400 bg-green-50'
+                      : 'border-orange-300 bg-orange-50'
+                  }`}
+                >
+                  <p
+                    className={`text-base font-semibold ${
+                      trackedOrder.status === 'Delivered' ? 'text-green-900' : 'text-orange-900'
+                    }`}
+                  >
+                    {trackedOrder.status === 'Delivered' ? 'Delivery Confirmed' : 'Delivery Issue Reported'}
                   </p>
-                  <p className="mt-2 text-sm text-green-800">{trackedOrder.deliveryConfirmationMessage}</p>
+                  <p
+                    className={`mt-2 text-sm ${
+                      trackedOrder.status === 'Delivered' ? 'text-green-800' : 'text-orange-800'
+                    }`}
+                  >
+                    {trackedOrder.deliveryConfirmationMessage}
+                  </p>
                 </div>
               ) : null}
             </div>
