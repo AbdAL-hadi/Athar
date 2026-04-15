@@ -13,6 +13,7 @@ import HomePage from './pages/HomePage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
 import ProductDetailsPage from './pages/ProductDetailsPage';
 import ProductsPage from './pages/ProductsPage';
+import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
@@ -177,11 +178,16 @@ const App = () => {
     setAuthLoading(false);
   };
 
+  const handleUpdateProfile = (updatedUser) => {
+    setAuthUser(updatedUser);
+    saveAuthSession({ token: authToken, user: updatedUser });
+  };
+
   const cartCount = getCartItemCount(cartItems);
 
   return (
     <Routes>
-      <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} />}>
+      <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />}>
         <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} />} />
         <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} />} />
         <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} />} />
@@ -191,6 +197,7 @@ const App = () => {
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
+        <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
       </Route>

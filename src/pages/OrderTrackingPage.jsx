@@ -73,6 +73,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
   const [showDeliveryIssueForm, setShowDeliveryIssueForm] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [issueReported, setIssueReported] = useState(false);
+  const [deliveryComments, setDeliveryComments] = useState('');
   const trackedOrderSectionRef = useRef(null);
 
   useEffect(() => {
@@ -124,6 +125,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       setTrackError('');
       setIsTracking(false);
       setDeliveryIssueMessage('');
+      setDeliveryComments('');
       setDeliveryConfirmationError('');
       setShowDeliveryIssueForm(false);
       setIssueReported(false);
@@ -214,7 +216,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
           method: 'PATCH',
           body: {
             confirmed,
-            message: deliveryIssueMessage.trim(),
+            message: confirmed ? deliveryComments.trim() : deliveryIssueMessage.trim(),
           },
           token: activeToken,
         },
@@ -223,6 +225,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
       if (response?.success) {
         setTrackedOrder(response?.data ?? null);
         setDeliveryIssueMessage('');
+        setDeliveryComments('');
         setDeliveryConfirmationError('');
         setShowDeliveryIssueForm(false);
         if (!confirmed) {
@@ -379,6 +382,24 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                       {deliveryConfirmationError}
                     </div>
                   ) : null}
+                  
+                  {/* Optional Comments Box */}
+                  <div className="mb-4 rounded-lg bg-white border border-blue-200 px-4 py-3">
+                    <label className="text-sm font-semibold text-blue-900 block mb-2">
+                      💬 Add Comments (Optional)
+                    </label>
+                    <textarea
+                      placeholder="Share your feedback about the package, delivery experience, or product condition..."
+                      value={deliveryComments}
+                      onChange={(event) => setDeliveryComments(event.target.value)}
+                      className="field w-full resize-none text-sm"
+                      rows={3}
+                    />
+                    <p className="mt-2 text-xs text-blue-700">
+                      Your feedback helps us improve our service.
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
                     <button
                       type="button"
@@ -402,6 +423,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
                     {showDeliveryIssueForm ? (
                       <div className="space-y-2 rounded-lg bg-orange-50 px-3 py-3">
+                        <label className="text-sm font-semibold text-orange-900 block">
+                          📝 Describe the Issue
+                        </label>
                         <textarea
                           placeholder="Please describe the issue with your delivery..."
                           value={deliveryIssueMessage}
