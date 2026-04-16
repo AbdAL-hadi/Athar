@@ -4,4 +4,4 @@ dist/
 build/
 .vscode/
 .DS_Store
-*.log
+*.log.env 

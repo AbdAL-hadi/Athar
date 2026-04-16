@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import Filter from '../components/Filter';
+import ProductPromoAd from '../components/ProductPromoAd';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
@@ -97,6 +98,8 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
 
   return (
     <div className="section-shell space-y-10 pb-6 pt-8">
+      <ProductPromoAd />
+
       <div className="flex justify-between items-start">
         <SectionTitle title="All products" description="The gallery syncs with the live Athar products API while preserving the premium catalog layout." />
         {onRefreshProducts && (

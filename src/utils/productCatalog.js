@@ -1,3 +1,4 @@
+import { productMotifLookup } from '../data/motifs.js';
 import { resolveApiAssetUrl } from './api';
 
 const categoryDescriptions = {
@@ -18,6 +19,7 @@ const hasValue = (value) => {
 };
 
 const pickValue = (...values) => values.find(hasValue);
+const normalizeKey = (value) => String(value ?? '').trim().toLowerCase();
 
 const asNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -36,6 +38,11 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     fallback.productId,
   );
   const name = pickValue(product?.title, product?.name, fallback.title, fallback.name, 'Untitled Product');
+  const motifDefaults =
+    productMotifLookup[slug] ??
+    productMotifLookup[fallback.id] ??
+    productMotifLookup[fallback.slug] ??
+    {};
 
   return {
     ...fallback,
@@ -54,8 +61,9 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     rating: asNumber(pickValue(fallback.rating, product?.rating), 0),
     reviewsCount: asNumber(pickValue(fallback.reviewsCount, product?.reviewsCount), 0),
     badge: pickValue(product?.badge, fallback.badge, ''),
+    motifId: pickValue(product?.motifId, fallback.motifId, motifDefaults.motifId, ''),
+    motifCode: pickValue(product?.motifCode, fallback.motifCode, motifDefaults.motifCode, ''),
     images: asArray(product?.images, asArray(fallback.images, [])).map(resolveApiAssetUrl),
-    videos: asArray(product?.videos, asArray(fallback.videos, [])).map(resolveApiAssetUrl),
     createdAt: pickValue(product?.createdAt, fallback.createdAt, null),
   };
 };
@@ -79,6 +87,10 @@ export const createProductLookup = (products = []) => {
     if (normalized.productId) {
       lookup.set(normalized.productId, normalized);
     }
+
+    if (normalized.title) {
+      lookup.set(normalizeKey(normalized.title), normalized);
+    }
   });
 
   return lookup;
@@ -92,6 +104,7 @@ export const mergeCatalogProducts = (remoteProducts = [], localProducts = []) =>
       localLookup.get(product.slug) ??
       localLookup.get(product._id) ??
       localLookup.get(product.id) ??
+      localLookup.get(normalizeKey(product.title)) ??
       null;
 
     return normalizeProduct(product, fallback);
