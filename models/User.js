@@ -65,6 +65,10 @@ const userSchema = new mongoose.Schema(
       enum: ['customer', 'admin', 'employee'],
       default: 'customer',
     },
+    favorites: {
+      type: [String],
+      default: [],
+    },
     address: {
       type: addressSchema,
       default: () => ({}),

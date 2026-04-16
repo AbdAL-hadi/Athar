@@ -1,4 +1,4 @@
-const assetModules = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp,avif,gif,mp4,mov}', {
+const assetModules = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp,avif,gif}', {
   eager: true,
   import: 'default',
 });
@@ -46,7 +46,13 @@ const parseResponseBody = async (response) => {
   try {
     return JSON.parse(text);
   } catch (error) {
-    return { message: text };
+    const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
+    const titleMatch = text.match(/<title>([\s\S]*?)<\/title>/i);
+    const cleanedMessage = (preMatch?.[1] || titleMatch?.[1] || text)
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return { message: cleanedMessage };
   }
 };
 

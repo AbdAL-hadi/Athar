@@ -1,10 +1,13 @@
+import { productMotifLookup } from './motifs.js';
+
 const productImage = (fileName) => `products/${fileName}`;
-const productVideo = (fileName) => `products/${fileName}`;
+const productImages = (...fileNames) => [...new Set(fileNames.filter(Boolean).map(productImage))];
 const logo = 'design/logo.jpeg';
 
 export const products = [
   {
     id: 'athar-gaza-rose-handbag',
+    ...productMotifLookup['athar-gaza-rose-handbag'],
     name: 'Athar Gaza Rose Handbag',
     category: 'Bags',
     price: 150,
@@ -16,7 +19,11 @@ export const products = [
     rating: 4.9,
     reviewsCount: 24,
     badge: 'Featured',
-    images: [productImage('athar-gaza-rose-handbag.png')],
+    images: productImages(
+      'athar-gaza-rose-handbag.png',
+      'Athar Gaza Rose Handbag.png',
+      'Athar Gaza Rose Handbag.jpg',
+    ),
   },
   {
     id: 'bethlehem-star-bracelet',
@@ -31,7 +38,13 @@ export const products = [
     rating: 4.8,
     reviewsCount: 31,
     badge: 'Best seller',
-    images: [productImage('bethlehem-star-bracelet.png')],
+    images: productImages(
+      'bethlehem-star-bracelet.png',
+      'Bethlehem Star Bracelet.png',
+      'Bethlehem Star Bracelet(1).png',
+      'Bethlehem Star Bracelet(2).png',
+      'Bethlehem Star Bracelet(3).png',
+    ),
   },
   {
     id: 'eight-petal-flower-ring',
@@ -46,10 +59,14 @@ export const products = [
     rating: 4.7,
     reviewsCount: 19,
     badge: 'New',
-    images: [productImage('eight-petal-flower-ring.png')],
+    images: productImages(
+      'eight-petal-flower-ring.png',
+      'eight-petal-flower-ring-alt.png',
+    ),
   },
   {
     id: 'peacock-eye-wallet',
+    ...productMotifLookup['peacock-eye-wallet'],
     name: 'Peacock Eye Wallet',
     category: 'Wallets',
     price: 120,
@@ -61,7 +78,11 @@ export const products = [
     rating: 4.9,
     reviewsCount: 28,
     badge: 'Featured',
-    images: [productImage('peacock-eye-wallet.png')],
+    images: productImages(
+      'peacock-eye-wallet.png',
+      'Peacock Eye Wallet.png',
+      'Peacock Eye Wallet(1).png',
+    ),
   },
   {
     id: 'geometric-diamond-sunglasses',
@@ -76,10 +97,15 @@ export const products = [
     rating: 4.6,
     reviewsCount: 14,
     badge: '',
-    images: [productImage('geometric-diamond-sunglasses.jpg')],
+    images: productImages(
+      'geometric-diamond-sunglasses.jpg',
+      'Geometric Diamond Sunglasses.png',
+      'Geometric Diamond Sunglasses(1).png',
+    ),
   },
   {
     id: 'wave-belt-bracelet',
+    ...productMotifLookup['wave-belt-bracelet'],
     name: 'Wave Belt Bracelet',
     category: 'Bracelets',
     price: 100,
@@ -91,7 +117,11 @@ export const products = [
     rating: 4.7,
     reviewsCount: 18,
     badge: '',
-    images: [productImage('wave-belt-bracelet.png')],
+    images: productImages(
+      'wave-belt-bracelet.png',
+      'Wave Belt Bracelet.png',
+      'Wave Belt Bracelet.jpg',
+    ),
   },
   {
     id: 'palestinian-geometric-engraving',
@@ -106,10 +136,15 @@ export const products = [
     rating: 4.8,
     reviewsCount: 15,
     badge: 'Limited',
-    images: [productImage('palestinian-geometric-engraving.png')],
+    images: productImages(
+      'palestinian-geometric-engraving.png',
+      'Palestinian Geometric Engraving.jpg',
+      'Palestinian Geometric Engraving(1).jpg',
+    ),
   },
   {
     id: 'wheat-ear-set',
+    ...productMotifLookup['wheat-ear-set'],
     name: 'Wheat Ear Set',
     category: 'Accessories',
     price: 90,
@@ -121,11 +156,15 @@ export const products = [
     rating: 4.7,
     reviewsCount: 12,
     badge: '',
-    images: [productImage('wheat-ear-set.png')],
-    videos: [productVideo('wheat-ear-set.mp4')],
+    images: productImages(
+      'wheat-ear-set.png',
+      'Wheat Ear Set.jpg',
+      'Wheat Ear Set(1).jpg',
+    ),
   },
   {
     id: 'coastal-card-holder',
+    ...productMotifLookup['coastal-card-holder'],
     name: 'Coastal Card Holder',
     category: 'Wallets',
     price: 75,
@@ -137,10 +176,15 @@ export const products = [
     rating: 4.5,
     reviewsCount: 10,
     badge: '',
-    images: [productImage('coastal-card-holder.png')],
+    images: productImages(
+      'coastal-card-holder.png',
+      'Coastal Card Holder.jpg',
+      'Coastal Card Holder(1).jpg',
+    ),
   },
   {
     id: 'desert-carryall',
+    ...productMotifLookup['desert-carryall'],
     name: 'Desert Carryall',
     category: 'Bags',
     price: 135,
@@ -152,8 +196,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 11,
     badge: '',
-    images: [productImage('desert-carryall.png')],
-    videos: [productVideo('desert-carryall.mp4')],
+    images: productImages(
+      'desert-carryall.png',
+      'Desert Carryall.png',
+      'Desert Carryall(1).png',
+    ),
   },
   {
     id: 'olive-crest-key-charm',
@@ -168,7 +215,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 9,
     badge: 'New',
-    images: [productImage('olive-crest-key-charm.png')],
+    images: productImages(
+      'olive-crest-key-charm.png',
+      'Olive Crest Key Charm.png',
+      'Olive Crest Key Charm.jpg',
+    ),
   },
   {
     id: 'mosaic-sun-medallion',
@@ -183,7 +234,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 13,
     badge: 'Limited',
-    images: [productImage('mosaic-sun-medallion.png')],
+    images: productImages(
+      'mosaic-sun-medallion.png',
+      'Mosaic Sun Medallion.png',
+      'Mosaic Sun Medallion(1).png',
+    ),
   },
   {
     id: 'citrus-orchard-watch',
@@ -198,10 +253,15 @@ export const products = [
     rating: 4.7,
     reviewsCount: 11,
     badge: '',
-    images: [productImage('citrus-orchard-watch.png')],
+    images: productImages(
+      'citrus-orchard-watch.png',
+      'Citrus Orchard Watch.png',
+      'Citrus Orchard Watch.jpg',
+    ),
   },
   {
     id: 'cedar-bloom-watch',
+    ...productMotifLookup['cedar-bloom-watch'],
     name: 'Cedar Bloom Watch',
     category: 'Watches',
     price: 110,
@@ -213,7 +273,12 @@ export const products = [
     rating: 4.7,
     reviewsCount: 10,
     badge: '',
-    images: [productImage('cedar-bloom-watch.png')],
+    images: productImages(
+      'cedar-bloom-watch.png',
+      'Cedar Bloom Watch.png',
+      'Cedar Bloom Watch.jpg',
+      'Cedar Bloom Watch (2).jpg',
+    ),
   },
   {
     id: 'olive-branch-watch',
@@ -228,7 +293,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 12,
     badge: 'Best seller',
-    images: [productImage('olive-branch-watch.png')],
+    images: productImages(
+      'olive-branch-watch.png',
+      'Olive Branch Watch.jpg',
+      'Olive Branch Watch(1).jpg',
+    ),
   },
   {
     id: 'floral-hand-chain',
@@ -243,7 +312,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 15,
     badge: 'New',
-    images: [productImage('floral-hand-chain.png')],
+    images: productImages(
+      'floral-hand-chain.png',
+      'Floral Hand Chain.png',
+      'Floral Hand Chain.jpg',
+    ),
   },
   {
     id: 'sunburst-cuff-bangle',
@@ -258,10 +331,16 @@ export const products = [
     rating: 4.6,
     reviewsCount: 8,
     badge: '',
-    images: [productImage('sunburst-cuff-bangle.png')],
+    images: productImages(
+      'sunburst-cuff-bangle.png',
+      'Sunburst Cuff Bangle_.png',
+      'Sunburst Cuff Bangle.jpg',
+      'Sunburst Cuff Bangle (2).jpg',
+    ),
   },
   {
     id: 'bethlehem-star-card-sleeve',
+    ...productMotifLookup['bethlehem-star-card-sleeve'],
     name: 'Bethlehem Star Card Sleeve',
     category: 'Wallets',
     price: 68,
@@ -273,7 +352,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 7,
     badge: '',
-    images: [productImage('bethlehem-star-card-sleeve.png')],
+    images: productImages(
+      'bethlehem-star-card-sleeve.png',
+      'Bethlehem Star Card Sleeve.jpg',
+      'Bethlehem Star Card Sleeve(1).jpg',
+    ),
   },
   {
     id: 'heritage-styling-set',
@@ -288,8 +371,11 @@ export const products = [
     rating: 4.9,
     reviewsCount: 6,
     badge: 'Limited',
-    images: [productImage('heritage-styling-set.png')],
-    videos: [productVideo('heritage-styling-set.mp4')],
+    images: productImages(
+      'heritage-styling-set.png',
+      'Heritage Styling Set.png',
+      'Heritage Styling Set.jpg',
+    ),
   },
   {
     id: 'leaf-crest-key-charm',
@@ -304,7 +390,11 @@ export const products = [
     rating: 4.5,
     reviewsCount: 9,
     badge: '',
-    images: [productImage('leaf-crest-key-charm.jpg')],
+    images: productImages(
+      'leaf-crest-key-charm.jpg',
+      'Leaf Crest Key Charm.jpg',
+      'Leaf Crest Key Charm(1).jpg',
+    ),
   },
   {
     id: 'script-medallion-pendant',
@@ -319,7 +409,11 @@ export const products = [
     rating: 4.7,
     reviewsCount: 10,
     badge: '',
-    images: [productImage('script-medallion-pendant.png')],
+    images: productImages(
+      'script-medallion-pendant.png',
+      'Script Medallion Pendant.jpg',
+      'Script Medallion Pendant(1).jpg',
+    ),
   },
   {
     id: 'mosaic-diamond-necklace',
@@ -334,7 +428,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 8,
     badge: '',
-    images: [productImage('mosaic-diamond-necklace.png')],
+    images: productImages(
+      'mosaic-diamond-necklace.png',
+      'Mosaic Diamond Necklace.png',
+      'Mosaic Diamond Necklace(1).png',
+    ),
   },
   {
     id: 'heritage-bookmark-charm',
@@ -349,7 +447,11 @@ export const products = [
     rating: 4.5,
     reviewsCount: 7,
     badge: '',
-    images: [productImage('heritage-bookmark-charm.png')],
+    images: productImages(
+      'heritage-bookmark-charm.png',
+      'Heritage Bookmark Charm.png',
+      'Heritage Bookmark Charm.jpg',
+    ),
   },
   {
     id: 'blossom-column-set',
@@ -364,8 +466,12 @@ export const products = [
     rating: 4.7,
     reviewsCount: 9,
     badge: 'New',
-    images: [productImage('blossom-column-set.png')],
-    videos: [productVideo('blossom-column-set.mp4')],
+    images: productImages(
+      'blossom-column-set.png',
+      'Blossom Column Set.png',
+      'Blossom Column Set.jpg',
+      'Blossom Column Sett.jpg',
+    ),
   },
   {
     id: 'grape-motif-ring-set',
@@ -380,7 +486,12 @@ export const products = [
     rating: 4.7,
     reviewsCount: 8,
     badge: '',
-    images: [productImage('grape-motif-ring-set.png')],
+    images: productImages(
+      'grape-motif-ring-set.png',
+      'Grape Motif Ring Set.png',
+      'Grape Motif Ring Set.jpg',
+      'Grape Motif Ring Set(1).jpg',
+    ),
   },
   {
     id: 'floral-link-bracelet',
@@ -395,8 +506,12 @@ export const products = [
     rating: 4.7,
     reviewsCount: 12,
     badge: '',
-    images: [productImage('floral-link-bracelet.png')],
-    videos: [productVideo('floral-link-bracelet.mp4')],
+    images: productImages(
+      'floral-link-bracelet.png',
+      'Flora Link Bracelet.png',
+      'Flora Link Bracelet.jpg',
+      'Flora Link Bracele.jpg',
+    ),
   },
   {
     id: 'grapevine-shoulder-bag',
@@ -411,7 +526,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 9,
     badge: 'New',
-    images: [productImage('athar-gaza-rose-handbag-alt.png')],
+    images: productImages(
+      'athar-gaza-rose-handbag-alt.png',
+      'Grapevine Shoulder Bag.png',
+      'Grapevine Shoulder Bag(1).png',
+    ),
   },
   {
     id: 'sunburst-bloom-bracelet',
@@ -426,7 +545,11 @@ export const products = [
     rating: 4.7,
     reviewsCount: 11,
     badge: '',
-    images: [productImage('bethlehem-star-bracelet-center.png')],
+    images: productImages(
+      'bethlehem-star-bracelet-center.png',
+      'Sunburst Bloom Bracelet.jpg',
+      'Sunburst Bloom Bracelet_.jpg',
+    ),
   },
   {
     id: 'petal-vine-bracelet',
@@ -441,7 +564,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 8,
     badge: '',
-    images: [productImage('bethlehem-star-bracelet-alt.png')],
+    images: productImages(
+      'bethlehem-star-bracelet-alt.png',
+      'Petal Vine Bracelet.png',
+      'Petal Vine Bracelet(1).png',
+    ),
   },
   {
     id: 'lattice-wrap-ring',
@@ -456,10 +583,15 @@ export const products = [
     rating: 4.7,
     reviewsCount: 9,
     badge: '',
-    images: [productImage('eight-petal-flower-ring-alt.png')],
+    images: productImages(
+      'eight-petal-flower-ring-alt.png',
+      'Lattic Warp Ring.jpg',
+      'Lattic Warp Ring(1).jpg',
+    ),
   },
   {
     id: 'filigree-round-sunglasses',
+    ...productMotifLookup['filigree-round-sunglasses'],
     name: 'Filigree Round Sunglasses',
     category: 'Accessories',
     price: 104,
@@ -471,7 +603,11 @@ export const products = [
     rating: 4.6,
     reviewsCount: 7,
     badge: '',
-    images: [productImage('geometric-diamond-sunglasses-closeup.jpg')],
+    images: productImages(
+      'geometric-diamond-sunglasses-closeup.jpg',
+      'Filigree Round Sunglasses.png',
+      'Filigree Round Sunglasses(1).png',
+    ),
   },
   {
     id: 'signature-etched-sunglasses',
@@ -486,7 +622,7 @@ export const products = [
     rating: 4.6,
     reviewsCount: 6,
     badge: '',
-    images: [productImage('geometric-diamond-sunglasses-front.png')],
+    images: productImages('geometric-diamond-sunglasses-front.png'),
   },
   {
     id: 'promise-ring-duo',
@@ -501,7 +637,12 @@ export const products = [
     rating: 4.8,
     reviewsCount: 10,
     badge: 'Gift set',
-    images: [productImage('palestinian-geometric-engraving-set.png')],
+    images: productImages(
+      'palestinian-geometric-engraving-set.png',
+      'Promise Ring Duo.png',
+      'Promise Ring Duo(1).png',
+      'Promise Ring Duo.jpg',
+    ),
   },
   {
     id: 'starline-band-ring',
@@ -516,7 +657,11 @@ export const products = [
     rating: 4.5,
     reviewsCount: 8,
     badge: '',
-    images: [productImage('palestinian-geometric-engraving-alt.jpg')],
+    images: productImages(
+      'palestinian-geometric-engraving-alt.jpg',
+      'Starline Band Ring.png',
+      'Starline Band Ring(1).png',
+    ),
   },
   {
     id: 'midnight-zip-card-wallet',
@@ -531,7 +676,11 @@ export const products = [
     rating: 4.7,
     reviewsCount: 9,
     badge: '',
-    images: [productImage('peacock-eye-wallet-compact.jpg')],
+    images: productImages(
+      'peacock-eye-wallet-compact.jpg',
+      'Midnight Zip Card Wallet.png',
+      'Midnight Zip Card Wallet.jpg',
+    ),
   },
   {
     id: 'olive-square-jewelry-set',
@@ -546,7 +695,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 7,
     badge: 'Set',
-    images: [productImage('wheat-ear-set-alt.png')],
+    images: productImages(
+      'wheat-ear-set-alt.png',
+      'Olive Square lewelry Set.jpg',
+      'Olive Square lewelry Set(1).jpg',
+    ),
   },
   {
     id: 'mashrabiya-square-jewelry-set',
@@ -561,8 +714,11 @@ export const products = [
     rating: 4.8,
     reviewsCount: 7,
     badge: 'Set',
-    images: [productImage('wheat-ear-set-square-set.png')],
-    videos: [productVideo('mashrabiya-square-jewelry-set.mp4')],
+    images: productImages(
+      'wheat-ear-set-square-set.png',
+      'Mashrabiya Square Jewelry Set.png',
+      'Mashrabiya Square Jewelry Set.jpg',
+    ),
   },
 ];
 

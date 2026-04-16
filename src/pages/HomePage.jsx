@@ -1,23 +1,29 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
+import { apiRequest } from '../utils/api';
+import { getActiveAuthToken } from '../utils/authSession';
 import { resolveApiAssetUrl } from '../utils/api';
 import { getCatalogCategories } from '../utils/productCatalog';
 
-const testimonials = [
+const starterTestimonials = [
   {
+    id: 'starter-layan',
     name: 'Layan Mustafa',
-    avatar: 'design/reviewer-layan.jpeg',
-    quote:
+    message:
       'The accessories are very well-organized and of high quality, with clear and eye-catching details. They truly add a distinctive touch to any look.',
+    createdAt: '2026-01-14T10:00:00.000Z',
+    isStarter: true,
   },
   {
+    id: 'starter-lama',
     name: 'Lama Ahmed',
-    avatar: 'design/reviewer-lama.jpeg',
-    quote:
+    message:
       'The piece is very nice and looks even neater when worn than in the pictures. Neat work and clear attention to detail.',
+    createdAt: '2026-01-07T10:00:00.000Z',
+    isStarter: true,
   },
 ];
 
@@ -36,12 +42,70 @@ const ArrowIcon = ({ direction = 'right' }) => (
   </svg>
 );
 
-const HomePage = ({ products, favoriteIds, onToggleFavorite }) => {
+const ScrollIcon = () => (
+  <svg
+    aria-hidden="true"
+    className="h-4 w-4"
+    fill="none"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="1.8"
+    viewBox="0 0 24 24"
+  >
+    <path d="m12 5 0 14" />
+    <path d="m6 13 6 6 6-6" />
+  </svg>
+);
+
+const FeedbackCard = ({ item }) => {
+  const initial = item?.name?.charAt(0)?.toUpperCase() || 'A';
+  const createdAtLabel = item?.createdAt
+    ? new Date(item.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : '';
+
+  return (
+    <article className="rounded-[24px] border border-line/70 bg-white px-5 py-5 shadow-card">
+      <div className="flex items-start gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blush text-xl font-bold text-ink">
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-display text-2xl text-ink">{item.name}</h3>
+            {createdAtLabel ? (
+              <span className="text-xs uppercase tracking-[0.18em] text-muted">
+                {createdAtLabel}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-2 text-base leading-7 text-ink-soft">{item.message}</p>
+        </div>
+      </div>
+    </article>
+  );
+};
+
+const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken }) => {
   const navigate = useNavigate();
   const categoriesRowRef = useRef(null);
+  const feedbackListRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [feedbackItems, setFeedbackItems] = useState(starterTestimonials);
+  const [feedbackForm, setFeedbackForm] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackSuccess, setFeedbackSuccess] = useState('');
   const categories = getCatalogCategories(products);
   const featuredProducts = products.filter((product) => product.featured).slice(0, 5);
+  const currentUserFeedback = authUser
+    ? feedbackItems.find((item) => item.userId === authUser.id)
+    : null;
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -58,6 +122,124 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite }) => {
       left: direction === 'left' ? -320 : 320,
       behavior: 'smooth',
     });
+  };
+
+  const scrollFeedbackDown = () => {
+    if (!feedbackListRef.current) {
+      return;
+    }
+
+    feedbackListRef.current.scrollBy({
+      top: 280,
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadFeedback = async () => {
+      setFeedbackLoading(true);
+      setFeedbackError('');
+
+      try {
+        const activeToken = getActiveAuthToken(authToken);
+        const response = await apiRequest('/api/feedback', {
+          token: activeToken || undefined,
+        });
+        const remoteFeedback = Array.isArray(response?.data) ? response.data : [];
+
+        if (!isCancelled) {
+          setFeedbackItems(
+            remoteFeedback.length > 0
+              ? [...remoteFeedback, ...starterTestimonials]
+              : starterTestimonials,
+          );
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setFeedbackItems(starterTestimonials);
+          setFeedbackError(
+            error?.message || 'We could not load community feedback right now.',
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setFeedbackLoading(false);
+        }
+      }
+    };
+
+    loadFeedback();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken]);
+
+  useEffect(() => {
+    setFeedbackForm(currentUserFeedback?.message ?? '');
+  }, [currentUserFeedback]);
+
+  const handleSubmitFeedback = async (event) => {
+    event.preventDefault();
+    setFeedbackError('');
+    setFeedbackSuccess('');
+
+    if (!authUser) {
+      navigate('/auth');
+      return;
+    }
+
+    const activeToken = getActiveAuthToken(authToken);
+
+    if (!activeToken) {
+      navigate('/auth');
+      return;
+    }
+
+    const normalizedMessage = feedbackForm.replace(/\s+/g, ' ').trim();
+
+    if (normalizedMessage.length < 10) {
+      setFeedbackError('Please write at least 10 characters before saving your feedback.');
+      return;
+    }
+
+    setFeedbackSubmitting(true);
+
+    try {
+      const response = await apiRequest('/api/feedback', {
+        method: 'POST',
+        token: activeToken,
+        body: { message: normalizedMessage },
+      });
+      const savedFeedback = response?.data ?? null;
+
+      if (savedFeedback) {
+        setFeedbackItems((currentItems) => {
+          const starterItems = currentItems.filter((item) => item.isStarter);
+          const remoteItems = currentItems.filter(
+            (item) => !item.isStarter && item.id !== savedFeedback.id,
+          );
+
+          return [savedFeedback, ...remoteItems, ...starterItems];
+        });
+      }
+
+      setFeedbackSuccess(response?.message || 'Your feedback has been saved.');
+      setFeedbackForm(savedFeedback?.message ?? normalizedMessage);
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) {
+        navigate('/auth');
+        return;
+      }
+
+      setFeedbackError(
+        error?.message || 'We could not save your feedback right now.',
+      );
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   return (
@@ -124,10 +306,10 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite }) => {
             </div>
           </div>
 
-          <div className="grid gap-10 md:grid-cols-2 lg:gap-12 xl:grid-cols-5">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 xl:grid-cols-4 2xl:grid-cols-5">
             {featuredProducts.map((product, index) => (
               <div key={product.id} className="group transform transition hover:scale-105">
-                <div className="relative overflow-hidden rounded-3xl bg-white shadow-lg transition hover:shadow-2xl h-full">
+                <div className="relative h-full rounded-3xl bg-white shadow-lg transition hover:shadow-2xl">
                   <ProductCard 
                     product={product} 
                     isFavorite={favoriteIds.includes(product.id)} 
@@ -228,19 +410,95 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite }) => {
       <section className="section-shell">
         <SectionTitle
           title="Feedback"
-          description="Kept as a quiet preview list to stay close to the reference page while preserving the storefront flow."
+          description="Customers can leave a comment here, and everyone sees the latest feedback in one scrollable place."
+          action={
+            <button
+              type="button"
+              onClick={scrollFeedbackDown}
+              className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-rose hover:bg-blush"
+            >
+              <ScrollIcon />
+              Scroll comments
+            </button>
+          }
         />
 
-        <div className="mt-8 divide-y divide-line rounded-[28px] bg-white shadow-card">
-          {testimonials.map((testimonial) => (
-            <article key={testimonial.name} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center">
-              <img src={resolveApiAssetUrl(testimonial.avatar)} alt={testimonial.name} className="h-16 w-16 rounded-full object-cover" />
-              <div>
-                <h3 className="font-display text-2xl text-ink">{testimonial.name}</h3>
-                <p className="mt-2 text-base leading-7 text-ink-soft">{testimonial.quote}</p>
+        <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[28px] bg-white p-6 shadow-card">
+            <h3 className="font-display text-3xl text-ink">
+              {currentUserFeedback ? 'Update your feedback' : 'Share your feedback'}
+            </h3>
+            <p className="mt-2 text-base leading-7 text-ink-soft">
+              {authUser
+                ? 'Write a short comment about your Athar experience. You can come back later and update it.'
+                : 'Log in with your customer account to publish your own feedback.'}
+            </p>
+
+            <form className="mt-6 space-y-4" onSubmit={handleSubmitFeedback}>
+              <textarea
+                value={feedbackForm}
+                onChange={(event) => setFeedbackForm(event.target.value)}
+                placeholder="Write your feedback here..."
+                rows={6}
+                className="w-full rounded-[24px] border border-line bg-cream px-5 py-4 text-base leading-7 text-ink outline-none transition focus:border-rose"
+                disabled={feedbackSubmitting}
+              />
+
+              {feedbackError ? (
+                <div className="rounded-2xl border border-rose/20 bg-rose/5 px-4 py-3 text-sm font-medium text-rose">
+                  {feedbackError}
+                </div>
+              ) : null}
+
+              {feedbackSuccess ? (
+                <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+                  {feedbackSuccess}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted">
+                  {feedbackSuccess
+                    ? feedbackSuccess
+                    : authUser
+                      ? 'Your comment will appear for other visitors after a successful save.'
+                      : 'You will be redirected to log in before posting.'}
+                </p>
+                <button
+                  type="submit"
+                  disabled={feedbackSubmitting}
+                  className="button-primary"
+                >
+                  {feedbackSubmitting
+                    ? 'Saving...'
+                    : currentUserFeedback
+                      ? 'Update feedback'
+                      : 'Add feedback'}
+                </button>
               </div>
-            </article>
-          ))}
+            </form>
+          </div>
+
+          <div
+            ref={feedbackListRef}
+            className="max-h-[540px] space-y-4 overflow-y-auto rounded-[28px] bg-white p-5 shadow-card"
+          >
+            {feedbackLoading ? (
+              <div className="rounded-[24px] border border-line/70 bg-cream px-5 py-8 text-center text-base text-ink-soft">
+                Loading feedback...
+              </div>
+            ) : null}
+
+            {!feedbackLoading && feedbackItems.length === 0 ? (
+              <div className="rounded-[24px] border border-line/70 bg-cream px-5 py-8 text-center text-base text-ink-soft">
+                No feedback has been shared yet.
+              </div>
+            ) : null}
+
+            {!feedbackLoading
+              ? feedbackItems.map((item) => <FeedbackCard key={item.id} item={item} />)
+              : null}
+          </div>
         </div>
       </section>
 

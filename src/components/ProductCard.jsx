@@ -40,7 +40,7 @@ const ProductCard = ({
 
       <div className="flex flex-1 flex-col px-2 pb-2">
         <Link to={productHref} className="flex flex-1 flex-col">
-          <p className="text-sm text-ink-soft">{productName}</p>
+          <p className="min-h-[3rem] text-sm text-ink-soft">{productName}</p>
           <div className="mt-3 flex items-end justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -50,7 +50,7 @@ const ProductCard = ({
               {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}
             </div>
 
-            <span className="inline-flex min-w-[4.5rem] justify-center rounded-sm bg-blush px-4 py-2 text-sm font-semibold text-ink transition group-hover:bg-rose">
+            <span className="inline-flex min-w-[3.75rem] shrink-0 justify-center rounded-sm bg-blush px-3 py-2 text-sm font-semibold text-ink transition group-hover:bg-rose">
               {ctaLabel}
             </span>
           </div>

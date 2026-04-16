@@ -1,5 +1,7 @@
 import PendingRegistration from '../models/PendingRegistration.js';
+import Product from '../models/Product.js';
 import User from '../models/User.js';
+import { products as localCatalogProducts } from '../src/data/products.js';
 import { createAuthToken, hashPassword, verifyPassword } from '../utils/auth.js';
 import { sendVerificationEmail } from '../utils/notifications.js';
 import {
@@ -16,12 +18,19 @@ const sanitizeUser = (userDocument) => ({
   isEmailVerified: userDocument.isEmailVerified !== false,
   emailVerifiedAt: userDocument.emailVerifiedAt,
   role: userDocument.role,
+  favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
   createdAt: userDocument.createdAt,
   updatedAt: userDocument.updatedAt,
 });
 
 const isUserEmailVerified = (userDocument) => userDocument?.isEmailVerified !== false;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const editableProfileKeys = new Set(['email', 'phone', 'address']);
+const editableAddressKeys = new Set(['line1', 'city', 'postalCode', 'country']);
+const normalizeReference = (value) => String(value ?? '').trim().toLowerCase();
+const getSafeFavoriteIds = (userDocument) =>
+  Array.isArray(userDocument?.favorites) ? userDocument.favorites : [];
 
 const getEmailDeliveryFailureMessage = (error) => {
   const rawMessage = String(error?.message ?? '').trim();
@@ -96,6 +105,51 @@ const findLegacyUnverifiedUserByEmail = (email) => {
     '+password +emailVerificationCodeHash +emailVerificationCodeExpiresAt +lastVerificationSentAt',
   );
 };
+
+const canPersistAuthenticatedUser = (authenticatedUser) => /^[0-9a-fA-F]{24}$/.test(String(authenticatedUser?._id ?? ''));
+
+const getPersistentAuthenticatedUser = async (authenticatedUser) => {
+  if (!canPersistAuthenticatedUser(authenticatedUser)) {
+    return null;
+  }
+
+  return User.findById(authenticatedUser._id).select('-password');
+};
+
+const findProductByReference = async (reference) => {
+  const normalizedReference = String(reference ?? '').trim();
+
+  if (!normalizedReference) {
+    return null;
+  }
+
+  const databaseProduct = /^[0-9a-fA-F]{24}$/.test(normalizedReference)
+    ? await Product.findById(normalizedReference)
+    : await Product.findOne({
+        $or: [
+          { slug: normalizedReference.toLowerCase() },
+          { title: normalizedReference },
+        ],
+      });
+
+  if (databaseProduct) {
+    return databaseProduct;
+  }
+
+  return (
+    localCatalogProducts.find((product) => {
+      return (
+        normalizeReference(product.id) === normalizeReference(normalizedReference) ||
+        normalizeReference(product.slug) === normalizeReference(normalizedReference) ||
+        normalizeReference(product.name) === normalizeReference(normalizedReference) ||
+        normalizeReference(product.title) === normalizeReference(normalizedReference)
+      );
+    }) ?? null
+  );
+};
+
+const getCanonicalFavoriteId = (productDocument) =>
+  productDocument?.slug || productDocument?.id || productDocument?._id?.toString?.() || '';
 
 export const registerUser = async (req, res) => {
   try {
@@ -586,4 +640,264 @@ export const getCurrentUser = async (req, res) => {
     success: true,
     data: sanitizeUser(req.user),
   });
+};
+
+export const updateCurrentUser = async (req, res) => {
+  try {
+    const submittedPayload = req.body ?? {};
+    const submittedKeys = Object.keys(submittedPayload);
+
+    if (submittedKeys.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide contact or address details to update.',
+      });
+    }
+
+    const hasInvalidField = submittedKeys.some((key) => !editableProfileKeys.has(key));
+
+    if (hasInvalidField) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only contact information and address information can be updated.',
+      });
+    }
+
+    if (
+      submittedPayload.address !== undefined &&
+      (
+        typeof submittedPayload.address !== 'object' ||
+        submittedPayload.address === null ||
+        Array.isArray(submittedPayload.address) ||
+        Object.keys(submittedPayload.address).some((key) => !editableAddressKeys.has(key))
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only line1, city, postalCode, and country are allowed inside address information.',
+      });
+    }
+
+    const user = await getPersistentAuthenticatedUser(req.user);
+
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account cannot update profile details from the current session.',
+      });
+    }
+
+    if (submittedPayload.email !== undefined) {
+      const normalizedEmail = String(submittedPayload.email ?? '').toLowerCase().trim();
+
+      if (!normalizedEmail || !emailPattern.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a valid email address.',
+        });
+      }
+
+      const existingUser = await User.findOne({ email: normalizedEmail }).select('_id');
+
+      if (existingUser && existingUser._id.toString() !== user._id.toString()) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email already exists.',
+        });
+      }
+
+      user.email = normalizedEmail;
+    }
+
+    if (submittedPayload.phone !== undefined) {
+      const normalizedPhone = String(submittedPayload.phone ?? '').trim();
+
+      if (!normalizedPhone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number is required.',
+        });
+      }
+
+      user.phone = normalizedPhone;
+    }
+
+    if (submittedPayload.address !== undefined) {
+      const mergedAddress = {
+        line1: String(submittedPayload.address?.line1 ?? user.address?.line1 ?? '').trim(),
+        city: String(submittedPayload.address?.city ?? user.address?.city ?? '').trim(),
+        postalCode: String(submittedPayload.address?.postalCode ?? user.address?.postalCode ?? '').trim(),
+        country: String(submittedPayload.address?.country ?? user.address?.country ?? '').trim(),
+      };
+
+      if (!mergedAddress.city || !mergedAddress.postalCode || !mergedAddress.country) {
+        return res.status(400).json({
+          success: false,
+          message: 'City, postal code, and country are required in address information.',
+        });
+      }
+
+      user.address = mergedAddress;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully.',
+      data: sanitizeUser(user),
+    });
+  } catch (error) {
+    console.error('[Athar profile] Update failed:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'We could not update your profile right now.',
+      error: error.message,
+    });
+  }
+};
+
+export const getCurrentUserFavorites = async (req, res) => {
+  try {
+    const user = await getPersistentAuthenticatedUser(req.user);
+
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account cannot manage favorites from the current session.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        favoriteIds: getSafeFavoriteIds(user),
+      },
+    });
+  } catch (error) {
+    console.error('[Athar favorites] Fetch failed:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'We could not load favorites right now.',
+      error: error.message,
+    });
+  }
+};
+
+export const addFavorite = async (req, res) => {
+  try {
+    const productReference = String(req.body?.productId ?? '').trim();
+
+    if (!productReference) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID is required.',
+      });
+    }
+
+    const user = await getPersistentAuthenticatedUser(req.user);
+
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account cannot manage favorites from the current session.',
+      });
+    }
+
+    const product = await findProductByReference(productReference);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found.',
+      });
+    }
+
+    const favoriteId = getCanonicalFavoriteId(product);
+    const currentFavoriteIds = getSafeFavoriteIds(user);
+
+    if (!favoriteId) {
+      return res.status(422).json({
+        success: false,
+        message: 'This product cannot be saved to favorites right now.',
+      });
+    }
+
+    if (!currentFavoriteIds.includes(favoriteId)) {
+      user.favorites = [...currentFavoriteIds, favoriteId];
+      await user.save();
+    } else {
+      user.favorites = currentFavoriteIds;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product saved to favorites.',
+      data: {
+        favoriteIds: getSafeFavoriteIds(user),
+      },
+    });
+  } catch (error) {
+    console.error('[Athar favorites] Add failed:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'We could not save this product to favorites right now.',
+      error: error.message,
+    });
+  }
+};
+
+export const removeFavorite = async (req, res) => {
+  try {
+    const productReference = String(req.params?.productId ?? '').trim();
+
+    if (!productReference) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID is required.',
+      });
+    }
+
+    const user = await getPersistentAuthenticatedUser(req.user);
+
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account cannot manage favorites from the current session.',
+      });
+    }
+
+    const product = await findProductByReference(productReference);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found.',
+      });
+    }
+
+    const favoriteId = getCanonicalFavoriteId(product);
+    const currentFavoriteIds = getSafeFavoriteIds(user);
+    user.favorites = currentFavoriteIds.filter((entry) => entry !== favoriteId);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product removed from favorites.',
+      data: {
+        favoriteIds: getSafeFavoriteIds(user),
+      },
+    });
+  } catch (error) {
+    console.error('[Athar favorites] Remove failed:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'We could not remove this product from favorites right now.',
+      error: error.message,
+    });
+  }
 };
