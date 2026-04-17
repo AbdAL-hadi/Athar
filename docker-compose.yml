@@ -1,0 +1,111 @@
+name: athar
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${DOCKER_VITE_API_BASE_URL:-http://localhost:5000}
+    depends_on:
+      - backend
+    ports:
+      - "${DOCKER_FRONTEND_PORT:-5173}:80"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    depends_on:
+      - mongo
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: ${DOCKER_MONGO_URI:-mongodb://mongo:27017/athar}
+      SMTP_HOST: ${DOCKER_SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${DOCKER_SMTP_PORT:-465}
+      SMTP_USER: ${DOCKER_SMTP_USER:-}
+      SMTP_PASS: ${DOCKER_SMTP_PASS:-}
+      EMAIL_FROM: ${DOCKER_EMAIL_FROM:-Athar <no-reply@example.com>}
+      JWT_SECRET: ${DOCKER_JWT_SECRET:-athar-docker-secret}
+      GLASSES_TRY_ON_MAX_FILE_SIZE_MB: ${DOCKER_GLASSES_TRY_ON_MAX_FILE_SIZE_MB:-10}
+      TRY_ON_REQUEST_TIMEOUT_MS: ${DOCKER_TRY_ON_REQUEST_TIMEOUT_MS:-300000}
+      HUGGING_FACE_API_TOKEN: ${DOCKER_HUGGING_FACE_API_TOKEN:-}
+      GROUNDING_DINO_MODEL_ID: ${DOCKER_GROUNDING_DINO_MODEL_ID:-IDEA-Research/grounding-dino-tiny}
+      GROUNDING_DINO_ENDPOINT_URL: ${DOCKER_GROUNDING_DINO_ENDPOINT_URL:-http://grounding-dino:7860/gradio_api/call/predict}
+      SAM_MODEL_ID: ${DOCKER_SAM_MODEL_ID:-facebook/sam-vit-huge}
+      SAM_LOCAL_SERVICE_URL: ${DOCKER_SAM_LOCAL_SERVICE_URL:-http://sam-service:8001}
+      MASK_REFINEMENT_MODEL_ID: ${DOCKER_MASK_REFINEMENT_MODEL_ID:-briaai/RMBG-2.0}
+      MASK_REFINEMENT_LOCAL_SERVICE_URL: ${DOCKER_MASK_REFINEMENT_LOCAL_SERVICE_URL:-http://rmbg-service:8002}
+      FLUX_FILL_MODEL_ID: ${DOCKER_FLUX_FILL_MODEL_ID:-black-forest-labs/FLUX.1-Fill-dev}
+      FACE_LANDMARKS_PROVIDER: ${DOCKER_FACE_LANDMARKS_PROVIDER:-internal}
+      FACE_LANDMARKS_MODEL: ${DOCKER_FACE_LANDMARKS_MODEL:-mediapipe-face-mesh}
+      FACE_LANDMARKS_ENDPOINT_URL: ${DOCKER_FACE_LANDMARKS_ENDPOINT_URL:-}
+    ports:
+      - "${DOCKER_BACKEND_PORT:-5000}:5000"
+    restart: unless-stopped
+    volumes:
+      - athar-generated:/app/generated
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "${DOCKER_MONGO_PORT:-27017}:27017"
+    restart: unless-stopped
+    volumes:
+      - athar-mongo-data:/data/db
+
+  grounding-dino:
+    build:
+      context: .
+      dockerfile: spaces/grounding-dino-space/Dockerfile
+    environment:
+      GROUNDING_DINO_MODEL_ID: ${DOCKER_GROUNDING_DINO_MODEL_ID:-IDEA-Research/grounding-dino-tiny}
+      GROUNDING_DINO_MAX_IMAGE_DIMENSION: ${DOCKER_GROUNDING_DINO_MAX_IMAGE_DIMENSION:-1280}
+      GRADIO_SERVER_NAME: 0.0.0.0
+      GRADIO_SERVER_PORT: 7860
+    ports:
+      - "${DOCKER_GROUNDING_DINO_PORT:-7860}:7860"
+    profiles:
+      - ai
+    restart: unless-stopped
+    volumes:
+      - athar-huggingface-cache:/root/.cache/huggingface
+      - athar-torch-cache:/root/.cache/torch
+
+  sam-service:
+    build:
+      context: .
+      dockerfile: services/tryOn/sam_local_service/Dockerfile
+    environment:
+      SAM_MODEL_ID: ${DOCKER_SAM_MODEL_ID:-facebook/sam-vit-huge}
+    ports:
+      - "${DOCKER_SAM_PORT:-8001}:8001"
+    profiles:
+      - ai
+    restart: unless-stopped
+    volumes:
+      - athar-huggingface-cache:/root/.cache/huggingface
+      - athar-torch-cache:/root/.cache/torch
+
+  rmbg-service:
+    build:
+      context: .
+      dockerfile: services/tryOn/rmbg_local_service/Dockerfile
+    environment:
+      MASK_REFINEMENT_MODEL_ID: ${DOCKER_MASK_REFINEMENT_MODEL_ID:-briaai/RMBG-2.0}
+    ports:
+      - "${DOCKER_RMBG_PORT:-8002}:8002"
+    profiles:
+      - ai
+    restart: unless-stopped
+    volumes:
+      - athar-huggingface-cache:/root/.cache/huggingface
+      - athar-torch-cache:/root/.cache/torch
+
+volumes:
+  athar-generated:
+  athar-huggingface-cache:
+  athar-mongo-data:
+  athar-torch-cache:
