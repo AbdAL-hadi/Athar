@@ -182,6 +182,7 @@ const detectWithInternalService = async ({ targetImage }) => {
   const payload = buildInternalPayload(targetImage);
   const candidates = [
     { command: 'python', args: [mediapipeScriptPath] },
+    { command: 'python3', args: [mediapipeScriptPath] },
     { command: 'py', args: ['-3', mediapipeScriptPath] },
   ];
 

@@ -68,9 +68,10 @@ export class ApiError extends Error {
 export const apiRequest = async (path, options = {}) => {
   const { method = 'GET', body, token, headers = {} } = options;
   const requestHeaders = new Headers(headers);
+  const isFormDataBody = typeof FormData !== 'undefined' && body instanceof FormData;
   requestHeaders.set('Accept', 'application/json');
 
-  if (body !== undefined && !requestHeaders.has('Content-Type')) {
+  if (body !== undefined && !isFormDataBody && !requestHeaders.has('Content-Type')) {
     requestHeaders.set('Content-Type', 'application/json');
   }
 
@@ -81,7 +82,12 @@ export const apiRequest = async (path, options = {}) => {
   const response = await fetch(buildApiUrl(path), {
     method,
     headers: requestHeaders,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : isFormDataBody
+          ? body
+          : JSON.stringify(body),
   });
 
   const payload = await parseResponseBody(response);

@@ -15,6 +15,7 @@ const sanitizeUser = (userDocument) => ({
   name: userDocument.name,
   email: userDocument.email,
   phone: userDocument.phone,
+  profilePicture: userDocument.profilePicture ?? '',
   isEmailVerified: userDocument.isEmailVerified !== false,
   emailVerifiedAt: userDocument.emailVerifiedAt,
   role: userDocument.role,
@@ -26,11 +27,51 @@ const sanitizeUser = (userDocument) => ({
 
 const isUserEmailVerified = (userDocument) => userDocument?.isEmailVerified !== false;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const editableProfileKeys = new Set(['email', 'phone', 'address']);
+const editableProfileKeys = new Set(['email', 'phone', 'address', 'profilePicture']);
 const editableAddressKeys = new Set(['line1', 'city', 'postalCode', 'country']);
+const profilePicturePattern = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/;
+const MAX_PROFILE_PICTURE_BYTES = 5 * 1024 * 1024;
 const normalizeReference = (value) => String(value ?? '').trim().toLowerCase();
 const getSafeFavoriteIds = (userDocument) =>
   Array.isArray(userDocument?.favorites) ? userDocument.favorites : [];
+
+const getBase64DecodedByteLength = (base64Value = '') => {
+  const normalizedValue = String(base64Value).replace(/\s+/g, '');
+  const padding = normalizedValue.endsWith('==') ? 2 : normalizedValue.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((normalizedValue.length * 3) / 4) - padding);
+};
+
+const normalizeProfilePicture = (submittedValue) => {
+  const normalizedValue = String(submittedValue ?? '').trim();
+
+  if (!normalizedValue) {
+    return {
+      value: '',
+      error: '',
+    };
+  }
+
+  if (!profilePicturePattern.test(normalizedValue)) {
+    return {
+      value: '',
+      error: 'Profile picture must be a valid image upload.',
+    };
+  }
+
+  const base64Payload = normalizedValue.split(',')[1] ?? '';
+
+  if (getBase64DecodedByteLength(base64Payload) > MAX_PROFILE_PICTURE_BYTES) {
+    return {
+      value: '',
+      error: 'Profile picture must be 5 MB or smaller.',
+    };
+  }
+
+  return {
+    value: normalizedValue,
+    error: '',
+  };
+};
 
 const getEmailDeliveryFailureMessage = (error) => {
   const rawMessage = String(error?.message ?? '').trim();
@@ -284,6 +325,7 @@ export const loginUser = async (req, res) => {
         isEmailVerified: true,
         emailVerifiedAt: new Date(),
         role: 'employee',
+        profilePicture: '',
         address: {
           line1: '',
           city: '',
@@ -316,6 +358,7 @@ export const loginUser = async (req, res) => {
         isEmailVerified: true,
         emailVerifiedAt: new Date(),
         role: 'delivery',
+        profilePicture: '',
         address: {
           line1: '',
           city: '',
@@ -650,7 +693,7 @@ export const updateCurrentUser = async (req, res) => {
     if (submittedKeys.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide contact or address details to update.',
+        message: 'Please provide contact, profile picture, or address details to update.',
       });
     }
 
@@ -659,7 +702,7 @@ export const updateCurrentUser = async (req, res) => {
     if (hasInvalidField) {
       return res.status(400).json({
         success: false,
-        message: 'Only contact information and address information can be updated.',
+        message: 'Only contact information, profile picture, and address information can be updated.',
       });
     }
 
@@ -720,6 +763,20 @@ export const updateCurrentUser = async (req, res) => {
       }
 
       user.phone = normalizedPhone;
+    }
+
+    if (submittedPayload.profilePicture !== undefined) {
+      const { value: normalizedProfilePicture, error: profilePictureError } =
+        normalizeProfilePicture(submittedPayload.profilePicture);
+
+      if (profilePictureError) {
+        return res.status(400).json({
+          success: false,
+          message: profilePictureError,
+        });
+      }
+
+      user.profilePicture = normalizedProfilePicture;
     }
 
     if (submittedPayload.address !== undefined) {
