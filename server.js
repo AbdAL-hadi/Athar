@@ -10,7 +10,7 @@ import productRoutes from './routes/productRoutes.js';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.get('/', (_req, res) => {
   res.send('Athar API is running');

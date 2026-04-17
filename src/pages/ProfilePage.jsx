@@ -54,9 +54,12 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [editingSection, setEditingSection] = useState('');
   const [feedback, setFeedback] = useState({ contact: '', address: '' });
   const [feedbackTone, setFeedbackTone] = useState({ contact: 'error', address: 'error' });
+  const [profilePictureFeedback, setProfilePictureFeedback] = useState('');
+  const [profilePictureFeedbackTone, setProfilePictureFeedbackTone] = useState('error');
   const [localAuthUser, setLocalAuthUser] = useState(authUser);
   const [contactForm, setContactForm] = useState(() => buildContactForm(authUser));
   const [addressForm, setAddressForm] = useState(() => buildAddressForm(authUser));
@@ -85,6 +88,11 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const clearSectionFeedback = (section) => {
     setSectionFeedback(section, '', 'error');
+  };
+
+  const setPictureFeedback = (message, tone = 'error') => {
+    setProfilePictureFeedback(message);
+    setProfilePictureFeedbackTone(tone);
   };
 
   const startEditing = (section) => {
@@ -121,32 +129,77 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const handleProfilePictureChange = (event) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
 
     if (!file) {
       return;
     }
 
     if (!file.type.startsWith('image/')) {
+      setPictureFeedback('Please choose a valid image file.');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
+      setPictureFeedback('Profile picture must be 5 MB or smaller.');
       return;
     }
 
+    const activeToken = getActiveAuthToken(authToken);
+
+    if (!activeToken) {
+      navigate('/auth');
+      return;
+    }
+
+    setPictureFeedback('');
+
+    const previousProfilePicture = localAuthUser?.profilePicture ?? '';
     const reader = new FileReader();
-    reader.onload = (loadEvent) => {
+    reader.onerror = () => {
+      setPictureFeedback('We could not read this image. Please try another file.');
+    };
+    reader.onload = async (loadEvent) => {
       const imageData = loadEvent.target?.result;
 
-      setLocalAuthUser((currentUser) => {
-        const nextUser = {
-          ...currentUser,
-          profilePicture: imageData,
-        };
+      if (typeof imageData !== 'string' || !imageData) {
+        setPictureFeedback('We could not read this image. Please try another file.');
+        return;
+      }
 
-        onUpdateProfile?.(nextUser);
-        return nextUser;
-      });
+      setIsUploadingPicture(true);
+      setPictureFeedback('Uploading profile picture...', 'success');
+      setLocalAuthUser((currentUser) => ({
+        ...currentUser,
+        profilePicture: imageData,
+      }));
+
+      try {
+        const response = await apiRequest('/api/auth/me', {
+          method: 'PATCH',
+          token: activeToken,
+          body: {
+            profilePicture: imageData,
+          },
+        });
+
+        const updatedUser = response?.data ?? null;
+
+        if (updatedUser) {
+          setLocalAuthUser(updatedUser);
+          onUpdateProfile?.(updatedUser);
+        }
+
+        setPictureFeedback(response?.message ?? 'Profile picture updated successfully.', 'success');
+      } catch (error) {
+        setLocalAuthUser((currentUser) => ({
+          ...currentUser,
+          profilePicture: previousProfilePicture,
+        }));
+        setPictureFeedback(error?.message ?? 'We could not save your profile picture right now.');
+      } finally {
+        setIsUploadingPicture(false);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -243,15 +296,8 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
       const updatedUser = response?.data ?? null;
 
       if (updatedUser) {
-        setLocalAuthUser((currentUser) => ({
-          ...currentUser,
-          ...updatedUser,
-          profilePicture: currentUser?.profilePicture ?? updatedUser.profilePicture,
-        }));
-        onUpdateProfile?.({
-          ...updatedUser,
-          profilePicture: localAuthUser?.profilePicture ?? updatedUser.profilePicture,
-        });
+        setLocalAuthUser(updatedUser);
+        onUpdateProfile?.(updatedUser);
       }
 
       setEditingSection('');
@@ -289,6 +335,7 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingPicture}
                   className="relative h-32 w-32 overflow-hidden rounded-full shadow-lg transition hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-rose/50"
                 >
                   {localAuthUser.profilePicture ? (
@@ -303,7 +350,7 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                     </div>
                   )}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
-                    <span className="text-sm font-bold text-white">Change</span>
+                    <span className="text-sm font-bold text-white">{isUploadingPicture ? 'Uploading...' : 'Change'}</span>
                   </div>
                 </button>
               </div>
@@ -311,6 +358,9 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                 <h2 className="mb-2 text-5xl font-bold text-ink">{localAuthUser.name || 'N/A'}</h2>
                 <p className="mb-4 text-2xl font-semibold capitalize text-rose">{localAuthUser.role || 'Customer'}</p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">{getVerificationStatus()}</div>
+                <div className="mt-4 max-w-md">
+                  <FeedbackMessage tone={profilePictureFeedbackTone} message={profilePictureFeedback} />
+                </div>
               </div>
             </div>
           </div>

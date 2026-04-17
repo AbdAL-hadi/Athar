@@ -42,6 +42,7 @@ export const attachUserIfPresent = async (req, _res, next) => {
         isEmailVerified: true,
         emailVerifiedAt: new Date(),
         role: 'employee',
+        profilePicture: '',
         address: {
           line1: '',
           city: '',
@@ -66,6 +67,7 @@ export const attachUserIfPresent = async (req, _res, next) => {
         isEmailVerified: true,
         emailVerifiedAt: new Date(),
         role: 'delivery',
+        profilePicture: '',
         address: {
           line1: '',
           city: '',
