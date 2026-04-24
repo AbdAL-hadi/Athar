@@ -1,6 +1,7 @@
 import PendingRegistration from '../models/PendingRegistration.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
+import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { products as localCatalogProducts } from '../src/data/products.js';
 import { createAuthToken, hashPassword, verifyPassword } from '../utils/auth.js';
 import { sendVerificationEmail } from '../utils/notifications.js';
@@ -192,6 +193,13 @@ const findProductByReference = async (reference) => {
 const getCanonicalFavoriteId = (productDocument) =>
   productDocument?.slug || productDocument?.id || productDocument?._id?.toString?.() || '';
 
+// Refreshes the workbook quietly after user data changes that affect the Customers sheet.
+const scheduleCustomerWorkbookRefresh = () => {
+  void queueSalesExportRefreshWithRetry().catch((error) => {
+    console.error('[Athar exports] Customer workbook refresh failed:', error.message);
+  });
+};
+
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, phone, address = {} } = req.body ?? {};
@@ -292,6 +300,11 @@ export const registerUser = async (req, res) => {
 };
 
 // Hardcoded employee credentials (temporary - to be replaced with database)
+const ADMIN_CREDENTIALS = {
+  email: 'admin@athar.com',
+  password: 'Admin@123',
+};
+
 const EMPLOYEE_CREDENTIALS = {
   email: 'employee@athar.com',
   password: 'Employee@123',
@@ -314,6 +327,39 @@ export const loginUser = async (req, res) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+
+    // Check for admin login first
+    if (normalizedEmail === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      const adminUser = {
+        _id: 'admin-001',
+        name: 'Admin',
+        email: ADMIN_CREDENTIALS.email,
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'admin',
+        profilePicture: '',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const token = createAuthToken(adminUser);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged in successfully as admin.',
+        data: {
+          token,
+          user: sanitizeUser(adminUser),
+        },
+      });
+    }
 
     // Check for employee login first
     if (normalizedEmail === EMPLOYEE_CREDENTIALS.email && password === EMPLOYEE_CREDENTIALS.password) {
@@ -530,6 +576,7 @@ export const verifyEmailCode = async (req, res) => {
       );
 
       await pendingRegistration.deleteOne();
+      scheduleCustomerWorkbookRefresh();
 
       const token = createAuthToken(user);
 
@@ -579,6 +626,7 @@ export const verifyEmailCode = async (req, res) => {
     legacyUser.emailVerificationCodeExpiresAt = null;
     legacyUser.lastVerificationSentAt = null;
     await legacyUser.save();
+    scheduleCustomerWorkbookRefresh();
 
     const token = createAuthToken(legacyUser);
 
@@ -798,6 +846,7 @@ export const updateCurrentUser = async (req, res) => {
     }
 
     await user.save();
+    scheduleCustomerWorkbookRefresh();
 
     return res.status(200).json({
       success: true,

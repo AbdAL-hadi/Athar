@@ -3,6 +3,7 @@ import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuthPage from './pages/AuthPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -212,7 +213,9 @@ const App = () => {
     setAuthLoading(false);
 
     // Redirect based on user role
-    if (user?.role === 'employee') {
+    if (user?.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (user?.role === 'employee') {
       navigate('/employee-dashboard');
     } else if (user?.role === 'delivery') {
       navigate('/delivery-dashboard');
@@ -253,6 +256,7 @@ const App = () => {
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
+        <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
       </Route>

@@ -248,8 +248,10 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
         <div className="section-shell relative">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div className="max-w-xl pt-2 lg:pl-16 lg:pt-12">
-              <h1 className="max-w-[10ch] font-display text-5xl font-bold italic leading-[1.08] text-ink sm:text-6xl">
-              A touch of heritage made to shine
+              <h1 className="max-w-[9ch] font-body text-[3.05rem] font-black italic leading-[1.04] tracking-[0.015em] text-black sm:text-[3.35rem] lg:text-[3.55rem]">
+                <span className="block">A touch of</span>
+                <span className="block">heritage</span>
+                <span className="block">made to shine</span>
               </h1>
               <p className="mt-7 max-w-md text-lg font-semibold leading-9 text-ink">
                 At Athar, we create handcrafted accessories that blend timeless heritage with modern elegance through refined copper details and artistic embroidery.

@@ -21,6 +21,11 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    fulfilledQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     price: {
       type: Number,
       required: true,
@@ -81,7 +86,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'],
+      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'],
       default: 'Pending',
     },
     paymentMethod: {
@@ -97,6 +102,30 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    confirmedAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+    inventoryApplied: {
+      type: Boolean,
+      default: false,
+    },
+    inventoryAppliedAt: {
+      type: Date,
+      default: null,
+    },
+    inventoryRestoredAt: {
+      type: Date,
+      default: null,
     },
     deliveryConfirmedByCustomer: {
       type: Boolean,

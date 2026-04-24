@@ -31,6 +31,30 @@ export const attachUserIfPresent = async (req, _res, next) => {
 
     console.log('Token payload:', { userId: payload.userId, role: payload.role });
 
+    // Handle mock admin user
+    if (payload.userId === 'admin-001' && payload.role === 'admin') {
+      req.user = {
+        _id: 'admin-001',
+        name: 'Admin',
+        email: 'admin@athar.com',
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'admin',
+        profilePicture: '',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      next();
+      return;
+    }
+
     // Handle mock employee user
     if (payload.userId === 'employee-001' && payload.role === 'employee') {
       console.log('Setting employee user');
