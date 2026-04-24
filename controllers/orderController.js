@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
+import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
 const normalizeAddress = (body = {}) => {
@@ -45,6 +47,13 @@ const canAccessOrder = (order, user) => {
   }
 
   return Boolean(orderUserId) && orderUserId === user._id.toString();
+};
+
+// Refreshes the sales workbook asynchronously so order updates never fail because of Excel I/O.
+const scheduleSalesWorkbookRefresh = () => {
+  void queueSalesExportRefreshWithRetry().catch((error) => {
+    console.error('[Athar exports] Workbook refresh failed after order update:', error.message);
+  });
 };
 
 export const createOrder = async (req, res) => {
@@ -335,7 +344,21 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const updatePayload = { status };
+    if (req.user?.role === 'delivery' && !['Shipped', 'Delivered', 'Cancelled'].includes(status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Delivery accounts can update only shipment-related statuses.',
+      });
+    }
+
+    if (req.user?.role === 'employee' && !['Confirmed', 'Cancelled'].includes(status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Employee accounts can update only confirmation-related statuses.',
+      });
+    }
+
+    const updatePayload = {};
 
     if (status === 'Cancelled') {
       updatePayload.deliveryConfirmedByCustomer = false;
@@ -349,15 +372,14 @@ export const updateOrderStatus = async (req, res) => {
       updatePayload.deliveryConfirmationMessage = 'Delivery team marked this order as delivered.';
     }
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      updatePayload,
-      { new: true, runValidators: true },
-    )
-      .populate('user', 'name email role')
-      .populate('items.product');
+    const order = await transitionOrderStatusWithInventory({
+      orderId: req.params.id,
+      nextStatus: status,
+      extraUpdates: updatePayload,
+    });
 
     await ensureOrderNumber(order);
+    scheduleSalesWorkbookRefresh();
 
     return res.status(200).json({
       success: true,
@@ -365,9 +387,9 @@ export const updateOrderStatus = async (req, res) => {
       data: order,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Failed to update order status.',
+      message: error.message || 'Failed to update order status.',
     });
   }
 };

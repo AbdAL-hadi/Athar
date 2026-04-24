@@ -43,6 +43,13 @@ const AboutIcon = () => (
   </svg>
 );
 
+const AdminIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M4 5.5h16v13H4z" />
+    <path d="M8 9.5h8M8 13h5" />
+  </svg>
+);
+
 const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -114,6 +121,12 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                 <span className="sr-only">{link.label}</span>
               </NavLink>
             ))}
+            {authUser && authUser.role === 'admin' ? (
+              <NavLink to="/admin/dashboard" className={iconLinkClass} aria-label="Admin Dashboard" title="Admin Dashboard">
+                <AdminIcon />
+                <span className="sr-only">Admin Dashboard</span>
+              </NavLink>
+            ) : null}
           </nav>
 
           {authLoading ? (

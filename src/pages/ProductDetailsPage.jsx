@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import FavoriteButton from '../components/FavoriteButton';
 import ProductCard from '../components/ProductCard';
 import QuantitySelector from '../components/QuantitySelector';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
-import { apiRequest } from '../utils/api';
+import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
 import { findProductByReference, normalizeProduct } from '../utils/productCatalog';
 
@@ -28,6 +28,26 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
   const [selectedMedia, setSelectedMedia] = useState(() => getDefaultMedia(fallbackProduct));
   const [quantity, setQuantity] = useState(1);
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [visualDescriptionData, setVisualDescriptionData] = useState(null);
+  const [visualDescriptionError, setVisualDescriptionError] = useState('');
+  const [isPreparingAudio, setIsPreparingAudio] = useState(false);
+  const [activeAudioLevel, setActiveAudioLevel] = useState('');
+  const [pendingAudioLevel, setPendingAudioLevel] = useState('');
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  const stopAudioPlayback = () => {
+    const currentAudio = audioRef.current;
+
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    setIsAudioPlaying(false);
+    setActiveAudioLevel('');
+  };
 
   useEffect(() => {
     let isCancelled = false;
@@ -39,6 +59,10 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
       setSelectedMedia(getDefaultMedia(fallbackProduct));
       setQuantity(1);
       setFeedbackMessage('');
+      setVisualDescriptionData(null);
+      setVisualDescriptionError('');
+      setPendingAudioLevel('');
+      stopAudioPlayback();
 
       try {
         const response = await apiRequest(`/api/products/${encodeURIComponent(id)}`);
@@ -71,8 +95,98 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
 
     return () => {
       isCancelled = true;
+      stopAudioPlayback();
     };
   }, [fallbackProduct, id]);
+
+  useEffect(() => {
+    if (!product?.id) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const loadVisualDescription = async () => {
+      try {
+        const response = await apiRequest(`/api/products/${encodeURIComponent(product.id)}/visual-description`);
+
+        if (!isCancelled) {
+          setVisualDescriptionData(response?.data ?? null);
+        }
+      } catch (error) {
+        if (!isCancelled && error?.status !== 404) {
+          setVisualDescriptionError(error.message || 'Description unavailable right now.');
+        }
+      }
+    };
+
+    loadVisualDescription();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
+
+  const startAudioPlayback = (audioUrl, detailLevel) => {
+    const resolvedAudioUrl = resolveApiAssetUrl(audioUrl);
+
+    if (!resolvedAudioUrl) {
+      throw new Error('No playable audio file was returned by the server.');
+    }
+
+    stopAudioPlayback();
+
+    const nextAudio = new Audio(resolvedAudioUrl);
+    nextAudio.onended = () => {
+      setIsAudioPlaying(false);
+      setActiveAudioLevel('');
+      audioRef.current = null;
+    };
+    nextAudio.onerror = () => {
+      setIsAudioPlaying(false);
+      setActiveAudioLevel('');
+      setVisualDescriptionError('Audio playback is not available in your browser right now.');
+      audioRef.current = null;
+    };
+
+    audioRef.current = nextAudio;
+    setActiveAudioLevel(detailLevel);
+
+    return nextAudio.play().then(() => {
+      setIsAudioPlaying(true);
+    });
+  };
+
+  const handleListen = async (detailLevel) => {
+    setIsPreparingAudio(true);
+    setPendingAudioLevel(detailLevel);
+    setVisualDescriptionError('');
+
+    try {
+      const response = await apiRequest(`/api/products/${encodeURIComponent(product.id)}/generate-visual-audio`, {
+        method: 'POST',
+        body: {
+          detailLevel,
+          language: 'en',
+        },
+      });
+      const nextVisualDescription = response?.data?.visualDescription ?? null;
+
+      if (nextVisualDescription) {
+        setVisualDescriptionData(nextVisualDescription);
+      }
+
+      await startAudioPlayback(
+        response?.data?.audioUrl,
+        response?.data?.detailLevel || detailLevel,
+      );
+    } catch (error) {
+      setVisualDescriptionError(error.message || 'Description unavailable right now.');
+    } finally {
+      setIsPreparingAudio(false);
+      setPendingAudioLevel('');
+    }
+  };
 
   if (isLoading && !product) {
     return (
@@ -161,6 +275,71 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
             <div className="rounded-[24px] bg-cream px-5 py-4">
               <p className="text-sm text-muted">Availability</p>
               <p className="mt-1 text-lg text-ink">{product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[28px] border border-[#ead8d2] bg-[#fffaf8] px-5 py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <h2 className="font-display text-3xl text-ink">AI visual describer</h2>
+                <p className="max-w-2xl text-base leading-8 text-ink-soft">
+                  A local accessibility feature for blind and low-vision visitors. It can read a short product description aloud, then continue with more detail if needed.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleListen('short')}
+                  disabled={isPreparingAudio}
+                  className="rounded-[18px] bg-blush px-5 py-3 text-base font-semibold text-ink transition hover:bg-rose disabled:cursor-wait disabled:bg-cream disabled:text-muted"
+                  aria-label="Listen to the short product description"
+                >
+                  {isPreparingAudio && pendingAudioLevel === 'short' ? 'Preparing audio...' : 'Listen to product description'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleListen('long')}
+                  disabled={isPreparingAudio}
+                  className="rounded-[18px] border border-[#e6cec6] bg-white px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream disabled:cursor-wait disabled:bg-[#faf4f2] disabled:text-muted"
+                  aria-label="Listen to the detailed product description"
+                >
+                  {isPreparingAudio && pendingAudioLevel === 'long' ? 'Preparing audio...' : 'More details'}
+                </button>
+                <button
+                  type="button"
+                  onClick={stopAudioPlayback}
+                  disabled={!isAudioPlaying}
+                  className="rounded-[18px] border border-[#e6cec6] bg-white px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream disabled:cursor-not-allowed disabled:text-muted"
+                  aria-label="Stop the spoken product description"
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3" aria-live="polite">
+              {visualDescriptionData?.inferences?.descriptions?.en?.short ? (
+                <div className="rounded-[20px] bg-white px-4 py-4 text-base leading-8 text-ink-soft">
+                  <p className="text-sm uppercase tracking-[0.18em] text-muted">Short description</p>
+                  <p className="mt-2">{visualDescriptionData.inferences.descriptions.en.short}</p>
+                </div>
+              ) : null}
+
+              {visualDescriptionData?.needsRefresh ? (
+                <p className="text-sm text-[#8c6546]">
+                  The stored description looks stale because the product details changed. The listen buttons can regenerate it on demand.
+                </p>
+              ) : null}
+
+              {visualDescriptionError ? (
+                <div className="rounded-[20px] border border-[#e7c8c8] bg-[#fff8f6] px-4 py-3 text-sm text-[#8c6546]">
+                  {visualDescriptionError}
+                </div>
+              ) : null}
+
+              {!visualDescriptionError && !visualDescriptionData?.inferences?.descriptions?.en?.short ? (
+                <p className="text-sm text-muted">Description unavailable right now. You can still try the listen button to prepare it on demand.</p>
+              ) : null}
             </div>
           </div>
 
