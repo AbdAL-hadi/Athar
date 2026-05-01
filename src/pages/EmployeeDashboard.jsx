@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
@@ -166,6 +166,8 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
   const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [currentPage, setCurrentPage] = useState(1);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef(null);
   const isAdmin = authUser?.role === 'admin';
   const canManageProducts = authUser?.role === 'employee' || isAdmin;
 
@@ -225,6 +227,22 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
 
     loadOrders();
   }, [activeTab, authToken, canManageProducts]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    if (accountMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [accountMenuOpen]);
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
@@ -352,6 +370,17 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     }
   };
 
+  const handleProfileClick = () => {
+    setAccountMenuOpen(false);
+    navigate('/profile');
+  };
+
+  const handleLogoutClick = () => {
+    setAccountMenuOpen(false);
+    onLogout();
+    navigate('/');
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
   }
@@ -390,15 +419,15 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
       <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
         <div className="section-shell flex flex-col gap-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Logo Section */}
-          <div className="flex items-center gap-4">
+          <Link to={isAdmin ? '/admin/dashboard' : '/employee-dashboard'} className="flex items-center gap-4">
             <div className="rounded-[20px] bg-blush p-1.5">
               <img src={resolveApiAssetUrl('products/athar.jpg')} alt="Athar logo" className="h-14 w-14 rounded-full object-cover" />
             </div>
             <div>
-              <p className="font-display text-5xl leading-none text-ink">{isAdmin ? 'Athar Admin' : 'Athar Employee'}</p>
+              <p className="font-display text-5xl leading-none text-ink">Athar</p>
               <p className="text-sm text-ink-soft">Order & Product Management Portal</p>
             </div>
-          </div>
+          </Link>
 
           {/* Navigation & Actions */}
           <div className="flex flex-wrap items-center gap-6">
@@ -425,12 +454,65 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
               </nav>
             )}
 
-            <button
-              onClick={onLogout}
-              className="button-primary whitespace-nowrap"
-            >
-              Logout
-            </button>
+            <div className="relative" ref={accountMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((currentValue) => !currentValue)}
+                className="flex items-center gap-3 rounded-full border-2 border-rose bg-white px-2 py-2 transition hover:bg-blush"
+              >
+                {authUser.profilePicture ? (
+                  <img
+                    src={authUser.profilePicture}
+                    alt={authUser.name}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ee8bb7] text-base font-bold text-white">
+                    {authUser.name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+                <span className="max-w-[120px] truncate pr-2 font-semibold text-ink">
+                  {authUser.name?.split(' ')[0] || 'Account'}
+                </span>
+              </button>
+
+              {accountMenuOpen ? (
+                <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-line bg-white shadow-lg">
+                  <div className="flex items-center gap-3 border-b border-line/30 px-4 py-4">
+                    {authUser.profilePicture ? (
+                      <img
+                        src={authUser.profilePicture}
+                        alt={authUser.name}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ee8bb7] text-lg font-bold text-white">
+                        {authUser.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{authUser.name}</p>
+                      <p className="text-xs capitalize text-ink-soft">{authUser.role}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleProfileClick}
+                    className="block w-full px-4 py-3 text-left text-sm text-ink transition hover:bg-blush"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutClick}
+                    className="block w-full rounded-b-lg px-4 py-3 text-left text-sm text-rose transition hover:bg-rose/10"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </header>

@@ -50,6 +50,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const dropdownRef = useRef(null);
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const productIcon = resolveApiAssetUrl('products/icons8-product-80.png');
+  const homeTarget = authUser?.role === 'admin' ? '/admin/dashboard' : '/';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -82,7 +83,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
       <div className="section-shell flex flex-col gap-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <Link to="/" className="flex items-center gap-4">
+        <Link to={homeTarget} className="flex items-center gap-4">
           <div className="rounded-[20px] bg-blush p-1.5">
             <img src={logo} alt="Athar logo" className="h-14 w-14 rounded-full object-cover" />
           </div>
