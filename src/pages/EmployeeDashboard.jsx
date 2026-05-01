@@ -6,6 +6,7 @@ import StaggerItem from '../components/animation/StaggerItem';
 import SearchBar from '../components/SearchBar';
 import Filter from '../components/Filter';
 import SectionTitle from '../components/SectionTitle';
+import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
 
 const ProductIcon = () => (
@@ -401,24 +402,28 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
 
           {/* Navigation & Actions */}
           <div className="flex flex-wrap items-center gap-6">
-            <nav className="flex flex-wrap items-center gap-6">
-              {employeeLinks.map((link) => (
-                <button
-                  key={link.id}
-                  onClick={() => setActiveTab(link.id)}
-                  className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                    activeTab === link.id
-                      ? 'border-rose bg-blush text-ink'
-                      : 'border-transparent text-ink-soft hover:border-line hover:bg-blush/60 hover:text-ink'
-                  }`}
-                  aria-label={link.label}
-                  title={link.label}
-                >
-                  {link.icon === 'product' ? <ProductIcon /> : <OrderIcon />}
-                  <span className="sr-only">{link.label}</span>
-                </button>
-              ))}
-            </nav>
+            {isAdmin ? (
+              <AdminNavigation />
+            ) : (
+              <nav className="flex flex-wrap items-center gap-6">
+                {employeeLinks.map((link) => (
+                  <button
+                    key={link.id}
+                    onClick={() => setActiveTab(link.id)}
+                    className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                      activeTab === link.id
+                        ? 'border-rose bg-blush text-ink'
+                        : 'border-transparent text-ink-soft hover:border-line hover:bg-blush/60 hover:text-ink'
+                    }`}
+                    aria-label={link.label}
+                    title={link.label}
+                  >
+                    {link.icon === 'product' ? <ProductIcon /> : <OrderIcon />}
+                    <span className="sr-only">{link.label}</span>
+                  </button>
+                ))}
+              </nav>
+            )}
 
             <button
               onClick={onLogout}

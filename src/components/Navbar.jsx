@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import AdminNavigation from './admin/AdminNavigation';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
@@ -40,13 +41,6 @@ const AboutIcon = () => (
     <circle cx="12" cy="12" r="9" />
     <path d="M12 10.5v5" />
     <circle cx="12" cy="7.5" r=".75" fill="currentColor" stroke="none" />
-  </svg>
-);
-
-const AdminIcon = () => (
-  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-    <path d="M4 5.5h16v13H4z" />
-    <path d="M8 9.5h8M8 13h5" />
   </svg>
 );
 
@@ -99,35 +93,33 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
         </Link>
 
         <div className="flex flex-wrap items-center gap-6">
-          <nav className="flex flex-wrap items-center gap-6">
-            {links.map((link) => (
-              <NavLink key={link.to} to={link.to} className={iconLinkClass} aria-label={link.label} title={link.label}>
-                {link.icon === 'heart' ? (
-                  <HeartIcon />
-                ) : link.icon === 'bag' ? (
-                  <BagIcon />
-                ) : link.icon === 'track' ? (
-                  <TrackIcon />
-                ) : link.icon === 'about' ? (
-                  <AboutIcon />
-                ) : (
-                  <img src={productIcon} alt="" className="h-5 w-5 object-contain" />
-                )}
-                {link.icon === 'bag' && cartCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold text-white">
-                    {cartCount}
-                  </span>
-                ) : null}
-                <span className="sr-only">{link.label}</span>
-              </NavLink>
-            ))}
-            {authUser && authUser.role === 'admin' ? (
-              <NavLink to="/admin/dashboard" className={iconLinkClass} aria-label="Admin Dashboard" title="Admin Dashboard">
-                <AdminIcon />
-                <span className="sr-only">Admin Dashboard</span>
-              </NavLink>
-            ) : null}
-          </nav>
+          {authUser?.role === 'admin' ? (
+            <AdminNavigation />
+          ) : (
+            <nav className="flex flex-wrap items-center gap-6">
+              {links.map((link) => (
+                <NavLink key={link.to} to={link.to} className={iconLinkClass} aria-label={link.label} title={link.label}>
+                  {link.icon === 'heart' ? (
+                    <HeartIcon />
+                  ) : link.icon === 'bag' ? (
+                    <BagIcon />
+                  ) : link.icon === 'track' ? (
+                    <TrackIcon />
+                  ) : link.icon === 'about' ? (
+                    <AboutIcon />
+                  ) : (
+                    <img src={productIcon} alt="" className="h-5 w-5 object-contain" />
+                  )}
+                  {link.icon === 'bag' && cartCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold text-white">
+                      {cartCount}
+                    </span>
+                  ) : null}
+                  <span className="sr-only">{link.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          )}
 
           {authLoading ? (
             <div className="button-primary whitespace-nowrap">Checking...</div>
