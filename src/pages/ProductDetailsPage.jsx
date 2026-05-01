@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import StaggerContainer from '../components/animation/StaggerContainer';
+import StaggerItem from '../components/animation/StaggerItem';
 import FavoriteButton from '../components/FavoriteButton';
 import ProductCard from '../components/ProductCard';
 import QuantitySelector from '../components/QuantitySelector';
@@ -7,7 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
-import { findProductByReference, normalizeProduct } from '../utils/productCatalog';
+import { findProductByReference, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
 
 const getDefaultMedia = (product) => {
   const firstImage = product?.images?.[0];
@@ -19,7 +21,18 @@ const getDefaultMedia = (product) => {
   return { type: 'image', src: '', alt: '' };
 };
 
-const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavorite }) => {
+const PRODUCT_COMMENT_MAX_LENGTH = 500;
+
+const ProductDetailsPage = ({
+  products,
+  onAddToCart,
+  favoriteIds,
+  onToggleFavorite,
+  authUser,
+  authToken,
+  onOpenTryOn,
+}) => {
+  const navigate = useNavigate();
   const { id } = useParams();
   const fallbackProduct = findProductByReference(products, id);
   const [product, setProduct] = useState(fallbackProduct);
@@ -30,11 +43,25 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [visualDescriptionData, setVisualDescriptionData] = useState(null);
   const [visualDescriptionError, setVisualDescriptionError] = useState('');
-  const [isPreparingAudio, setIsPreparingAudio] = useState(false);
-  const [activeAudioLevel, setActiveAudioLevel] = useState('');
-  const [pendingAudioLevel, setPendingAudioLevel] = useState('');
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [commentItems, setCommentItems] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentRating, setCommentRating] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentMessage, setCommentMessage] = useState('');
+  const [commentError, setCommentError] = useState('');
   const audioRef = useRef(null);
+  const speechUtteranceRef = useRef(null);
+
+  const stopSpeechPlayback = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    speechUtteranceRef.current = null;
+    setIsAudioPlaying(false);
+  };
 
   const stopAudioPlayback = () => {
     const currentAudio = audioRef.current;
@@ -46,7 +73,7 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
     }
 
     setIsAudioPlaying(false);
-    setActiveAudioLevel('');
+    stopSpeechPlayback();
   };
 
   useEffect(() => {
@@ -61,11 +88,23 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
       setFeedbackMessage('');
       setVisualDescriptionData(null);
       setVisualDescriptionError('');
-      setPendingAudioLevel('');
       stopAudioPlayback();
 
       try {
-        const response = await apiRequest(`/api/products/${encodeURIComponent(id)}`);
+        let response;
+
+        try {
+          response = await apiRequest(`/api/products/${encodeURIComponent(id)}`);
+        } catch (primaryError) {
+          const fallbackLookupId = fallbackProduct?.productId;
+
+          if (primaryError?.status === 404 && fallbackLookupId && fallbackLookupId !== id) {
+            response = await apiRequest(`/api/products/${encodeURIComponent(fallbackLookupId)}`);
+          } else {
+            throw primaryError;
+          }
+        }
+
         const normalizedProduct = normalizeProduct(response?.data ?? null, fallbackProduct ?? null);
 
         if (!isCancelled) {
@@ -77,7 +116,11 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
           if (fallbackProduct) {
             setProduct(fallbackProduct);
             setSelectedMedia(getDefaultMedia(fallbackProduct));
-            setLoadError(error.message || 'Unable to refresh this product from the Athar API right now.');
+            setLoadError(
+              error?.status === 404
+                ? ''
+                : error.message || 'Unable to refresh this product from the Athar API right now.',
+            );
           } else {
             setProduct(null);
             setSelectedMedia(getDefaultMedia(null));
@@ -127,64 +170,153 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
     };
   }, [product?.id]);
 
-  const startAudioPlayback = (audioUrl, detailLevel) => {
-    const resolvedAudioUrl = resolveApiAssetUrl(audioUrl);
+  useEffect(() => {
+    if (!product?.id) {
+      setCommentItems([]);
+      return undefined;
+    }
 
-    if (!resolvedAudioUrl) {
-      throw new Error('No playable audio file was returned by the server.');
+    let isCancelled = false;
+
+    const loadComments = async () => {
+      setCommentsLoading(true);
+      setCommentError('');
+
+      try {
+        const response = await apiRequest(
+          `/api/comments/product/${encodeURIComponent(product.id)}`,
+        );
+
+        if (!isCancelled) {
+          setCommentItems(Array.isArray(response?.data) ? response.data : []);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setCommentError(error.message || 'We could not load product comments right now.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setCommentsLoading(false);
+        }
+      }
+    };
+
+    loadComments();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
+
+  const buildSpokenProductDescription = () => {
+    const visualDescriptions = visualDescriptionData?.inferences?.descriptions?.en ?? {};
+    const preferredDescription =
+      product.accessibilityDescription ||
+      visualDescriptions.long ||
+      visualDescriptions.short ||
+      product.description ||
+      `${product.name} is a ${product.category?.toLowerCase() || 'product'}${product.material ? ` made with ${product.material}` : ''}${product.color ? ` in ${product.color}` : ''}.`;
+    const details = [
+      product.name,
+      product.category ? `Category: ${product.category}.` : '',
+      Number.isFinite(Number(product.price)) ? `Price: ${formatCurrency(product.price)}.` : '',
+      product.material ? `Material: ${product.material}.` : '',
+      product.color ? `Color: ${product.color}.` : '',
+      preferredDescription,
+      product.stock !== undefined ? `Availability: ${product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}.` : '',
+    ];
+
+    return details.filter(Boolean).join(' ');
+  };
+
+  const handleListen = () => {
+    setVisualDescriptionError('');
+
+    if (isAudioPlaying) {
+      stopAudioPlayback();
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+      setVisualDescriptionError('Audio reading is not available in your browser right now.');
+      return;
     }
 
     stopAudioPlayback();
 
-    const nextAudio = new Audio(resolvedAudioUrl);
-    nextAudio.onended = () => {
+    const utterance = new SpeechSynthesisUtterance(buildSpokenProductDescription());
+    utterance.lang = 'en-US';
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+      speechUtteranceRef.current = null;
       setIsAudioPlaying(false);
-      setActiveAudioLevel('');
-      audioRef.current = null;
     };
-    nextAudio.onerror = () => {
+    utterance.onerror = () => {
+      speechUtteranceRef.current = null;
       setIsAudioPlaying(false);
-      setActiveAudioLevel('');
-      setVisualDescriptionError('Audio playback is not available in your browser right now.');
-      audioRef.current = null;
+      setVisualDescriptionError('Audio reading is not available in your browser right now.');
     };
 
-    audioRef.current = nextAudio;
-    setActiveAudioLevel(detailLevel);
-
-    return nextAudio.play().then(() => {
-      setIsAudioPlaying(true);
-    });
+    speechUtteranceRef.current = utterance;
+    setIsAudioPlaying(true);
+    window.speechSynthesis.speak(utterance);
   };
 
-  const handleListen = async (detailLevel) => {
-    setIsPreparingAudio(true);
-    setPendingAudioLevel(detailLevel);
-    setVisualDescriptionError('');
+  const handleSubmitComment = async (event) => {
+    event.preventDefault();
+    setCommentError('');
+    setCommentMessage('');
+
+    if (!authUser || !authToken) {
+      navigate('/auth?mode=register');
+      return;
+    }
+
+    const normalizedComment = commentText.replace(/\s+/g, ' ').trim();
+
+    if (!normalizedComment) {
+      setCommentError('Please write a comment before submitting.');
+      return;
+    }
+
+    if (normalizedComment.length > PRODUCT_COMMENT_MAX_LENGTH) {
+      setCommentError(`Comments must stay under ${PRODUCT_COMMENT_MAX_LENGTH} characters.`);
+      return;
+    }
+
+    setCommentSubmitting(true);
 
     try {
-      const response = await apiRequest(`/api/products/${encodeURIComponent(product.id)}/generate-visual-audio`, {
+      const response = await apiRequest('/api/comments', {
         method: 'POST',
+        token: authToken,
         body: {
-          detailLevel,
-          language: 'en',
+          productId: product.id,
+          text: normalizedComment,
+          rating: commentRating || undefined,
         },
       });
-      const nextVisualDescription = response?.data?.visualDescription ?? null;
 
-      if (nextVisualDescription) {
-        setVisualDescriptionData(nextVisualDescription);
+      setCommentMessage(response?.message || 'Your comment has been submitted.');
+      setCommentText('');
+      setCommentRating('');
+
+      if (response?.data?.status === 'approved') {
+        const commentsResponse = await apiRequest(
+          `/api/comments/product/${encodeURIComponent(product.id)}`,
+        );
+        setCommentItems(Array.isArray(commentsResponse?.data) ? commentsResponse.data : []);
+      }
+    } catch (error) {
+      if (error?.status === 401) {
+        navigate('/auth?mode=register');
+        return;
       }
 
-      await startAudioPlayback(
-        response?.data?.audioUrl,
-        response?.data?.detailLevel || detailLevel,
-      );
-    } catch (error) {
-      setVisualDescriptionError(error.message || 'Description unavailable right now.');
+      setCommentError(error.message || 'We could not submit your comment right now.');
     } finally {
-      setIsPreparingAudio(false);
-      setPendingAudioLevel('');
+      setCommentSubmitting(false);
     }
   };
 
@@ -218,7 +350,12 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
 
   const handleAdd = () => {
     if (product.stock < 1) return;
-    onAddToCart(product, quantity);
+    const wasAdded = onAddToCart?.(product, quantity);
+
+    if (wasAdded === false) {
+      return;
+    }
+
     setFeedbackMessage(`${quantity} item${quantity > 1 ? 's' : ''} added to cart.`);
   };
 
@@ -248,7 +385,7 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
           {loadError ? <div className="rounded-[22px] border border-[#e7c8c8] bg-[#fff8f6] px-4 py-3 text-sm text-[#8c6546]">{loadError}</div> : null}
           <div className="flex items-start justify-between gap-4">
             <p className="text-sm uppercase tracking-[0.18em] text-muted">{product.category}</p>
-            <FavoriteButton active={favoriteIds.includes(product.id)} onClick={() => onToggleFavorite(product.id)} className="h-11 w-11 shrink-0" />
+            <FavoriteButton active={isProductFavorite(favoriteIds, product)} onClick={() => onToggleFavorite(product)} className="h-11 w-11 shrink-0" />
           </div>
           <h1 className="mt-3 font-display text-5xl font-bold text-ink">{product.name}</h1>
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -265,7 +402,23 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
               </Link>
             ) : null}
           </div>
-          <p className="mt-8 text-2xl leading-10 text-ink-soft">{product.description}</p>
+          <div className="mt-8 space-y-4">
+            <p className="text-2xl leading-10 text-ink-soft">{product.description}</p>
+            <div className="flex flex-wrap items-center gap-3" aria-live="polite">
+              <button
+                type="button"
+                onClick={handleListen}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#e6cec6] bg-[#fffaf8] px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream focus:outline-none focus:ring-4 focus:ring-rose/20"
+                aria-label={isAudioPlaying ? 'Stop reading the product description' : 'Listen to product description'}
+              >
+                <span aria-hidden="true">{isAudioPlaying ? '■' : '♪'}</span>
+                {isAudioPlaying ? 'Stop reading' : 'Listen to product description'}
+              </button>
+              {visualDescriptionError ? (
+                <span className="text-sm text-[#8c6546]">{visualDescriptionError}</span>
+              ) : null}
+            </div>
+          </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <div className="rounded-[24px] bg-cream px-5 py-4">
@@ -278,73 +431,17 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
             </div>
           </div>
 
-          <div className="mt-8 rounded-[28px] border border-[#ead8d2] bg-[#fffaf8] px-5 py-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <h2 className="font-display text-3xl text-ink">AI visual describer</h2>
-                <p className="max-w-2xl text-base leading-8 text-ink-soft">
-                  A local accessibility feature for blind and low-vision visitors. It can read a short product description aloud, then continue with more detail if needed.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleListen('short')}
-                  disabled={isPreparingAudio}
-                  className="rounded-[18px] bg-blush px-5 py-3 text-base font-semibold text-ink transition hover:bg-rose disabled:cursor-wait disabled:bg-cream disabled:text-muted"
-                  aria-label="Listen to the short product description"
-                >
-                  {isPreparingAudio && pendingAudioLevel === 'short' ? 'Preparing audio...' : 'Listen to product description'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleListen('long')}
-                  disabled={isPreparingAudio}
-                  className="rounded-[18px] border border-[#e6cec6] bg-white px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream disabled:cursor-wait disabled:bg-[#faf4f2] disabled:text-muted"
-                  aria-label="Listen to the detailed product description"
-                >
-                  {isPreparingAudio && pendingAudioLevel === 'long' ? 'Preparing audio...' : 'More details'}
-                </button>
-                <button
-                  type="button"
-                  onClick={stopAudioPlayback}
-                  disabled={!isAudioPlaying}
-                  className="rounded-[18px] border border-[#e6cec6] bg-white px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream disabled:cursor-not-allowed disabled:text-muted"
-                  aria-label="Stop the spoken product description"
-                >
-                  Stop
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3" aria-live="polite">
-              {visualDescriptionData?.inferences?.descriptions?.en?.short ? (
-                <div className="rounded-[20px] bg-white px-4 py-4 text-base leading-8 text-ink-soft">
-                  <p className="text-sm uppercase tracking-[0.18em] text-muted">Short description</p>
-                  <p className="mt-2">{visualDescriptionData.inferences.descriptions.en.short}</p>
-                </div>
-              ) : null}
-
-              {visualDescriptionData?.needsRefresh ? (
-                <p className="text-sm text-[#8c6546]">
-                  The stored description looks stale because the product details changed. The listen buttons can regenerate it on demand.
-                </p>
-              ) : null}
-
-              {visualDescriptionError ? (
-                <div className="rounded-[20px] border border-[#e7c8c8] bg-[#fff8f6] px-4 py-3 text-sm text-[#8c6546]">
-                  {visualDescriptionError}
-                </div>
-              ) : null}
-
-              {!visualDescriptionError && !visualDescriptionData?.inferences?.descriptions?.en?.short ? (
-                <p className="text-sm text-muted">Description unavailable right now. You can still try the listen button to prepare it on demand.</p>
-              ) : null}
-            </div>
-          </div>
-
           <div className="mt-8 flex flex-col gap-5">
             <QuantitySelector value={quantity} onChange={setQuantity} max={product.stock > 0 ? product.stock : 1} className="w-fit" />
+            {onOpenTryOn ? (
+              <button
+                type="button"
+                onClick={() => onOpenTryOn(product)}
+                className="w-full rounded-[24px] border border-line bg-white px-6 py-4 text-xl font-semibold text-ink transition hover:bg-cream"
+              >
+                AI Try-On
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleAdd}
@@ -359,14 +456,127 @@ const ProductDetailsPage = ({ products, onAddToCart, favoriteIds, onToggleFavori
         </div>
       </section>
 
+      <section className="rounded-[32px] bg-white px-6 py-7 shadow-soft sm:px-8">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <p className="text-sm uppercase tracking-[0.18em] text-muted">Community reviews</p>
+            <h2 className="mt-2 font-display text-4xl text-ink">Product comments</h2>
+            <p className="mt-3 max-w-2xl text-base leading-8 text-ink-soft">
+              Comments are checked before publishing to keep the community respectful. AI-assisted moderation may send uncertain comments for admin review.
+            </p>
+          </div>
+          {!authUser ? (
+            <Link to="/auth?mode=register" className="button-primary">
+              Log in to comment
+            </Link>
+          ) : null}
+        </div>
+
+        {authUser ? (
+          <form onSubmit={handleSubmitComment} className="mt-6 rounded-[28px] border border-line bg-[#fffaf8] p-5">
+            <div className="grid gap-4 lg:grid-cols-[1fr_160px]">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-ink">Your comment</span>
+                <textarea
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  maxLength={PRODUCT_COMMENT_MAX_LENGTH}
+                  rows={4}
+                  className="w-full rounded-[22px] border border-line bg-white px-4 py-3 text-base text-ink outline-none transition focus:border-rose focus:ring-4 focus:ring-rose/10"
+                  placeholder="Share what you liked about this product..."
+                  disabled={commentSubmitting}
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-ink">Rating</span>
+                <select
+                  value={commentRating}
+                  onChange={(event) => setCommentRating(event.target.value)}
+                  className="w-full rounded-[22px] border border-line bg-white px-4 py-3 text-base text-ink outline-none transition focus:border-rose focus:ring-4 focus:ring-rose/10"
+                  disabled={commentSubmitting}
+                >
+                  <option value="">Optional</option>
+                  {[5, 4, 3, 2, 1].map((ratingValue) => (
+                    <option key={ratingValue} value={ratingValue}>
+                      {ratingValue} stars
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted">
+                {commentText.length}/{PRODUCT_COMMENT_MAX_LENGTH} characters
+              </p>
+              <button
+                type="submit"
+                disabled={commentSubmitting}
+                className="rounded-[18px] bg-blush px-6 py-3 font-semibold text-ink transition hover:bg-rose disabled:cursor-wait disabled:bg-cream disabled:text-muted"
+              >
+                {commentSubmitting ? 'Checking comment...' : 'Submit comment'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        <div className="mt-5 space-y-3" aria-live="polite">
+          {commentMessage ? (
+            <div className="rounded-[20px] border border-[#bdd8bc] bg-[#f1faf0] px-4 py-3 text-sm text-[#2f6a35]">
+              {commentMessage}
+            </div>
+          ) : null}
+          {commentError ? (
+            <div className="rounded-[20px] border border-[#e7c8c8] bg-[#fff8f6] px-4 py-3 text-sm text-[#8c6546]">
+              {commentError}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-7 space-y-4">
+          {commentsLoading ? (
+            <div className="rounded-[24px] bg-cream px-5 py-5 text-ink-soft">Loading comments...</div>
+          ) : null}
+
+          {!commentsLoading && commentItems.length === 0 ? (
+            <div className="rounded-[24px] bg-cream px-5 py-5 text-ink-soft">
+              No approved comments yet. Be the first to share a respectful note.
+            </div>
+          ) : null}
+
+          {!commentsLoading
+            ? commentItems.map((comment) => (
+                <article key={comment.id} className="rounded-[24px] border border-line bg-white px-5 py-5 shadow-card">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-display text-2xl text-ink">{comment.authorName}</h3>
+                      {comment.rating ? (
+                        <p className="mt-1 text-sm font-semibold text-rose">
+                          {'★'.repeat(comment.rating)}
+                          <span className="text-muted">{'★'.repeat(5 - comment.rating)}</span>
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                      {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : ''}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-base leading-8 text-ink-soft">{comment.text}</p>
+                </article>
+              ))
+            : null}
+        </div>
+      </section>
+
       {relatedProducts.length > 0 ? (
         <section>
           <SectionTitle title="Related products" description="Additional pieces from the same category, kept connected to the reusable logic already in the project." />
-          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <StaggerContainer immediate className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {relatedProducts.map((relatedProduct) => (
-              <ProductCard key={relatedProduct.id} product={relatedProduct} isFavorite={favoriteIds.includes(relatedProduct.id)} onToggleFavorite={onToggleFavorite} />
+              <StaggerItem key={relatedProduct.id}>
+                <ProductCard product={relatedProduct} isFavorite={isProductFavorite(favoriteIds, relatedProduct)} onToggleFavorite={onToggleFavorite} onOpenTryOn={onOpenTryOn} />
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerContainer>
         </section>
       ) : null}
 

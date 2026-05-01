@@ -33,6 +33,7 @@ const audioDescriptionLanguageSchema = new mongoose.Schema(
 );
 
 const trackedVisualFields = ['title', 'description', 'category', 'material', 'images'];
+const tryOnCategories = ['glasses', 'ring', 'bracelet', 'watch', 'necklace', 'bag', 'accessory', ''];
 
 const clearAudioDescriptionUrls = (audioDescriptions = {}) => {
   audioDescriptions.en = audioDescriptions.en ?? {};
@@ -63,10 +64,30 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    shortDescription: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    accessibilityDescription: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     price: {
       type: Number,
       required: true,
       min: 0,
+    },
+    compareAt: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    sku: {
+      type: String,
+      default: '',
+      trim: true,
     },
     images: {
       type: [String],
@@ -85,6 +106,12 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    color: {
+      type: String,
+      default: '',
+      trim: true,
+      lowercase: true,
     },
     stock: {
       type: Number,
@@ -169,6 +196,68 @@ const productSchema = new mongoose.Schema(
       },
     },
     semanticTags: {
+      type: [String],
+      default: [],
+    },
+    materialTags: {
+      type: [String],
+      default: [],
+    },
+    targetAudience: {
+      type: [String],
+      default: [],
+    },
+    bestFor: {
+      type: [String],
+      default: [],
+    },
+    giftable: {
+      type: Boolean,
+      default: false,
+    },
+    tryOnEligible: {
+      type: Boolean,
+      default: false,
+    },
+    tryOnCategory: {
+      type: String,
+      enum: tryOnCategories,
+      default: '',
+      trim: true,
+      lowercase: true,
+    },
+    seoTitle: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 60,
+    },
+    metaDescription: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 155,
+    },
+    seoKeywords: {
+      type: [String],
+      default: [],
+    },
+    promoHeadline: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    promoSubtitle: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    ctaText: {
+      type: String,
+      default: 'View Product',
+      trim: true,
+    },
+    highlightBullets: {
       type: [String],
       default: [],
     },

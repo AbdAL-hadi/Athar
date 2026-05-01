@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
+import StaggerContainer from '../components/animation/StaggerContainer';
+import StaggerItem from '../components/animation/StaggerItem';
 import SearchBar from '../components/SearchBar';
 import Filter from '../components/Filter';
 import SectionTitle from '../components/SectionTitle';
+import AdminProductEditor from '../components/admin/AdminProductEditor';
 
 const ProductIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -51,6 +54,89 @@ const sortProducts = (productList, sortBy) => {
   }
 };
 
+const buildEditForm = (product) => ({
+  title: product.title || '',
+  description: product.description || '',
+  shortDescription: product.shortDescription || '',
+  accessibilityDescription: product.accessibilityDescription || '',
+  price: product.price ?? '',
+  compareAt: product.compareAt ?? '',
+  stock: product.stock ?? '',
+  category: product.category || '',
+  material: product.material || '',
+  color: product.color || product.dominantColors?.[0] || '',
+  sku: product.sku || product.motifCode || '',
+  images: product.images || (product.image ? [product.image] : []),
+  styleTags: product.styleTags || [],
+  occasionTags: product.occasionTags || [],
+  semanticTags: product.semanticTags || [],
+  materialTags: product.materialTags || [],
+  targetAudience: product.targetAudience || [],
+  bestFor: product.bestFor || [],
+  giftable: Boolean(product.giftable),
+  tryOnEligible: Boolean(product.tryOnEligible),
+  tryOnCategory: product.tryOnCategory || '',
+  seoTitle: product.seoTitle || '',
+  metaDescription: product.metaDescription || '',
+  seoKeywords: product.seoKeywords || [],
+  promoHeadline: product.promoHeadline || '',
+  promoSubtitle: product.promoSubtitle || '',
+  ctaText: product.ctaText || 'View Product',
+  highlightBullets: product.highlightBullets || [],
+});
+
+const buildEmptyProductForm = () => ({
+  title: '',
+  description: '',
+  shortDescription: '',
+  accessibilityDescription: '',
+  price: '',
+  compareAt: '',
+  stock: '',
+  category: '',
+  material: '',
+  color: '',
+  sku: '',
+  images: [],
+  styleTags: [],
+  occasionTags: [],
+  semanticTags: [],
+  materialTags: [],
+  targetAudience: [],
+  bestFor: [],
+  giftable: false,
+  tryOnEligible: false,
+  tryOnCategory: '',
+  seoTitle: '',
+  metaDescription: '',
+  seoKeywords: [],
+  promoHeadline: '',
+  promoSubtitle: '',
+  ctaText: 'View Product',
+  highlightBullets: [],
+});
+
+const appendProductFormData = (form, imageFiles) => {
+  const data = new FormData();
+
+  Object.entries(form).forEach(([key, value]) => {
+    if (key === 'images') {
+      data.append('existingImages', JSON.stringify(Array.isArray(value) ? value : []));
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      data.append(key, JSON.stringify(value));
+      return;
+    }
+
+    data.append(key, value ?? '');
+  });
+
+  imageFiles.forEach((file) => data.append('images', file));
+  return data;
+};
+
 const getCategoryList = (products) => {
   const categories = new Set();
   products.forEach((p) => {
@@ -64,9 +150,14 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isProductsLoading, setIsProductsLoading] = useState(true);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+  const [productError, setProductError] = useState('');
+  const [orderError, setOrderError] = useState('');
   const [error, setError] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
+  const [productEditorMode, setProductEditorMode] = useState('');
+  const [productImageFiles, setProductImageFiles] = useState([]);
   const [editForm, setEditForm] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -74,82 +165,170 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
   const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [currentPage, setCurrentPage] = useState(1);
+  const isAdmin = authUser?.role === 'admin';
+  const canManageProducts = authUser?.role === 'employee' || isAdmin;
 
-  // Redirect if not authenticated or not an employee
+  // Redirect if not authenticated or not an employee/admin manager.
   useEffect(() => {
     if (!authLoading) {
-      if (!authToken || authUser?.role !== 'employee') {
+      if (!authToken || !canManageProducts) {
         navigate('/auth');
       }
     }
-  }, [authLoading, authToken, authUser?.role, navigate]);
+  }, [authLoading, authToken, canManageProducts, navigate]);
 
-  // Load products and orders
+  // Load products independently so order failures never block product management.
   useEffect(() => {
-    const loadData = async () => {
-      if (!authToken) {
-        setIsLoading(false);
+    const loadProducts = async () => {
+      if (!authToken || !canManageProducts) {
+        setIsProductsLoading(false);
         return;
       }
 
-      setIsLoading(true);
-      setError('');
+      setIsProductsLoading(true);
+      setProductError('');
 
       try {
-        const [productsRes, ordersRes] = await Promise.all([
-          apiRequest('/api/products'),
-          apiRequest('/api/orders/my', { token: authToken }),
-        ]);
-
+        const productsRes = await apiRequest('/api/products');
         setProducts(productsRes?.data ?? []);
-        setOrders(ordersRes?.data ?? []);
       } catch (err) {
-        setError(err.message || 'Failed to load data');
+        setProducts([]);
+        setProductError('Failed to fetch products.');
       } finally {
-        setIsLoading(false);
+        setIsProductsLoading(false);
       }
     };
 
-    loadData();
-  }, [authToken]);
+    loadProducts();
+  }, [authToken, canManageProducts]);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      if (!authToken || !canManageProducts || activeTab !== 'orders') {
+        return;
+      }
+
+      setIsOrdersLoading(true);
+      setOrderError('');
+
+      try {
+        const ordersRes = await apiRequest('/api/orders/my', { token: authToken });
+        setOrders(ordersRes?.data ?? []);
+      } catch (err) {
+        setOrders([]);
+        setOrderError(err.message || 'Failed to fetch orders.');
+      } finally {
+        setIsOrdersLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, [activeTab, authToken, canManageProducts]);
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
-    setEditForm({
-      title: product.title,
-      description: product.description,
-      price: product.price,
-      stock: product.stock,
-      category: product.category,
-    });
+    setProductEditorMode('edit');
+    setProductImageFiles([]);
+    setEditForm(buildEditForm(product));
+  };
+
+  const handleAddProduct = () => {
+    setEditingProduct({ _id: '', images: [] });
+    setProductEditorMode('create');
+    setProductImageFiles([]);
+    setEditForm(buildEmptyProductForm());
+  };
+
+  const handleCloseProductEditor = () => {
+    setEditingProduct(null);
+    setProductEditorMode('');
+    setProductImageFiles([]);
+    setError('');
+  };
+
+  const updateEditFormField = (field, value) => {
+    setEditForm((current) => ({ ...current, [field]: value }));
   };
 
   const handleSaveProduct = async () => {
     try {
       setError('');
-      const response = await apiRequest(`/api/products/${editingProduct._id}`, {
-        method: 'PATCH',
-        body: editForm,
+      const isCreate = productEditorMode === 'create';
+      const hasImage = (Array.isArray(editForm.images) && editForm.images.length > 0) || productImageFiles.length > 0;
+
+      if (!String(editForm.title || '').trim()) {
+        throw new Error('Product name is required before saving.');
+      }
+
+      if (!String(editForm.category || '').trim()) {
+        throw new Error('Category is required before saving.');
+      }
+
+      if (!String(editForm.description || '').trim()) {
+        throw new Error('Description is required before saving.');
+      }
+
+      if (!String(editForm.material || '').trim()) {
+        throw new Error('Material is required before saving.');
+      }
+
+      if (!String(editForm.price ?? '').trim() || !Number.isFinite(Number(editForm.price))) {
+        throw new Error('Price must be numeric.');
+      }
+
+      if (!String(editForm.stock ?? '').trim() || !Number.isFinite(Number(editForm.stock))) {
+        throw new Error('Stock must be numeric.');
+      }
+
+      if (!hasImage) {
+        throw new Error('Upload at least one product image before saving.');
+      }
+
+      const response = await apiRequest(isCreate ? '/api/products' : `/api/products/${editingProduct._id}`, {
+        method: isCreate ? 'POST' : 'PATCH',
+        body: appendProductFormData(editForm, productImageFiles),
         token: authToken,
       });
 
       if (response.success && response.data) {
-        // Update the product in the state with the response data
-        setProducts((prev) =>
-          prev.map((p) =>
-            p._id === editingProduct._id ? response.data : p,
-          ),
-        );
-        
-        // Close the modal
-        setEditingProduct(null);
-        setError('');
+        setProducts((prev) => {
+          if (isCreate) return [response.data, ...prev];
+          return prev.map((p) => (p._id === editingProduct._id ? response.data : p));
+        });
+
+        handleCloseProductEditor();
       } else {
-        throw new Error(response.message || 'Failed to update product');
+        throw new Error(response.message || 'Failed to save product');
       }
     } catch (err) {
-      setError(err.message || 'Failed to update product. Please try again.');
-      console.error('Product update error:', err);
+      setError(err.message || 'Failed to save product. Please try again.');
+      console.error('Product save error:', err);
+    }
+  };
+
+  const handleDeleteProduct = async (product) => {
+    if (!product?._id) {
+      setError('This product cannot be deleted right now.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete "${product.title}" from Athar products? This will remove it from the database.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError('');
+
+      await apiRequest(`/api/products/${product._id}`, {
+        method: 'DELETE',
+        token: authToken,
+      });
+
+      setProducts((currentProducts) => currentProducts.filter((item) => item._id !== product._id));
+    } catch (err) {
+      setError(err.message || 'Failed to delete product. Please try again.');
     }
   };
 
@@ -176,7 +355,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
   }
 
-  if (!authUser || authUser?.role !== 'employee') {
+  if (!authUser || !canManageProducts) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Redirecting...</div>;
   }
 
@@ -215,7 +394,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
               <img src={resolveApiAssetUrl('products/athar.jpg')} alt="Athar logo" className="h-14 w-14 rounded-full object-cover" />
             </div>
             <div>
-              <p className="font-display text-5xl leading-none text-ink">Athar Employee</p>
+              <p className="font-display text-5xl leading-none text-ink">{isAdmin ? 'Athar Admin' : 'Athar Employee'}</p>
               <p className="text-sm text-ink-soft">Order & Product Management Portal</p>
             </div>
           </div>
@@ -262,24 +441,31 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
         {/* Products Tab */}
         {activeTab === 'products' && (
           <div className="space-y-10">
-            <SectionTitle 
-              title="All Products" 
-              description="Manage all Athar products. Edit product details, prices, and inventory."
-            />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <SectionTitle
+                title="All Products"
+                description="Manage all Athar products. Edit product details, prices, and inventory."
+              />
+              {isAdmin ? (
+                <button type="button" onClick={handleAddProduct} className="button-primary w-fit px-6 py-3 text-sm">
+                  + Add Product
+                </button>
+              ) : null}
+            </div>
 
-            {isLoading ? (
+            {isProductsLoading ? (
               <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">
                 Loading products...
               </div>
             ) : null}
 
-            {error ? (
+            {productError ? (
               <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">
-                {error}
+                {productError}
               </div>
             ) : null}
 
-            {!isLoading && products.length > 0 && (
+            {!isProductsLoading && !productError && products.length > 0 && (
               <>
                 {/* Search and Filters Section */}
                 <section className="space-y-6 rounded-[32px] bg-white p-5 shadow-soft sm:p-6">
@@ -330,45 +516,56 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                 {/* Products Grid */}
                 {filteredProducts.length > 0 ? (
                   <section className="space-y-8">
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <StaggerContainer immediate className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                       {paginatedProducts.map((product) => {
                         const productImageUrl = resolveApiAssetUrl(product?.images?.[0] || product?.image);
                         return (
-                          <div
-                            key={product._id}
-                            className="rounded-[28px] bg-white overflow-hidden hover:shadow-lg transition shadow-card group"
-                          >
-                            {productImageUrl && (
-                              <div className="relative overflow-hidden rounded-[24px] bg-cream aspect-[4/3]">
-                                <img
-                                  src={productImageUrl}
-                                  alt={product.title}
-                                  loading="lazy"
-                                  decoding="async"
-                                  className="w-full h-full object-cover object-center transition duration-500 group-hover:scale-[1.02]"
-                                />
+                          <StaggerItem key={product._id}>
+                            <div className="rounded-[28px] bg-white overflow-hidden hover:shadow-lg transition shadow-card group">
+                              {productImageUrl && (
+                                <div className="relative overflow-hidden rounded-[24px] bg-cream aspect-[4/3]">
+                                  <img
+                                    src={productImageUrl}
+                                    alt={product.title}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover object-center transition duration-500 group-hover:scale-[1.02]"
+                                  />
+                                </div>
+                              )}
+                              <div className="p-4">
+                                <h3 className="font-bold text-ink mb-2 line-clamp-2">{product.title}</h3>
+                                <p className="text-text text-sm mb-3 line-clamp-2">
+                                  {product.description}
+                                </p>
+                                <div className="flex justify-between items-center mb-4">
+                                  <span className="text-blush font-bold text-lg">{product.price}JD</span>
+                                  <span className="text-sm text-muted uppercase tracking-[0.18em]">{product.category}</span>
+                                </div>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditProduct(product)}
+                                    className="w-full bg-blush text-white py-2 rounded-lg hover:bg-opacity-80 transition font-semibold"
+                                  >
+                                    Edit Product
+                                  </button>
+                                  {isAdmin ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteProduct(product)}
+                                      className="w-full rounded-lg border border-[#e7c8c8] bg-white py-2 font-semibold text-[#8c3f3f] transition hover:bg-[#fff5f5]"
+                                    >
+                                      Delete Product
+                                    </button>
+                                  ) : null}
+                                </div>
                               </div>
-                            )}
-                            <div className="p-4">
-                              <h3 className="font-bold text-ink mb-2 line-clamp-2">{product.title}</h3>
-                              <p className="text-text text-sm mb-3 line-clamp-2">
-                                {product.description}
-                              </p>
-                              <div className="flex justify-between items-center mb-4">
-                                <span className="text-blush font-bold text-lg">{product.price}JD</span>
-                                <span className="text-sm text-muted uppercase tracking-[0.18em]">{product.category}</span>
-                              </div>
-                              <button
-                                onClick={() => handleEditProduct(product)}
-                                className="w-full bg-blush text-white py-2 rounded-lg hover:bg-opacity-80 transition font-semibold"
-                              >
-                                Edit Product
-                              </button>
                             </div>
-                          </div>
+                          </StaggerItem>
                         );
                       })}
-                    </div>
+                    </StaggerContainer>
 
                     {/* Pagination */}
                     {totalPages > 1 ? (
@@ -398,9 +595,14 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
               </>
             )}
 
-            {!isLoading && products.length === 0 && (
+            {!isProductsLoading && !productError && products.length === 0 && (
               <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
                 <h3 className="font-display text-4xl text-ink">The catalog is temporarily empty.</h3>
+                {isAdmin ? (
+                  <button type="button" onClick={handleAddProduct} className="button-primary mt-5 px-6 py-3 text-sm">
+                    + Add Product
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -411,8 +613,12 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
           <div>
             <h2 className="text-3xl font-bold text-ink mb-6">Orders Tracking & Management</h2>
 
-            {isLoading ? (
+            {isOrdersLoading ? (
               <div className="text-center py-8">Loading orders...</div>
+            ) : orderError ? (
+              <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">
+                {orderError}
+              </div>
             ) : orders.length === 0 ? (
               <div className="text-center py-8 text-text">No orders found</div>
             ) : (
@@ -505,98 +711,20 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
         )}
       </div>
 
-      {/* Edit Product Modal */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-2xl p-0">
-            {/* Modal Header */}
-            <div className="border-b border-line px-8 py-6">
-              <h2 className="font-display text-5xl text-ink">Edit Product</h2>
-              <p className="text-muted text-sm mt-1">Update product details and information</p>
-            </div>
-
-            {/* Modal Content */}
-            <div className="px-8 py-8 space-y-8 max-h-[70vh] overflow-y-auto">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-muted mb-3">Title</label>
-                <input
-                  type="text"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="field w-full bg-white text-base"
-                  placeholder="Enter product title"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-muted mb-3">Description</label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="field w-full bg-white text-base"
-                  rows="5"
-                  placeholder="Enter product description"
-                />
-              </div>
-
-              {/* Price and Stock Grid */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-muted mb-3">Price</label>
-                  <input
-                    type="number"
-                    value={editForm.price}
-                    onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) })}
-                    className="field w-full bg-white text-base"
-                    step="0.01"
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-muted mb-3">Stock</label>
-                  <input
-                    type="number"
-                    value={editForm.stock}
-                    onChange={(e) => setEditForm({ ...editForm, stock: parseInt(e.target.value) })}
-                    className="field w-full bg-white text-base"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-muted mb-3">Category</label>
-                <input
-                  type="text"
-                  value={editForm.category}
-                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                  className="field w-full bg-white text-base"
-                  placeholder="Enter category"
-                />
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-line px-8 py-6 flex gap-4">
-              <button
-                onClick={() => setEditingProduct(null)}
-                className="flex-1 px-6 py-3 border-2 border-line text-ink rounded-full hover:bg-cream transition font-semibold text-base"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProduct}
-                className="flex-1 button-primary text-base py-3"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminProductEditor
+          authToken={authToken}
+          error={error}
+          form={editForm}
+          imageFiles={productImageFiles}
+          isAdmin={isAdmin}
+          mode={productEditorMode}
+          product={editingProduct}
+          onCancel={handleCloseProductEditor}
+          onFieldChange={updateEditFormField}
+          onImagesChange={setProductImageFiles}
+          onSave={handleSaveProduct}
+        />
       )}
     </div>
   );
