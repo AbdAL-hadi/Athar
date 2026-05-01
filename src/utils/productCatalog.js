@@ -53,7 +53,8 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     title: name,
     category: pickValue(product?.category, fallback.category, ''),
     price: asNumber(pickValue(product?.price, fallback.price), 0),
-    compareAt: asNumber(pickValue(fallback.compareAt, product?.compareAt, product?.price, fallback.price), 0),
+    compareAt: asNumber(pickValue(product?.compareAt, fallback.compareAt, product?.price, fallback.price), 0),
+    sku: pickValue(product?.sku, fallback.sku, ''),
     material: pickValue(product?.material, fallback.material, ''),
     description: pickValue(product?.description, fallback.description, ''),
     stock: asNumber(pickValue(product?.stock, fallback.stock), 0),
@@ -116,6 +117,34 @@ export const findProductByReference = (products = [], reference = '') => {
     products.find((product) => product.id === reference || product.slug === reference || product.productId === reference) ??
     null
   );
+};
+
+export const getProductFavoriteKeys = (productOrReference = {}) => {
+  if (typeof productOrReference === 'string') {
+    return productOrReference ? [productOrReference] : [];
+  }
+
+  return [
+    productOrReference.id,
+    productOrReference.slug,
+    productOrReference.productId,
+    productOrReference._id,
+    productOrReference.title,
+    productOrReference.name,
+  ].filter(hasValue);
+};
+
+export const getProductFavoriteReference = (productOrReference = {}) => {
+  return getProductFavoriteKeys(productOrReference)[0] ?? '';
+};
+
+export const isProductFavorite = (favoriteIds = [], productOrReference = {}) => {
+  const favoriteLookup = new Set(favoriteIds.map(normalizeKey));
+  return getProductFavoriteKeys(productOrReference).some((key) => favoriteLookup.has(normalizeKey(key)));
+};
+
+export const getFavoriteProducts = (products = [], favoriteIds = []) => {
+  return products.filter((product) => isProductFavorite(favoriteIds, product));
 };
 
 export const getCatalogCategories = (products = []) => {

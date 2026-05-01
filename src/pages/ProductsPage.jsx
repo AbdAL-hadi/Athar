@@ -1,10 +1,14 @@
 import { Link, useSearchParams } from 'react-router-dom';
+import Reveal from '../components/animation/Reveal';
+import StaggerContainer from '../components/animation/StaggerContainer';
+import StaggerItem from '../components/animation/StaggerItem';
 import Filter from '../components/Filter';
 import ProductPromoAd from '../components/ProductPromoAd';
 import ProductCard from '../components/ProductCard';
+import ProductCardSkeleton from '../components/ProductCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
-import { getCatalogCategories } from '../utils/productCatalog';
+import { getCatalogCategories, isProductFavorite } from '../utils/productCatalog';
 
 const PRODUCTS_PER_PAGE = 6;
 const sortOptions = [
@@ -33,7 +37,7 @@ const sortProducts = (productList, sortBy) => {
   }
 };
 
-const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = false, errorMessage = '', onRefreshProducts }) => {
+const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = false, errorMessage = '', onRefreshProducts, onOpenTryOn }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categories = getCatalogCategories(products);
   const query = searchParams.get('q') ?? '';
@@ -95,6 +99,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
   const clearFilters = () => setSearchParams({});
   const hasActiveFilters =
     normalizedQuery.length > 0 || selectedCategory !== 'All' || minPrice !== '' || maxPrice !== '' || sortBy !== 'featured';
+  const shouldShowSkeletons = isLoading && products.length === 0;
 
   return (
     <div className="section-shell space-y-10 pb-6 pt-8">
@@ -148,13 +153,23 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
         />
       </section>
 
-      {filteredProducts.length > 0 ? (
-        <section className="space-y-8">
+      {shouldShowSkeletons ? (
+        <section className="space-y-8" aria-label="Loading products">
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {paginatedProducts.map((product) => (
-              <ProductCard key={product.id} product={product} isFavorite={favoriteIds.includes(product.id)} onToggleFavorite={onToggleFavorite} />
+            {Array.from({ length: PRODUCTS_PER_PAGE }).map((_, index) => (
+              <ProductCardSkeleton key={`product-skeleton-${index}`} />
             ))}
           </div>
+        </section>
+      ) : filteredProducts.length > 0 ? (
+        <section className="space-y-8">
+          <StaggerContainer immediate className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {paginatedProducts.map((product) => (
+              <StaggerItem key={product.id}>
+                <ProductCard product={product} isFavorite={isProductFavorite(favoriteIds, product)} onToggleFavorite={onToggleFavorite} onOpenTryOn={onOpenTryOn} />
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
 
           {totalPages > 1 ? (
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -174,23 +189,27 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
           ) : null}
         </section>
       ) : products.length === 0 && !isLoading && !hasActiveFilters ? (
-        <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-          <h3 className="font-display text-4xl text-ink">The catalog is temporarily empty.</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Once the Athar products API is available again, the collection will appear here automatically.</p>
-        </div>
-      ) : (
-        <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-          <h3 className="font-display text-4xl text-ink">No products match these filters.</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Try widening the price range, changing the category, or starting again from the full catalog.</p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button type="button" onClick={clearFilters} className="button-primary">
-              Reset filters
-            </button>
-            <Link to="/" className="button-secondary">
-              Return home
-            </Link>
+        <Reveal>
+          <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
+            <h3 className="font-display text-4xl text-ink">The catalog is temporarily empty.</h3>
+            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Once the Athar products API is available again, the collection will appear here automatically.</p>
           </div>
-        </div>
+        </Reveal>
+      ) : (
+        <Reveal>
+          <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
+            <h3 className="font-display text-4xl text-ink">No products match these filters.</h3>
+            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Try widening the price range, changing the category, or starting again from the full catalog.</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={clearFilters} className="button-primary">
+                Reset filters
+              </button>
+              <Link to="/" className="button-secondary">
+                Return home
+              </Link>
+            </div>
+          </div>
+        </Reveal>
       )}
     </div>
   );

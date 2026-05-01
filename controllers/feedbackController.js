@@ -17,6 +17,7 @@ const sanitizeFeedback = (feedbackDocument, currentUserId = '') => ({
   userId: feedbackDocument.user?.toString?.() ?? '',
   name: feedbackDocument.name,
   message: feedbackDocument.message,
+  status: feedbackDocument.status || 'approved',
   createdAt: feedbackDocument.createdAt,
   updatedAt: feedbackDocument.updatedAt,
   isOwner:
@@ -27,7 +28,9 @@ const sanitizeFeedback = (feedbackDocument, currentUserId = '') => ({
 export const getFeedbackList = async (req, res) => {
   try {
     const currentUserId = req.user?._id?.toString?.() ?? '';
-    const feedbackItems = await Feedback.find({})
+    const feedbackItems = await Feedback.find({
+      $or: [{ status: 'approved' }, { status: { $exists: false } }],
+    })
       .sort({ updatedAt: -1, createdAt: -1 })
       .limit(50);
 
@@ -38,11 +41,11 @@ export const getFeedbackList = async (req, res) => {
       ),
     });
   } catch (error) {
-    console.error('[Athar feedback] Fetch failed:', error.message);
+    console.error('[Athar reviews] Fetch failed:', error.message);
 
     return res.status(500).json({
       success: false,
-      message: 'We could not load feedback right now.',
+      message: 'We could not load reviews right now.',
       error: error.message,
     });
   }
@@ -55,14 +58,14 @@ export const upsertFeedback = async (req, res) => {
     if (!user) {
       return res.status(403).json({
         success: false,
-        message: 'This account cannot publish feedback from the current session.',
+        message: 'This account cannot publish reviews from the current session.',
       });
     }
 
     if (user.role !== 'customer') {
       return res.status(403).json({
         success: false,
-        message: 'Only customer accounts can add feedback.',
+        message: 'Only customer accounts can add reviews.',
       });
     }
 
@@ -73,14 +76,14 @@ export const upsertFeedback = async (req, res) => {
     if (normalizedMessage.length < 10) {
       return res.status(400).json({
         success: false,
-        message: 'Please write at least 10 characters in your feedback.',
+        message: 'Please write at least 10 characters in your review.',
       });
     }
 
     if (normalizedMessage.length > 500) {
       return res.status(400).json({
         success: false,
-        message: 'Feedback must stay under 500 characters.',
+        message: 'Reviews must stay under 500 characters.',
       });
     }
 
@@ -90,6 +93,7 @@ export const upsertFeedback = async (req, res) => {
         user: user._id,
         name: user.name,
         message: normalizedMessage,
+        status: 'approved',
       },
       {
         new: true,
@@ -100,15 +104,15 @@ export const upsertFeedback = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Your feedback has been saved.',
+      message: 'Your review has been saved.',
       data: sanitizeFeedback(feedback, user._id.toString()),
     });
   } catch (error) {
-    console.error('[Athar feedback] Save failed:', error.message);
+    console.error('[Athar reviews] Save failed:', error.message);
 
     return res.status(500).json({
       success: false,
-      message: 'We could not save your feedback right now.',
+      message: 'We could not save your review right now.',
       error: error.message,
     });
   }

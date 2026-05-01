@@ -29,8 +29,6 @@ export const attachUserIfPresent = async (req, _res, next) => {
       return;
     }
 
-    console.log('Token payload:', { userId: payload.userId, role: payload.role });
-
     // Handle mock admin user
     if (payload.userId === 'admin-001' && payload.role === 'admin') {
       req.user = {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SectionTitle from '../components/SectionTitle';
 import { API_BASE_URL, apiRequest } from '../utils/api';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -273,6 +273,34 @@ const AdminDashboardPage = ({ authToken, authUser, authLoading }) => {
           <p className="mt-3 max-w-4xl text-base leading-8">{dashboard.insight.message}</p>
         </section>
       ) : null}
+
+      <section className="rounded-[28px] bg-white p-6 shadow-card">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col justify-between gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-5 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-display text-3xl text-ink">Product AI Assist</h2>
+              <p className="mt-2 text-sm text-ink-soft">
+                Open product management to improve descriptions, metadata, SEO, and website promo text.
+              </p>
+            </div>
+            <Link to="/employee-dashboard" className="button-primary whitespace-nowrap">
+              Manage products
+            </Link>
+          </div>
+
+          <div className="flex flex-col justify-between gap-4 rounded-[24px] border border-line bg-white p-5 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-display text-3xl text-ink">Comment Moderation</h2>
+              <p className="mt-2 text-sm text-ink-soft">
+                Review product comments flagged by local AI-assisted moderation before they appear publicly.
+              </p>
+            </div>
+            <Link to="/admin/comments" className="button-primary whitespace-nowrap">
+              Open moderation
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {isLoading ? (
         <div className="rounded-[28px] bg-white px-6 py-10 text-lg text-ink-soft shadow-card">Loading live admin data...</div>

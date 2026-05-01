@@ -214,3 +214,46 @@ Python-side tests:
 ```bash
 pytest services/visual_describer/test_visual_describer.py
 ```
+
+## AI-assisted comment moderation
+
+Product comments are moderated by the backend before they are public. Athar uses a free local/open-source stack:
+
+- `@xenova/transformers`
+- default model: `Xenova/toxic-bert`
+- local rule fallback for Arabic/English blocked terms, suspicious repetition, and spam patterns
+
+No paid moderation API is used. The first AI moderation request can take longer while the model loads or downloads into the local Transformers.js cache. If the model is unavailable, the backend falls back to the local rule checks and keeps suspicious comments pending for admin review.
+
+### Comment endpoints
+
+- `POST /api/comments`
+- `GET /api/comments/product/:productId`
+- `GET /api/admin/comments/moderation`
+- `PATCH /api/admin/comments/:commentId/status`
+
+### Decisions
+
+- score `80+`: rejected, hidden publicly, and a rejection email is attempted
+- score `40-79`: pending, hidden publicly until admin review
+- score below `40`: approved and public
+
+### Safe local test words
+
+Use these harmless tokens to test moderation without typing real offensive language:
+
+- rejected: `athar_badword_test`
+- pending: `athar_spam_test`
+- threat rejection: `athar_threat_test`
+
+### Environment
+
+```bash
+TOXICITY_MODEL_ID=Xenova/toxic-bert
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=
+SMTP_PASS=
+EMAIL_FROM=Athar <your@email.com>
+SMTP_FROM=Athar <your@email.com>
+```

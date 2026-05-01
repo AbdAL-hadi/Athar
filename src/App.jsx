@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
+import AITryOnModal from './components/AITryOnModal';
 import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
+import AdminCommentModerationPage from './pages/AdminCommentModerationPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuthPage from './pages/AuthPage';
 import CartPage from './pages/CartPage';
@@ -17,10 +19,11 @@ import ProductDetailsPage from './pages/ProductDetailsPage';
 import ProductsPage from './pages/ProductsPage';
 import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
+import Toast from './components/Toast';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
 import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, updateCartItemQuantity } from './utils/cart';
-import { mergeCatalogProducts, normalizeProducts } from './utils/productCatalog';
+import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProducts } from './utils/productCatalog';
 
 const fallbackProducts = normalizeProducts(mockProducts);
 
@@ -34,6 +37,8 @@ const App = () => {
   const [authToken, setAuthToken] = useState(() => loadAuthToken());
   const [authUser, setAuthUser] = useState(() => loadAuthUser());
   const [authLoading, setAuthLoading] = useState(() => Boolean(loadAuthToken()));
+  const [tryOnProduct, setTryOnProduct] = useState(null);
+  const [cartAuthMessage, setCartAuthMessage] = useState('');
 
   // Function to refresh products from API
   const refreshProducts = async () => {
@@ -155,7 +160,16 @@ const App = () => {
   };
 
   const handleAddToCart = (product, quantity = 1) => {
+    const activeToken = getActiveAuthToken(authToken);
+
+    if (!activeToken || !authUser) {
+      setCartAuthMessage('Please log in to add items to your cart.');
+      navigate('/login');
+      return false;
+    }
+
     setCartItems((currentItems) => addCartItem(currentItems, product, quantity));
+    return true;
   };
 
   const handleUpdateCartItem = (productId, quantity) => {
@@ -170,39 +184,58 @@ const App = () => {
     setCartItems([]);
   };
 
-  const handleToggleFavorite = async (productId) => {
+  const handleToggleFavorite = async (productOrReference) => {
     const activeToken = getActiveAuthToken(authToken);
 
     if (!activeToken || !authUser) {
-      navigate('/auth');
+      navigate('/auth?mode=register');
+      return;
+    }
+
+    const product =
+      typeof productOrReference === 'string'
+        ? products.find((item) => isProductFavorite([productOrReference], item)) ?? productOrReference
+        : productOrReference;
+    const productReference = getProductFavoriteReference(product);
+
+    if (!productReference) {
+      console.error('[Athar favorites] Missing product reference for favorite toggle.');
       return;
     }
 
     try {
-      const isFavorite = favoriteIds.includes(productId);
+      const isFavorite = isProductFavorite(favoriteIds, product);
       const response = await apiRequest(
-        isFavorite ? `/api/auth/favorites/${encodeURIComponent(productId)}` : '/api/auth/favorites',
+        isFavorite ? `/api/auth/favorites/${encodeURIComponent(productReference)}` : '/api/auth/favorites',
         {
           method: isFavorite ? 'DELETE' : 'POST',
-          body: isFavorite ? undefined : { productId },
+          body: isFavorite ? undefined : { productId: productReference },
           token: activeToken,
         },
       );
 
       syncFavoriteIds(response?.data?.favoriteIds ?? []);
     } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
+      if (error?.status === 401) {
         clearAuthSession();
         setAuthToken('');
         setAuthUser(null);
         setFavoriteIds([]);
         setAuthLoading(false);
-        navigate('/auth');
+        navigate('/auth?mode=register');
         return;
       }
 
       console.error('[Athar favorites] Toggle failed:', error?.message ?? error);
     }
+  };
+
+  const handleOpenTryOn = (product) => {
+    setTryOnProduct(product);
+  };
+
+  const handleCloseTryOn = () => {
+    setTryOnProduct(null);
   };
 
   const handleAuthSuccess = ({ token, user }) => {
@@ -243,26 +276,38 @@ const App = () => {
   const cartCount = getCartItemCount(cartItems);
 
   return (
+    <>
     <Routes>
       <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />}>
-        <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} authToken={authToken} />} />
-        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} />} />
-        <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} />} />
+        <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} />} />
+        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} onOpenTryOn={handleOpenTryOn} />} />
+        <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/motifs/:motifId" element={<MotifDetailsPage products={products} />} />
-        <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} />} />
-        <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} />} />
+        <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onOpenTryOn={handleOpenTryOn} />} />
+        <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/cart" element={<CartPage items={cartItems} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
+        <Route path="/admin/comments" element={<AdminCommentModerationPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
+        <Route path="/login" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
       </Route>
       <Route path="/employee-dashboard" element={<EmployeeDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
       <Route path="/delivery-dashboard" element={<DeliveryDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
     </Routes>
+    <AITryOnModal product={tryOnProduct} open={Boolean(tryOnProduct)} onClose={handleCloseTryOn} />
+    <Toast
+      open={Boolean(cartAuthMessage)}
+      variant="error"
+      title="Login required"
+      message={cartAuthMessage}
+      onClose={() => setCartAuthMessage('')}
+    />
+    </>
   );
 };
 
