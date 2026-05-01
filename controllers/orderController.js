@@ -97,12 +97,27 @@ export const createOrder = async (req, res) => {
     const productIds = normalizedItems.map((item) => item.productId).filter((value) => mongoose.isValidObjectId(value));
     const products = await Product.find({ _id: { $in: productIds } });
     const productLookup = new Map(products.map((product) => [product._id.toString(), product]));
+    const requestedQuantityByProductId = normalizedItems.reduce((lookup, item) => {
+      const productId = String(item.productId);
+      lookup.set(productId, (lookup.get(productId) || 0) + Number(item.quantity || 0));
+      return lookup;
+    }, new Map());
 
     const orderItems = normalizedItems.map((item) => {
       const product = productLookup.get(String(item.productId));
 
       if (!product) {
-        throw new Error(`Product ${item.productId} could not be found.`);
+        const error = new Error(`Product ${item.productId} could not be found.`);
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const requestedQuantity = requestedQuantityByProductId.get(String(item.productId)) || 0;
+
+      if (Number(product.stock || 0) < requestedQuantity) {
+        const error = new Error(`Not enough stock for ${product.title}.`);
+        error.statusCode = 409;
+        throw error;
       }
 
       return {
@@ -131,7 +146,13 @@ export const createOrder = async (req, res) => {
       phone,
     });
 
-    const populatedOrder = await Order.findById(order._id).populate('items.product').populate('user', 'name email role');
+    const populatedOrder = await transitionOrderStatusWithInventory({
+      orderId: order._id,
+      nextStatus: 'Confirmed',
+    });
+
+    scheduleSalesWorkbookRefresh();
+
     let whatsappNotification = {
       delivered: false,
       channel: 'skipped',
@@ -157,7 +178,7 @@ export const createOrder = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || 'Failed to create order.',
     });

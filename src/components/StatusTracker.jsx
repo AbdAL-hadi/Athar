@@ -1,16 +1,17 @@
 const defaultSteps = [
   { label: 'Ordered', value: 'Pending' },
-  { label: 'Being Processed', value: 'Confirmed' },
   { label: 'Shipped', value: 'Shipped' },
   { label: 'Delivered', value: 'Delivered' },
 ];
 
 const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '' }) => {
+  const normalizedStatus = status === 'Confirmed' ? 'Shipped' : status;
+
   // Handle cancelled status
-  if (status === 'Cancelled') {
+  if (normalizedStatus === 'Cancelled') {
     return (
       <div className={`space-y-6 ${className}`}>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((step) => {
             const label = typeof step === 'string' ? step : step.label;
 
@@ -28,12 +29,12 @@ const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '
 
   const currentIndex = Math.max(
     0,
-    steps.findIndex((step) => (typeof step === 'string' ? step : step.value) === status),
+    steps.findIndex((step) => (typeof step === 'string' ? step : step.value) === normalizedStatus),
   );
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
         {steps.map((step, index) => {
           const label = typeof step === 'string' ? step : step.label;
           const isActive = index <= currentIndex;

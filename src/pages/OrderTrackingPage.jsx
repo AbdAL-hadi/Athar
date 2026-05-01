@@ -9,16 +9,16 @@ import { loadRecentOrders } from '../utils/orders';
 
 const trackerSteps = [
   { label: 'Ordered', value: 'Pending' },
-  { label: 'Being Processed', value: 'Confirmed' },
   { label: 'Shipped', value: 'Shipped' },
   { label: 'Delivered', value: 'Delivered' },
 ];
+
+const getCustomerFacingStatus = (status) => (status === 'Confirmed' ? 'Shipped' : status);
 
 const getEstimatedDelivery = (status) => {
   if (status === 'Delivered') return 'Delivered';
   if (status === 'Cancelled') return 'Cancelled';
   if (status === 'Shipped') return '2-3 days';
-  if (status === 'Confirmed') return '3-5 days';
   return 'Awaiting confirmation';
 };
 
@@ -292,7 +292,8 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
             <div className="mt-6 grid gap-4">
               {myOrders.map((order) => {
                 const orderIdentifier = order.orderNumber ?? order._id;
-                const statusStyles = getOrderStatusStyles(order.status);
+                const visibleStatus = getCustomerFacingStatus(order.status);
+                const statusStyles = getOrderStatusStyles(visibleStatus);
 
                 return (
                   <article key={orderIdentifier} className={`rounded-[24px] bg-cream px-5 py-5 ${statusStyles.card}`}>
@@ -304,7 +305,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                           <span className={`h-3 w-3 rounded-full ${statusStyles.dot}`} aria-hidden="true" />
                           <p className="text-base text-ink-soft">Status:</p>
                           <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusStyles.badge}`}>
-                            {order.status}
+                            {visibleStatus}
                           </span>
                         </div>
                       </div>
@@ -355,11 +356,11 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
 
             <div className="space-y-6 border-t border-line pt-8">
               <h3 className="text-center font-display text-4xl text-ink">Order Status</h3>
-              <StatusTracker status={trackedOrder.status} steps={trackerSteps} />
+              <StatusTracker status={getCustomerFacingStatus(trackedOrder.status)} steps={trackerSteps} />
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Status</p>
-                  <p className="mt-2 text-lg text-ink">{trackedOrder.status}</p>
+                  <p className="mt-2 text-lg text-ink">{getCustomerFacingStatus(trackedOrder.status)}</p>
                   {trackedOrder.status === 'Delivered' ? (
                     <p className="mt-2 text-sm font-semibold text-green-700">Order tracking completed.</p>
                   ) : trackedOrder.status === 'Cancelled' ? (
@@ -368,7 +369,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 </div>
                 <div className="rounded-[24px] bg-cream px-5 py-4">
                   <p className="text-sm text-muted">Estimated Delivery</p>
-                  <p className="mt-2 text-lg text-ink">{getEstimatedDelivery(trackedOrder.status)}</p>
+                  <p className="mt-2 text-lg text-ink">{getEstimatedDelivery(getCustomerFacingStatus(trackedOrder.status))}</p>
                 </div>
               </div>
 
