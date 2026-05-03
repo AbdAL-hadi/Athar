@@ -31,6 +31,11 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    pointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { _id: false },
 );
@@ -83,6 +88,15 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+    loyaltyPointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    loyaltyPointsAppliedAt: {
+      type: Date,
+      default: null,
     },
     status: {
       type: String,

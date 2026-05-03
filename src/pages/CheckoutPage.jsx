@@ -7,6 +7,7 @@ import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { getCartGrandTotal, getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
+import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
 import { getOrderIdentifier, saveRecentOrder } from '../utils/orders';
 
 const initialForm = {
@@ -35,6 +36,7 @@ const CheckoutPage = ({
   const orderNumberFromUrl = searchParams.get('order') ?? '';
   const isSuccessRoute = location.pathname === '/checkout/success';
   const whatsappNotification = location.state?.whatsappNotification ?? null;
+  const loyaltyAward = location.state?.loyalty ?? null;
   const [formData, setFormData] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +58,10 @@ const CheckoutPage = ({
 
   const subtotal = useMemo(() => getCartSubtotal(items), [items]);
   const total = useMemo(() => getCartGrandTotal(items), [items]);
+  const cartPoints = useMemo(
+    () => items.reduce((sum, item) => sum + calculateProductPoints(item, item.quantity), 0),
+    [items],
+  );
 
   const validate = () => {
     const nextErrors = {};
@@ -127,16 +133,25 @@ const CheckoutPage = ({
 
       const order = response?.data;
       const orderIdentifier = getOrderIdentifier(order);
+      const loyalty = response?.loyalty ?? {
+        pointsEarned: order?.loyaltyPointsEarned ?? cartPoints,
+        balance: response?.user?.loyaltyPoints ?? null,
+      };
       saveRecentOrder(orderIdentifier, authUser);
 
       if (import.meta.env.DEV) {
         console.debug('[Athar checkout] order.user after creation', order?.user?._id ?? order?.user ?? null);
       }
 
-      onCheckoutSuccess?.();
+      onCheckoutSuccess?.({
+        order,
+        user: response?.user ?? null,
+        loyalty,
+      });
       navigate(`/checkout/success?order=${encodeURIComponent(orderIdentifier)}`, {
         state: {
           whatsappNotification: response?.notifications?.whatsapp ?? null,
+          loyalty,
         },
       });
     } catch (error) {
@@ -158,6 +173,21 @@ const CheckoutPage = ({
             <p className="text-lg text-ink-soft">Order ID</p>
             <p className="mt-2 break-all font-display text-5xl text-ink">{orderNumberFromUrl || 'Pending'}</p>
           </div>
+
+          {loyaltyAward?.pointsEarned ? (
+            <div className="mx-auto mt-5 max-w-md rounded-[28px] border border-[#dfbd79]/50 bg-[#fff7f0] px-6 py-5">
+              <p className="text-lg font-semibold text-ink">You earned {formatAtharPoints(loyaltyAward.pointsEarned)}.</p>
+              {loyaltyAward.balance !== null && loyaltyAward.balance !== undefined ? (
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
+                  Your new balance is {formatAtharPoints(loyaltyAward.balance)}.
+                </p>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
+                  Log in before checkout next time to save points to your Athar account.
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to={`/order-tracking?order=${encodeURIComponent(orderNumberFromUrl)}`} className="button-primary">
@@ -206,6 +236,9 @@ const CheckoutPage = ({
                   <div>
                     <p className="font-medium text-ink">{item.name}</p>
                     <p className="text-sm text-ink-soft">x{item.quantity}</p>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+                      +{calculateProductPoints(item, item.quantity)} Athar Points
+                    </p>
                   </div>
                   <p className="font-semibold text-ink">{formatCurrency(item.price * item.quantity)}</p>
                 </div>
@@ -222,6 +255,15 @@ const CheckoutPage = ({
                 <div className="flex items-center justify-between font-semibold text-ink">
                   <span>Total</span>
                   <span>{formatCurrency(total)}</span>
+                </div>
+                <div className="rounded-[22px] border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 font-semibold text-ink">
+                    <span>Athar Points earned</span>
+                    <span>+{cartPoints}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-ink-soft">
+                    Points are added to your account after the order is confirmed.
+                  </p>
                 </div>
               </div>
             </div>

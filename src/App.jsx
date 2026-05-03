@@ -13,6 +13,7 @@ import DeliveryDashboard from './pages/DeliveryDashboard';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import FavoritesPage from './pages/FavoritesPage';
 import HomePage from './pages/HomePage';
+import LoyaltyRewardsPage from './pages/LoyaltyRewardsPage';
 import MotifDetailsPage from './pages/MotifDetailsPage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
 import ProductDetailsPage from './pages/ProductDetailsPage';
@@ -180,8 +181,12 @@ const App = () => {
     setCartItems((currentItems) => removeCartItem(currentItems, productId));
   };
 
-  const handleClearCart = () => {
+  const handleClearCart = (checkoutResult = {}) => {
     setCartItems([]);
+
+    if (checkoutResult?.user) {
+      syncAuthUser(checkoutResult.user);
+    }
   };
 
   const handleToggleFavorite = async (productOrReference) => {
@@ -285,6 +290,8 @@ const App = () => {
         <Route path="/motifs/:motifId" element={<MotifDetailsPage products={products} />} />
         <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
+        <Route path="/rewards" element={<LoyaltyRewardsPage authUser={authUser} />} />
+        <Route path="/loyalty" element={<LoyaltyRewardsPage authUser={authUser} />} />
         <Route path="/cart" element={<CartPage items={cartItems} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />

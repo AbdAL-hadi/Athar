@@ -73,6 +73,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    loyaltyPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lifetimeLoyaltyPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     address: {
       type: addressSchema,
       default: () => ({}),

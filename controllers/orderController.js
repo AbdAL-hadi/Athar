@@ -1,8 +1,10 @@
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import User from '../models/User.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
+import { calculateProductPoints } from '../src/utils/loyaltyPoints.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
 const normalizeAddress = (body = {}) => {
@@ -20,6 +22,23 @@ const normalizeAddress = (body = {}) => {
 const generateOrderNumber = () => {
   return `ATH${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`;
 };
+
+const sanitizeCheckoutUser = (userDocument) => ({
+  id: userDocument._id.toString(),
+  name: userDocument.name,
+  email: userDocument.email,
+  phone: userDocument.phone,
+  profilePicture: userDocument.profilePicture ?? '',
+  isEmailVerified: userDocument.isEmailVerified !== false,
+  emailVerifiedAt: userDocument.emailVerifiedAt,
+  role: userDocument.role,
+  favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
+  address: userDocument.address,
+  loyaltyPoints: Number(userDocument.loyaltyPoints ?? 0),
+  lifetimeLoyaltyPoints: Number(userDocument.lifetimeLoyaltyPoints ?? userDocument.loyaltyPoints ?? 0),
+  createdAt: userDocument.createdAt,
+  updatedAt: userDocument.updatedAt,
+});
 
 const ensureOrderNumber = async (order) => {
   if (order.orderNumber) {
@@ -126,20 +145,25 @@ export const createOrder = async (req, res) => {
         image: product.images[0],
         quantity: item.quantity,
         price: product.price,
+        pointsEarned: calculateProductPoints(product, item.quantity),
       };
     });
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const normalizedShippingFee = Number(shippingFee) || 0;
     const total = subtotal + normalizedShippingFee;
+    const loyaltyPointsEarned = orderItems.reduce((sum, item) => sum + item.pointsEarned, 0);
+    const persistentUserId =
+      req.user?._id && mongoose.isValidObjectId(req.user._id) ? req.user._id : null;
 
     const order = await Order.create({
-      user: req.user?._id ?? null,
+      user: persistentUserId,
       orderNumber: generateOrderNumber(),
       items: orderItems,
       subtotal,
       shippingFee: normalizedShippingFee,
       total,
+      loyaltyPointsEarned,
       status: 'Pending',
       paymentMethod,
       address,
@@ -150,6 +174,28 @@ export const createOrder = async (req, res) => {
       orderId: order._id,
       nextStatus: 'Confirmed',
     });
+
+    let updatedUser = null;
+
+    if (persistentUserId && loyaltyPointsEarned > 0) {
+      updatedUser = await User.findByIdAndUpdate(
+        persistentUserId,
+        {
+          $inc: {
+            loyaltyPoints: loyaltyPointsEarned,
+            lifetimeLoyaltyPoints: loyaltyPointsEarned,
+          },
+        },
+        { new: true },
+      ).select('-password');
+
+      if (updatedUser) {
+        populatedOrder.loyaltyPointsAppliedAt = new Date();
+        await Order.findByIdAndUpdate(populatedOrder._id, {
+          loyaltyPointsAppliedAt: populatedOrder.loyaltyPointsAppliedAt,
+        });
+      }
+    }
 
     scheduleSalesWorkbookRefresh();
 
@@ -173,6 +219,11 @@ export const createOrder = async (req, res) => {
       success: true,
       message: 'Order created successfully.',
       data: populatedOrder,
+      loyalty: {
+        pointsEarned: loyaltyPointsEarned,
+        balance: updatedUser ? Number(updatedUser.loyaltyPoints ?? 0) : null,
+      },
+      user: updatedUser ? sanitizeCheckoutUser(updatedUser) : null,
       notifications: {
         whatsapp: whatsappNotification,
       },

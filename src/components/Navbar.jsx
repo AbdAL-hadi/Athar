@@ -5,6 +5,7 @@ import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
   { to: '/products', label: 'Products', icon: 'product' },
+  { to: '/rewards', label: 'Rewards', icon: 'reward' },
   { to: '/favorites', label: 'Favorite', icon: 'heart' },
   { to: '/cart', label: 'Cart', icon: 'bag' },
   { to: '/order-tracking', label: 'Track Order', icon: 'track' },
@@ -33,6 +34,13 @@ const TrackIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
     <path d="M20 10c0 4.42-8 11-8 11S4 14.42 4 10a8 8 0 1 1 16 0Z" />
     <circle cx="12" cy="10" r="2.5" />
+  </svg>
+);
+
+const RewardIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M12 3.75 14.42 8.6l5.35.78-3.88 3.78.92 5.34L12 15.98 7.19 18.5l.92-5.34-3.88-3.78 5.35-.78L12 3.75Z" />
+    <path d="M8.2 21h7.6" />
   </svg>
 );
 
@@ -106,6 +114,8 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <BagIcon />
                   ) : link.icon === 'track' ? (
                     <TrackIcon />
+                  ) : link.icon === 'reward' ? (
+                    <RewardIcon />
                   ) : link.icon === 'about' ? (
                     <AboutIcon />
                   ) : (

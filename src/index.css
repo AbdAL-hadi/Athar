@@ -56,4 +56,62 @@
   .field-panel {
     @apply w-full rounded-[24px] border border-line bg-cream px-4 py-3 text-ink placeholder:text-muted;
   }
+
+  .athar-rewards-page {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 18% 8%, rgba(214, 173, 96, 0.16), transparent 30%),
+      radial-gradient(circle at 86% 24%, rgba(84, 113, 95, 0.14), transparent 28%),
+      linear-gradient(180deg, #fffaf7 0%, #f8f2ee 44%, #f1e2d9 100%);
+  }
+
+  .athar-rewards-page::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(45deg, rgba(143, 95, 69, 0.08) 12.5%, transparent 12.5%, transparent 50%, rgba(143, 95, 69, 0.08) 50%, rgba(143, 95, 69, 0.08) 62.5%, transparent 62.5%, transparent),
+      linear-gradient(45deg, rgba(84, 113, 95, 0.06) 12.5%, transparent 12.5%, transparent 50%, rgba(84, 113, 95, 0.06) 50%, rgba(84, 113, 95, 0.06) 62.5%, transparent 62.5%, transparent);
+    background-position: 0 0, 18px 18px;
+    background-size: 36px 36px;
+    opacity: 0.32;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 72%);
+  }
+
+  .heritage-surface {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(222, 199, 180, 0.9);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 240, 0.96)),
+      #fffaf7;
+    box-shadow: 0 28px 70px rgba(80, 45, 28, 0.1);
+  }
+
+  .heritage-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(90deg, rgba(184, 135, 70, 0.1) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(84, 113, 95, 0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: 0.18;
+  }
+
+  .heritage-surface > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .athar-gold-rule {
+    height: 3px;
+    width: 4.5rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #b88746, #dfbd79, #54715f);
+  }
 }

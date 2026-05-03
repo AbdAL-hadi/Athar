@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import FavoriteButton from './FavoriteButton';
 import { resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
+import { calculateProductPoints } from '../utils/loyaltyPoints';
 
 const MOTION_EASE = [0.22, 1, 0.36, 1];
 
@@ -20,6 +21,7 @@ const ProductCard = ({
   const productHref = `/products/${product.id}`;
   const primaryImage = resolveApiAssetUrl(product?.images?.[0]);
   const productName = product?.name || product?.title || 'Athar product';
+  const productPoints = calculateProductPoints(product);
   const cardMotionProps = prefersReducedMotion
     ? {}
     : {
@@ -82,6 +84,11 @@ const ProductCard = ({
                   </span>
                 ) : null}
               </div>
+              {productPoints > 0 ? (
+                <span className="mt-2 inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+                  +{productPoints} Athar Points
+                </span>
+              ) : null}
               {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}
             </div>
 
