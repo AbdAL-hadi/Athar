@@ -186,7 +186,7 @@ export const createOrder = async (req, res) => {
         orderNumber: generateOrderNumber(),
         items: orderItems,
         subtotal,
-        shippingFee: redemption.appliedShippingFee,
+        shippingFee: normalizedShippingFee,
         discountAmount: redemption.discountAmount,
         total: redemption.finalTotal,
         loyaltyReward: redemption.reward

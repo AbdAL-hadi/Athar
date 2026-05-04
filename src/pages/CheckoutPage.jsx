@@ -154,6 +154,7 @@ const CheckoutPage = ({
   }, [authUser, cartPoints, currentBalance, items.length, projectedBalanceAfterReward]);
   const successPointsEarned = Number(loyaltyAward?.pointsEarned ?? successOrder?.earnedPoints ?? successOrder?.loyaltyPointsEarned ?? 0);
   const successRedeemedReward = loyaltyAward?.redeemedReward ?? successOrder?.loyaltyReward ?? null;
+  const successPointsRedeemed = Number(successRedeemedReward?.pointsRedeemed ?? 0);
   const successBalance =
     loyaltyAward?.balance !== null && loyaltyAward?.balance !== undefined
       ? Number(loyaltyAward.balance)
@@ -162,7 +163,11 @@ const CheckoutPage = ({
         : null;
   const previousBalance =
     successBalance !== null && successBalance !== undefined
-      ? Math.max(0, successBalance - successPointsEarned)
+      ? Math.max(0, successBalance - successPointsEarned + successPointsRedeemed)
+      : null;
+  const balanceAfterRedemption =
+    previousBalance !== null && previousBalance !== undefined
+      ? Math.max(0, previousBalance - successPointsRedeemed)
       : null;
 
   const validate = () => {
@@ -278,10 +283,12 @@ const CheckoutPage = ({
             <p className="mt-2 break-all font-display text-5xl text-ink">{orderNumberFromUrl || 'Pending'}</p>
           </div>
 
-          {successPointsEarned > 0 ? (
+          {successPointsEarned > 0 || successPointsRedeemed > 0 ? (
             <div className="mx-auto mt-5 max-w-md rounded-[28px] border border-[#dfbd79]/50 bg-[#fff7f0] px-6 py-5">
               <p className="text-lg font-semibold text-ink">
-                Congratulations! You earned {formatAtharPoints(successPointsEarned)} from this order.
+                {successPointsEarned > 0
+                  ? `Congratulations! You earned ${formatAtharPoints(successPointsEarned)} from this order.`
+                  : 'Your Athar Points balance was updated for this order.'}
               </p>
               {successRedeemedReward?.title ? (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
@@ -295,6 +302,18 @@ const CheckoutPage = ({
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Balance before purchase</p>
                     <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(previousBalance)}</p>
                   </div>
+                  {successPointsRedeemed > 0 ? (
+                    <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Points redeemed</p>
+                      <p className="mt-2 text-base font-semibold text-ink">-{formatAtharPoints(successPointsRedeemed)}</p>
+                    </div>
+                  ) : null}
+                  {balanceAfterRedemption !== null && balanceAfterRedemption !== undefined ? (
+                    <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Balance after redemption</p>
+                      <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(balanceAfterRedemption)}</p>
+                    </div>
+                  ) : null}
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Points earned</p>
                     <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(successPointsEarned)}</p>
