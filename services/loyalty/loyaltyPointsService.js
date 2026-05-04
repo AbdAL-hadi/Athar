@@ -35,6 +35,11 @@ const getOrderById = (orderId, session) => {
   return session ? query.session(session) : query;
 };
 
+const getUserById = (userId, session) => {
+  const query = User.findById(userId).select('-password');
+  return session ? query.session(session) : query;
+};
+
 const getOrderEarnedPoints = (order = null) => {
   const earnedPoints = Number(order?.earnedPoints ?? 0);
   const legacyEarnedPoints = Number(order?.loyaltyPointsEarned ?? 0);
@@ -80,56 +85,27 @@ export const awardLoyaltyPointsForOrder = async (orderId) => {
     }
 
     const pointsEarned = getOrderEarnedPoints(claimedOrder);
-    const userUpdate = User.findByIdAndUpdate(
-      claimedOrder.user,
-      [
-        {
-          $set: {
-            atharPoints: {
-              $add: [
-                {
-                  $max: [
-                    { $ifNull: ['$atharPoints', 0] },
-                    { $ifNull: ['$loyaltyPoints', 0] },
-                  ],
-                },
-                pointsEarned,
-              ],
-            },
-            loyaltyPoints: {
-              $add: [
-                {
-                  $max: [
-                    { $ifNull: ['$atharPoints', 0] },
-                    { $ifNull: ['$loyaltyPoints', 0] },
-                  ],
-                },
-                pointsEarned,
-              ],
-            },
-            lifetimeLoyaltyPoints: {
-              $add: [
-                {
-                  $max: [
-                    { $ifNull: ['$lifetimeLoyaltyPoints', 0] },
-                    { $ifNull: ['$atharPoints', 0] },
-                    { $ifNull: ['$loyaltyPoints', 0] },
-                  ],
-                },
-                pointsEarned,
-              ],
-            },
-            updatedAt: '$$NOW',
-          },
-        },
-      ],
-      { new: true },
-    ).select('-password');
-    const updatedUser = session ? await userUpdate.session(session) : await userUpdate;
+    const updatedUser = await getUserById(claimedOrder.user, session);
 
     if (!updatedUser) {
       throw new Error('Unable to add Athar Points because the customer account was not found.');
     }
+
+    const currentBalance = Math.max(
+      Number(updatedUser.atharPoints ?? 0),
+      Number(updatedUser.loyaltyPoints ?? 0),
+    );
+    const lifetimeBaseline = Math.max(
+      Number(updatedUser.lifetimeLoyaltyPoints ?? 0),
+      Number(updatedUser.atharPoints ?? 0),
+      Number(updatedUser.loyaltyPoints ?? 0),
+    );
+
+    updatedUser.atharPoints = currentBalance + pointsEarned;
+    updatedUser.loyaltyPoints = currentBalance + pointsEarned;
+    updatedUser.lifetimeLoyaltyPoints = lifetimeBaseline + pointsEarned;
+
+    await updatedUser.save({ session });
 
     return {
       applied: true,

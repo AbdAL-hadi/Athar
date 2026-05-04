@@ -162,6 +162,14 @@ const CityBadgeIcon = ({ city, accent }) => {
 
 const formatPointsCount = (points) => Math.max(0, Math.round(Number(points) || 0)).toLocaleString('en-US');
 
+const formatTierRange = (minPoints, maxPoints = null) => {
+  if (maxPoints == null) {
+    return `${formatPointsCount(minPoints)}+ points`;
+  }
+
+  return `${formatPointsCount(minPoints)}-${formatPointsCount(maxPoints)} points`;
+};
+
 const EarnIcon = ({ type }) => {
   const commonProps = {
     'aria-hidden': 'true',
@@ -244,13 +252,20 @@ const LoyaltyRewardsPage = ({ authUser }) => {
   const currentPoints = authUser
     ? Math.max(Number(authUser?.atharPoints ?? 0), Number(authUser?.loyaltyPoints ?? 0))
     : FALLBACK_LOYALTY_POINTS;
-  const nextRewardPoints = FREE_SHIPPING_REWARD_POINTS;
-  const remainingPoints = Math.max(0, nextRewardPoints - currentPoints);
-  const progressPercent = Math.min(100, Math.round((currentPoints / nextRewardPoints) * 100));
-  const freeShippingUnlocked = currentPoints >= nextRewardPoints;
   const currentTier =
     [...tierLevels].reverse().find((tier) => currentPoints >= tier.minPoints) ?? tierLevels[0];
   const nextTier = tierLevels.find((tier) => tier.minPoints > currentPoints);
+  const currentTierMin = currentTier.minPoints;
+  const currentTierMax = nextTier ? nextTier.minPoints : currentTier.minPoints;
+  const currentTierRange = formatTierRange(currentTierMin, nextTier ? nextTier.minPoints - 1 : null);
+  const pointsEarnedInTier = Math.max(0, currentPoints - currentTierMin);
+  const pointsNeededForTier = nextTier ? Math.max(1, nextTier.minPoints - currentTierMin) : Math.max(1, currentTierMin || 1);
+  const progressPercent = nextTier
+    ? Math.min(100, Math.round((pointsEarnedInTier / pointsNeededForTier) * 100))
+    : 100;
+  const tierPointsRemaining = nextTier ? Math.max(0, nextTier.minPoints - currentPoints) : 0;
+  const freeShippingUnlocked = currentPoints >= FREE_SHIPPING_REWARD_POINTS;
+  const remainingPoints = Math.max(0, FREE_SHIPPING_REWARD_POINTS - currentPoints);
   const pointsToNextTier = nextTier ? nextTier.minPoints - currentPoints : 0;
   const collectedCityBadgeCount = cityBadges.filter((badge) => badge.status === 'Collected').length;
   const nextCityBadge = cityBadges.find((badge) => badge.status !== 'Collected') ?? cityBadges[0];
@@ -321,17 +336,26 @@ const LoyaltyRewardsPage = ({ authUser }) => {
 
               <div className="mt-10">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-base font-semibold text-ink">Progress toward free shipping</p>
-                  <p className="text-base font-bold text-ink">{formatPointsCount(currentPoints)} / {formatPointsCount(nextRewardPoints)} points</p>
+                  <p className="text-base font-semibold text-ink">
+                    {nextTier ? `Progress toward ${nextTier.name}` : 'Current tier progress'}
+                  </p>
+                  <p className="text-base font-bold text-ink">
+                    {nextTier
+                      ? `${formatPointsCount(currentPoints)} / ${formatPointsCount(currentTierMax)} points`
+                      : `${formatPointsCount(currentPoints)} points`}
+                  </p>
                 </div>
+                <p className="mt-1 text-sm leading-6 text-ink-soft">
+                  Tier range: {currentTierRange}
+                </p>
 
                 <div
                   className="mt-4 h-4 overflow-hidden rounded-full border border-line bg-cream"
                   role="progressbar"
-                  aria-label="Progress toward free shipping"
-                  aria-valuemin="0"
-                  aria-valuemax={nextRewardPoints}
-                  aria-valuenow={Math.min(currentPoints, nextRewardPoints)}
+                  aria-label={nextTier ? `Progress toward ${nextTier.name}` : 'Current tier progress'}
+                  aria-valuemin={currentTierMin}
+                  aria-valuemax={currentTierMax}
+                  aria-valuenow={nextTier ? Math.min(currentPoints, currentTierMax) : currentPoints}
                 >
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,#54715f_0%,#b88746_55%,#dfbd79_100%)]"
@@ -340,9 +364,14 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                 </div>
 
                 <p className="mt-4 text-lg font-semibold leading-8 text-ink">
+                  {nextTier
+                    ? `You are only ${formatPointsCount(tierPointsRemaining)} points away from ${nextTier.name}.`
+                    : 'You have reached the highest Athar tier.'}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
                   {freeShippingUnlocked
                     ? 'Free shipping is unlocked for your next eligible order.'
-                    : `You are only ${remainingPoints} points away from unlocking free shipping.`}
+                    : `Free shipping unlocks in ${formatPointsCount(remainingPoints)} more points.`}
                 </p>
               </div>
             </div>
