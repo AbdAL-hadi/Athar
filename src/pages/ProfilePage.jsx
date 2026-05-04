@@ -382,6 +382,21 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const isEditingContact = editingSection === 'contact';
   const isEditingAddress = editingSection === 'address';
+  const fullName = getUserFullName(localAuthUser);
+  const initials = fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || '?';
+  const accountType = formatRole(localAuthUser?.role);
+  const verificationLine = localAuthUser?.isEmailVerified
+    ? `Email verified for ${getDisplayValue(localAuthUser?.email)}.`
+    : `Verify ${getDisplayValue(localAuthUser?.email)} to secure your account updates.`;
+  const loyaltyBalance = Math.max(
+    Number(localAuthUser?.atharPoints ?? 0) || 0,
+    Number(localAuthUser?.loyaltyPoints ?? 0) || 0,
+  );
 
   return (
     <div className="min-h-screen bg-cream">
@@ -443,9 +458,7 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                   <FeedbackMessage tone={profilePictureFeedbackTone} message={profilePictureFeedback} />
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </header>
 
             <div className="mt-8 space-y-6">
               <section className="overflow-hidden rounded-[26px] border border-line bg-white">
@@ -610,6 +623,7 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                 </div>
                 <div className="grid gap-4 p-5 sm:p-7 lg:grid-cols-2">
                   <ReadOnlyField label="Account Type:" value={accountType} />
+                  <ReadOnlyField label="Athar Balance:" value={formatAtharPoints(loyaltyBalance)} />
                   <ReadOnlyField label="Member Since:" value={formatDate(localAuthUser?.createdAt)} />
                   <ReadOnlyField label="Last Updated:" value={formatDate(localAuthUser?.updatedAt)} wide />
                 </div>

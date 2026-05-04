@@ -333,12 +333,6 @@ const ProductDetailsPage = ({
     );
   }
 
-  const relatedProducts = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 3);
-  const galleryItems = product.images.map((image, index) => ({
-  type: 'image',
-  src: resolveApiAssetUrl(image),
-  alt: `${product.name} view ${index + 1}`,
-}));
   const unitProductPoints = calculateProductPoints(product);
   const purchasePoints = calculateProductPoints(product, quantity);
   const currentBalance = getCurrentAtharPointsBalance(authUser);
