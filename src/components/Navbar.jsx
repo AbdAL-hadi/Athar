@@ -122,6 +122,10 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <BagIcon />
                   ) : link.icon === 'track' ? (
                     <TrackIcon />
+                  ) : link.icon === 'map' ? (
+                    <MapIcon />
+                  ) : link.icon === 'reward' ? (
+                    <RewardIcon />
                   ) : link.icon === 'about' ? (
                     <AboutIcon />
                   ) : (
