@@ -51,6 +51,18 @@ const normalizeArrayField = (value) => {
 
 const normalizeBoolean = (value) => value === true || value === 'true' || value === '1' || value === 1;
 
+const normalizeOptionalNumber = (value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || (typeof value === 'string' && value.trim() === '')) {
+    return null;
+  }
+
+  return Number(value);
+};
+
 const uploadedImagePaths = (files = []) =>
   files.map((file) => `uploads/products/${file.filename}`).filter(Boolean);
 
@@ -82,6 +94,14 @@ const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
   if (payload.tryOnCategory !== undefined) payload.tryOnCategory = payload.tryOnCategory.toLowerCase();
   if (body.price !== undefined) payload.price = Number(body.price);
   if (body.compareAt !== undefined) payload.compareAt = Number(body.compareAt) || 0;
+
+  const submittedPointsValue = body.pointsValue ?? body.atharPoints ?? body.customPoints ?? body.points;
+  const normalizedPointsValue = normalizeOptionalNumber(submittedPointsValue);
+
+  if (normalizedPointsValue !== undefined) {
+    payload.pointsValue = normalizedPointsValue;
+  }
+
   if (body.stock !== undefined) {
     const nextStock = Number(body.stock);
     const inventoryState = getInventoryState(nextStock, existingProduct?.lowStockThreshold);
@@ -114,6 +134,14 @@ const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
   if (body.images !== undefined || body.existingImages !== undefined || files.length > 0) payload.images = images;
 
   return payload;
+};
+
+const hasInvalidPointsValue = (payload = {}) => {
+  if (payload.pointsValue === undefined || payload.pointsValue === null) {
+    return false;
+  }
+
+  return !Number.isFinite(payload.pointsValue) || payload.pointsValue < 0;
 };
 
 const ensureUniqueSlug = async (title, productIdToIgnore = null) => {
@@ -207,6 +235,10 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Stock must be a valid number.' });
     }
 
+    if (hasInvalidPointsValue(payload)) {
+      return res.status(400).json({ success: false, message: 'Points Value must be a valid number.' });
+    }
+
     if (!Array.isArray(payload.images) || payload.images.length === 0) {
       return res.status(400).json({ success: false, message: 'Upload at least one product image.' });
     }
@@ -263,6 +295,13 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Images must include at least one product image.',
+      });
+    }
+
+    if (hasInvalidPointsValue(updateData)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Points Value must be a valid number.',
       });
     }
 

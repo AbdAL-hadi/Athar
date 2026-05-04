@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
-import User from '../models/User.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
+import { awardLoyaltyPointsForOrder } from '../services/loyalty/loyaltyPointsService.js';
 import { calculateProductPoints } from '../src/utils/loyaltyPoints.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
@@ -34,8 +34,13 @@ const sanitizeCheckoutUser = (userDocument) => ({
   role: userDocument.role,
   favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
-  loyaltyPoints: Number(userDocument.loyaltyPoints ?? 0),
-  lifetimeLoyaltyPoints: Number(userDocument.lifetimeLoyaltyPoints ?? userDocument.loyaltyPoints ?? 0),
+  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.lifetimeLoyaltyPoints ?? 0),
+    Number(userDocument.atharPoints ?? 0),
+    Number(userDocument.loyaltyPoints ?? 0),
+  ),
   createdAt: userDocument.createdAt,
   updatedAt: userDocument.updatedAt,
 });
@@ -164,6 +169,8 @@ export const createOrder = async (req, res) => {
       shippingFee: normalizedShippingFee,
       total,
       loyaltyPointsEarned,
+      earnedPoints: loyaltyPointsEarned,
+      pointsAdded: false,
       status: 'Pending',
       paymentMethod,
       address,
@@ -175,26 +182,12 @@ export const createOrder = async (req, res) => {
       nextStatus: 'Confirmed',
     });
 
-    let updatedUser = null;
+    const loyaltyAward = await awardLoyaltyPointsForOrder(populatedOrder._id);
+    const updatedUser = loyaltyAward.user;
 
-    if (persistentUserId && loyaltyPointsEarned > 0) {
-      updatedUser = await User.findByIdAndUpdate(
-        persistentUserId,
-        {
-          $inc: {
-            loyaltyPoints: loyaltyPointsEarned,
-            lifetimeLoyaltyPoints: loyaltyPointsEarned,
-          },
-        },
-        { new: true },
-      ).select('-password');
-
-      if (updatedUser) {
-        populatedOrder.loyaltyPointsAppliedAt = new Date();
-        await Order.findByIdAndUpdate(populatedOrder._id, {
-          loyaltyPointsAppliedAt: populatedOrder.loyaltyPointsAppliedAt,
-        });
-      }
+    if (loyaltyAward.appliedAt) {
+      populatedOrder.loyaltyPointsAppliedAt = loyaltyAward.appliedAt;
+      populatedOrder.pointsAdded = true;
     }
 
     scheduleSalesWorkbookRefresh();
@@ -221,7 +214,8 @@ export const createOrder = async (req, res) => {
       data: populatedOrder,
       loyalty: {
         pointsEarned: loyaltyPointsEarned,
-        balance: updatedUser ? Number(updatedUser.loyaltyPoints ?? 0) : null,
+        balance: loyaltyAward.balance,
+        applied: loyaltyAward.applied,
       },
       user: updatedUser ? sanitizeCheckoutUser(updatedUser) : null,
       notifications: {

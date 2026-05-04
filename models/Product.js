@@ -84,6 +84,26 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    pointsValue: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    atharPoints: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    customPoints: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    points: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     sku: {
       type: String,
       default: '',

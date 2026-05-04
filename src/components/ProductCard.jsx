@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import FavoriteButton from './FavoriteButton';
 import { resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
-import { calculateProductPoints } from '../utils/loyaltyPoints';
+import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
 
 const MOTION_EASE = [0.22, 1, 0.36, 1];
 
@@ -86,7 +86,7 @@ const ProductCard = ({
               </div>
               {productPoints > 0 ? (
                 <span className="mt-2 inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                  +{productPoints} Athar Points
+                  +{formatAtharPoints(productPoints)}
                 </span>
               ) : null}
               {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}

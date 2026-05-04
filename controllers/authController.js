@@ -22,8 +22,13 @@ const sanitizeUser = (userDocument) => ({
   role: userDocument.role,
   favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
-  loyaltyPoints: Number(userDocument.loyaltyPoints ?? 0),
-  lifetimeLoyaltyPoints: Number(userDocument.lifetimeLoyaltyPoints ?? userDocument.loyaltyPoints ?? 0),
+  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.lifetimeLoyaltyPoints ?? 0),
+    Number(userDocument.atharPoints ?? 0),
+    Number(userDocument.loyaltyPoints ?? 0),
+  ),
   createdAt: userDocument.createdAt,
   updatedAt: userDocument.updatedAt,
 });

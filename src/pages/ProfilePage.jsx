@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
+import { formatAtharPoints } from '../utils/loyaltyPoints';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -69,6 +70,42 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
     setContactForm(buildContactForm(authUser));
     setAddressForm(buildAddressForm(authUser));
   }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    const activeToken = getActiveAuthToken(authToken);
+
+    if (!activeToken) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const refreshCurrentUser = async () => {
+      try {
+        const response = await apiRequest('/api/auth/me', { token: activeToken });
+        const updatedUser = response?.data ?? null;
+
+        if (!isCancelled && updatedUser) {
+          setLocalAuthUser(updatedUser);
+          onUpdateProfile?.(updatedUser);
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.debug('[Athar profile] Unable to refresh profile balance', error?.message ?? error);
+        }
+      }
+    };
+
+    refreshCurrentUser();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, authUser?.id]);
 
   if (!authUser) {
     return (
@@ -311,6 +348,13 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const isEditingContact = editingSection === 'contact';
   const isEditingAddress = editingSection === 'address';
+  const currentAtharPoints = Math.max(
+    Number(localAuthUser?.atharPoints ?? 0),
+    Number(localAuthUser?.loyaltyPoints ?? 0),
+  );
+  const lifetimeAtharPoints = Number.isFinite(Number(localAuthUser?.lifetimeLoyaltyPoints))
+    ? Number(localAuthUser.lifetimeLoyaltyPoints)
+    : currentAtharPoints;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blush/20 via-cream to-white">
@@ -362,6 +406,28 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                   <FeedbackMessage tone={profilePictureFeedbackTone} message={profilePictureFeedback} />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-8 overflow-hidden rounded-2xl border-2 border-[#dfbd79]/50 bg-white shadow-md">
+          <div className="border-b-2 border-line bg-[#fff7f0] px-8 py-6">
+            <h3 className="text-3xl font-bold text-ink">My Athar Points</h3>
+          </div>
+          <div className="grid gap-5 p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div>
+              <p className="text-lg font-semibold text-ink-soft">My Athar Points: {currentAtharPoints}</p>
+              <p className="mt-2 font-display text-6xl text-ink">{formatAtharPoints(currentAtharPoints)}</p>
+              <p className="mt-3 text-sm leading-6 text-ink-soft">
+                This balance reflects points earned from completed Athar purchases.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-cream px-5 py-4 text-left lg:min-w-[16rem]">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Lifetime earned</p>
+              <p className="mt-2 text-2xl font-bold text-ink">{formatAtharPoints(lifetimeAtharPoints)}</p>
+              <Link to="/rewards" className="mt-4 inline-flex text-sm font-semibold text-rose transition hover:text-ink">
+                View rewards
+              </Link>
             </div>
           </div>
         </div>

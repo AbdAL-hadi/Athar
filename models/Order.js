@@ -94,6 +94,15 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    earnedPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsAdded: {
+      type: Boolean,
+      default: false,
+    },
     loyaltyPointsAppliedAt: {
       type: Date,
       default: null,

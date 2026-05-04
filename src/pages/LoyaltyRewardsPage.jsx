@@ -239,8 +239,8 @@ const LoyaltyRewardsPage = ({ authUser }) => {
   const firstName = authUser?.name?.split(' ')?.[0] || 'Athar member';
   const heroImage = resolveApiAssetUrl('design/about-campaign-2.jpeg');
   const logoImage = resolveApiAssetUrl('design/logo.jpeg');
-  const currentPoints = Number.isFinite(Number(authUser?.loyaltyPoints))
-    ? Number(authUser.loyaltyPoints)
+  const currentPoints = authUser
+    ? Math.max(Number(authUser?.atharPoints ?? 0), Number(authUser?.loyaltyPoints ?? 0))
     : FALLBACK_LOYALTY_POINTS;
   const nextRewardPoints = FREE_SHIPPING_REWARD_POINTS;
   const remainingPoints = Math.max(0, nextRewardPoints - currentPoints);

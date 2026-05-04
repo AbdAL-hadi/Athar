@@ -62,6 +62,7 @@ const buildEditForm = (product) => ({
   accessibilityDescription: product.accessibilityDescription || '',
   price: product.price ?? '',
   compareAt: product.compareAt ?? '',
+  pointsValue: product.pointsValue ?? product.atharPoints ?? product.customPoints ?? product.points ?? '',
   stock: product.stock ?? '',
   category: product.category || '',
   material: product.material || '',
@@ -93,6 +94,7 @@ const buildEmptyProductForm = () => ({
   accessibilityDescription: '',
   price: '',
   compareAt: '',
+  pointsValue: '',
   stock: '',
   category: '',
   material: '',
@@ -293,6 +295,10 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
 
       if (!String(editForm.price ?? '').trim() || !Number.isFinite(Number(editForm.price))) {
         throw new Error('Price must be numeric.');
+      }
+
+      if (String(editForm.pointsValue ?? '').trim() && !Number.isFinite(Number(editForm.pointsValue))) {
+        throw new Error('Points Value must be numeric.');
       }
 
       if (!String(editForm.stock ?? '').trim() || !Number.isFinite(Number(editForm.stock))) {

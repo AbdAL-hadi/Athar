@@ -210,6 +210,22 @@ const AdminProductEditor = ({
                 </div>
 
                 <div>
+                  <FieldLabel>Points Value (optional)</FieldLabel>
+                  <input
+                    type="number"
+                    value={form.pointsValue}
+                    onChange={(event) => onFieldChange('pointsValue', event.target.value)}
+                    className={fieldClassName}
+                    min="0"
+                    step="1"
+                    placeholder="Auto from price"
+                  />
+                  <p className="mt-2 text-sm leading-6 text-ink-soft">
+                    Leave empty to calculate points automatically from price: 1 dollar = 1 point.
+                  </p>
+                </div>
+
+                <div>
                   <FieldLabel>Description</FieldLabel>
                   <textarea
                     value={form.description}

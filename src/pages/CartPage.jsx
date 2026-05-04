@@ -3,11 +3,15 @@ import CartItem from '../components/CartItem';
 import SectionTitle from '../components/SectionTitle';
 import { formatCurrency } from '../utils/format';
 import { getCartCompareSubtotal, getCartGrandTotal, getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
+import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
+import { findProductByReference } from '../utils/productCatalog';
 
-const CartPage = ({ items, onUpdateQuantity, onRemoveItem }) => {
+const CartPage = ({ items, products = [], onUpdateQuantity, onRemoveItem }) => {
   const subtotal = getCartSubtotal(items);
   const compareSubtotal = getCartCompareSubtotal(items);
   const grandTotal = getCartGrandTotal(items);
+  const resolvePointsProduct = (item) => findProductByReference(products, item.productId || item.id) ?? item;
+  const cartPoints = items.reduce((sum, item) => sum + calculateProductPoints(resolvePointsProduct(item), item.quantity), 0);
 
   if (items.length === 0) {
     return (
@@ -29,7 +33,7 @@ const CartPage = ({ items, onUpdateQuantity, onRemoveItem }) => {
 
       <section className="overflow-hidden rounded-[32px] bg-white shadow-soft">
         {items.map((item) => (
-          <CartItem key={item.id} item={item} onUpdateQuantity={onUpdateQuantity} onRemove={onRemoveItem} />
+          <CartItem key={item.id} item={item} pointsProduct={resolvePointsProduct(item)} onUpdateQuantity={onUpdateQuantity} onRemove={onRemoveItem} />
         ))}
 
         <div className="flex flex-col gap-6 px-5 py-6 lg:flex-row lg:items-end lg:justify-between">
@@ -37,6 +41,11 @@ const CartPage = ({ items, onUpdateQuantity, onRemoveItem }) => {
             {compareSubtotal > subtotal ? <p className="font-display text-4xl text-muted line-through">{formatCurrency(compareSubtotal)}</p> : null}
             <p className="font-display text-5xl text-ink">{formatCurrency(grandTotal)}</p>
             <p className="text-base text-ink-soft">Includes shipping of {formatCurrency(SHIPPING_FEE)}</p>
+            {cartPoints > 0 ? (
+              <p className="mt-3 inline-flex rounded-full border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-2 text-sm font-bold text-[#8f5f45]">
+                You will earn {formatAtharPoints(cartPoints)} from this order.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-3">

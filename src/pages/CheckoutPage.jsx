@@ -9,6 +9,7 @@ import { getCartGrandTotal, getCartSubtotal, SHIPPING_FEE } from '../utils/cart'
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
 import { getOrderIdentifier, saveRecentOrder } from '../utils/orders';
+import { findProductByReference } from '../utils/productCatalog';
 
 const initialForm = {
   fullName: '',
@@ -37,6 +38,8 @@ const CheckoutPage = ({
   const isSuccessRoute = location.pathname === '/checkout/success';
   const whatsappNotification = location.state?.whatsappNotification ?? null;
   const loyaltyAward = location.state?.loyalty ?? null;
+  const [successOrder, setSuccessOrder] = useState(null);
+  const [successOrderError, setSuccessOrderError] = useState('');
   const [formData, setFormData] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,12 +59,68 @@ const CheckoutPage = ({
     }
   }, [authUser]);
 
+  useEffect(() => {
+    if (!isSuccessRoute || !orderNumberFromUrl || loyaltyAward?.pointsEarned) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadSuccessOrder = async () => {
+      setSuccessOrderError('');
+
+      try {
+        const response = await apiRequest(`/api/orders/${encodeURIComponent(orderNumberFromUrl)}`, {
+          token: getActiveAuthToken(authToken),
+        });
+
+        if (!isCancelled) {
+          setSuccessOrder(response?.data ?? null);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setSuccessOrder(null);
+          setSuccessOrderError(error?.message ?? 'We could not reload this order right now.');
+        }
+      }
+    };
+
+    loadSuccessOrder();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, isSuccessRoute, loyaltyAward?.pointsEarned, orderNumberFromUrl]);
+
   const subtotal = useMemo(() => getCartSubtotal(items), [items]);
   const total = useMemo(() => getCartGrandTotal(items), [items]);
   const cartPoints = useMemo(
-    () => items.reduce((sum, item) => sum + calculateProductPoints(item, item.quantity), 0),
-    [items],
+    () =>
+      items.reduce((sum, item) => {
+        const pointsProduct = findProductByReference(products, item.productId || item.id) ?? item;
+        return sum + calculateProductPoints(pointsProduct, item.quantity);
+      }, 0),
+    [items, products],
   );
+  const checkoutPointsSummary = useMemo(() => {
+    if (items.length === 0) {
+      return null;
+    }
+
+    return {
+      title: `Complete this order and earn ${formatAtharPoints(cartPoints)}.`,
+      description: authUser
+        ? 'These points will be added to your Athar Points balance after the purchase is completed successfully.'
+        : 'Log in before placing this order to save these points to your Athar Points balance.',
+    };
+  }, [authUser, cartPoints, items.length]);
+  const successPointsEarned = Number(loyaltyAward?.pointsEarned ?? successOrder?.earnedPoints ?? successOrder?.loyaltyPointsEarned ?? 0);
+  const successBalance =
+    loyaltyAward?.balance !== null && loyaltyAward?.balance !== undefined
+      ? Number(loyaltyAward.balance)
+      : authUser?.atharPoints !== null && authUser?.atharPoints !== undefined
+        ? Math.max(Number(authUser.atharPoints ?? 0), Number(authUser.loyaltyPoints ?? 0))
+        : null;
 
   const validate = () => {
     const nextErrors = {};
@@ -106,7 +165,7 @@ const CheckoutPage = ({
 
       const payload = {
         items: items.map((item) => {
-          const product = products.find((catalogProduct) => catalogProduct.id === item.id || catalogProduct.productId === item.id);
+          const product = findProductByReference(products, item.productId || item.id);
 
           return {
             productId: product?.productId || product?.id,
@@ -134,8 +193,8 @@ const CheckoutPage = ({
       const order = response?.data;
       const orderIdentifier = getOrderIdentifier(order);
       const loyalty = response?.loyalty ?? {
-        pointsEarned: order?.loyaltyPointsEarned ?? cartPoints,
-        balance: response?.user?.loyaltyPoints ?? null,
+        pointsEarned: order?.earnedPoints ?? order?.loyaltyPointsEarned ?? cartPoints,
+        balance: response?.user?.atharPoints ?? response?.user?.loyaltyPoints ?? null,
       };
       saveRecentOrder(orderIdentifier, authUser);
 
@@ -174,12 +233,14 @@ const CheckoutPage = ({
             <p className="mt-2 break-all font-display text-5xl text-ink">{orderNumberFromUrl || 'Pending'}</p>
           </div>
 
-          {loyaltyAward?.pointsEarned ? (
+          {successPointsEarned > 0 ? (
             <div className="mx-auto mt-5 max-w-md rounded-[28px] border border-[#dfbd79]/50 bg-[#fff7f0] px-6 py-5">
-              <p className="text-lg font-semibold text-ink">You earned {formatAtharPoints(loyaltyAward.pointsEarned)}.</p>
-              {loyaltyAward.balance !== null && loyaltyAward.balance !== undefined ? (
+              <p className="text-lg font-semibold text-ink">
+                Congratulations! You earned {formatAtharPoints(successPointsEarned)} from this order.
+              </p>
+              {successBalance !== null && successBalance !== undefined ? (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
-                  Your new balance is {formatAtharPoints(loyaltyAward.balance)}.
+                  Your new balance is {formatAtharPoints(successBalance)}.
                 </p>
               ) : (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
@@ -187,6 +248,9 @@ const CheckoutPage = ({
                 </p>
               )}
             </div>
+          ) : null}
+          {successOrderError ? (
+            <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-ink-soft">{successOrderError}</p>
           ) : null}
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -222,7 +286,7 @@ const CheckoutPage = ({
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[32px] bg-white p-6 shadow-soft">
-          <CheckoutForm formData={formData} errors={errors} onFieldChange={handleFieldChange} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+          <CheckoutForm formData={formData} errors={errors} onFieldChange={handleFieldChange} onSubmit={handleSubmit} isSubmitting={isSubmitting} pointsSummary={checkoutPointsSummary} />
         </section>
 
         <section className="rounded-[32px] bg-white p-6 shadow-soft">
@@ -231,18 +295,23 @@ const CheckoutPage = ({
             <p className="mt-4 text-lg text-ink-soft">Your cart is empty. Add products first before checking out.</p>
           ) : (
             <div className="mt-6 space-y-4">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 rounded-[22px] bg-cream px-4 py-3">
-                  <div>
-                    <p className="font-medium text-ink">{item.name}</p>
-                    <p className="text-sm text-ink-soft">x{item.quantity}</p>
-                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                      +{calculateProductPoints(item, item.quantity)} Athar Points
-                    </p>
+              {items.map((item) => {
+                const pointsProduct = findProductByReference(products, item.productId || item.id) ?? item;
+                const itemPoints = calculateProductPoints(pointsProduct, item.quantity);
+
+                return (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-[22px] bg-cream px-4 py-3">
+                    <div>
+                      <p className="font-medium text-ink">{item.name}</p>
+                      <p className="text-sm text-ink-soft">x{item.quantity}</p>
+                      <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+                        +{formatAtharPoints(itemPoints)}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-ink">{formatCurrency(item.price * item.quantity)}</p>
                   </div>
-                  <p className="font-semibold text-ink">{formatCurrency(item.price * item.quantity)}</p>
-                </div>
-              ))}
+                );
+              })}
               <div className="space-y-3 border-t border-line pt-4 text-ink-soft">
                 <div className="flex items-center justify-between">
                   <span>Subtotal</span>
@@ -259,10 +328,10 @@ const CheckoutPage = ({
                 <div className="rounded-[22px] border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-3">
                   <div className="flex items-center justify-between gap-3 font-semibold text-ink">
                     <span>Athar Points earned</span>
-                    <span>+{cartPoints}</span>
+                    <span>+{formatAtharPoints(cartPoints)}</span>
                   </div>
                   <p className="mt-1 text-xs leading-5 text-ink-soft">
-                    Points are added to your account after the order is confirmed.
+                    Points are added to your account after the purchase is completed successfully.
                   </p>
                 </div>
               </div>

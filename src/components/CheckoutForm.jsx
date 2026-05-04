@@ -7,6 +7,7 @@ const CheckoutForm = ({
   title = 'Shipping details',
   submitLabel = 'Confirm order',
   paymentMethods = ['Cash on Delivery'],
+  pointsSummary = null,
   className = '',
 }) => {
   return (
@@ -59,6 +60,13 @@ const CheckoutForm = ({
         ))}
         {errors.paymentMethod ? <p className="text-sm text-[#b56f64]">{errors.paymentMethod}</p> : null}
       </div>
+
+      {pointsSummary ? (
+        <div className="rounded-[24px] border border-[#dfbd79]/50 bg-[#fff7f0] px-5 py-4">
+          <p className="text-lg font-semibold text-ink">{pointsSummary.title}</p>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">{pointsSummary.description}</p>
+        </div>
+      ) : null}
 
       <button type="submit" disabled={isSubmitting} className="button-primary w-full py-4 text-xl">
         {isSubmitting ? 'Placing order...' : submitLabel}
