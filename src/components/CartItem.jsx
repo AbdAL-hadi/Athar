@@ -5,6 +5,7 @@ import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoint
 
 const CartItem = ({ item, pointsProduct = null, onUpdateQuantity, onRemove, className = '' }) => {
   const itemPoints = calculateProductPoints(pointsProduct ?? item, item.quantity);
+  const unitPoints = calculateProductPoints(pointsProduct ?? item);
 
   return (
     <article
@@ -17,9 +18,14 @@ const CartItem = ({ item, pointsProduct = null, onUpdateQuantity, onRemove, clas
         <h2 className="mt-2 font-display text-4xl text-ink">{item.name}</h2>
         <p className="mt-2 text-2xl font-semibold text-ink">{formatCurrency(item.price)}</p>
         {itemPoints > 0 ? (
-          <span className="mt-3 inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-            +{formatAtharPoints(itemPoints)}
-          </span>
+          <div className="mt-3 space-y-1.5">
+            <span className="inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+              Earn {formatAtharPoints(itemPoints)}
+            </span>
+            <p className="text-sm leading-6 text-ink-soft">
+              {formatAtharPoints(unitPoints)} per piece x {item.quantity}.
+            </p>
+          </div>
         ) : null}
         <p className="mt-2 text-base text-ink-soft">{item.material}</p>
       </div>

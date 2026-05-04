@@ -292,7 +292,7 @@ const App = () => {
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/rewards" element={<LoyaltyRewardsPage authUser={authUser} />} />
         <Route path="/loyalty" element={<LoyaltyRewardsPage authUser={authUser} />} />
-        <Route path="/cart" element={<CartPage items={cartItems} products={products} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
+        <Route path="/cart" element={<CartPage items={cartItems} products={products} authUser={authUser} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />

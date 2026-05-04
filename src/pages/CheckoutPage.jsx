@@ -7,7 +7,7 @@ import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { getCartGrandTotal, getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
-import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
+import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
 import { getOrderIdentifier, saveRecentOrder } from '../utils/orders';
 import { findProductByReference } from '../utils/productCatalog';
 
@@ -102,6 +102,8 @@ const CheckoutPage = ({
       }, 0),
     [items, products],
   );
+  const currentBalance = useMemo(() => getCurrentAtharPointsBalance(authUser), [authUser]);
+  const projectedBalance = currentBalance + cartPoints;
   const checkoutPointsSummary = useMemo(() => {
     if (items.length === 0) {
       return null;
@@ -112,15 +114,29 @@ const CheckoutPage = ({
       description: authUser
         ? 'These points will be added to your Athar Points balance after the purchase is completed successfully.'
         : 'Log in before placing this order to save these points to your Athar Points balance.',
+      metrics: authUser
+        ? [
+            { label: 'Current balance', value: formatAtharPoints(currentBalance) },
+            { label: 'This checkout', value: formatAtharPoints(cartPoints) },
+            { label: 'After purchase', value: formatAtharPoints(projectedBalance) },
+          ]
+        : [
+            { label: 'This checkout', value: formatAtharPoints(cartPoints) },
+            { label: 'Account status', value: 'Log in to save' },
+          ],
     };
-  }, [authUser, cartPoints, items.length]);
+  }, [authUser, cartPoints, currentBalance, items.length, projectedBalance]);
   const successPointsEarned = Number(loyaltyAward?.pointsEarned ?? successOrder?.earnedPoints ?? successOrder?.loyaltyPointsEarned ?? 0);
   const successBalance =
     loyaltyAward?.balance !== null && loyaltyAward?.balance !== undefined
       ? Number(loyaltyAward.balance)
       : authUser?.atharPoints !== null && authUser?.atharPoints !== undefined
-        ? Math.max(Number(authUser.atharPoints ?? 0), Number(authUser.loyaltyPoints ?? 0))
+        ? getCurrentAtharPointsBalance(authUser)
         : null;
+  const previousBalance =
+    successBalance !== null && successBalance !== undefined
+      ? Math.max(0, successBalance - successPointsEarned)
+      : null;
 
   const validate = () => {
     const nextErrors = {};
@@ -239,9 +255,20 @@ const CheckoutPage = ({
                 Congratulations! You earned {formatAtharPoints(successPointsEarned)} from this order.
               </p>
               {successBalance !== null && successBalance !== undefined ? (
-                <p className="mt-2 text-sm leading-6 text-ink-soft">
-                  Your new balance is {formatAtharPoints(successBalance)}.
-                </p>
+                <div className="mt-4 grid gap-3 text-left">
+                  <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Balance before purchase</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(previousBalance)}</p>
+                  </div>
+                  <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Points earned</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(successPointsEarned)}</p>
+                  </div>
+                  <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Updated balance</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(successBalance)}</p>
+                  </div>
+                </div>
               ) : (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
                   Log in before checkout next time to save points to your Athar account.
@@ -330,6 +357,18 @@ const CheckoutPage = ({
                     <span>Athar Points earned</span>
                     <span>+{formatAtharPoints(cartPoints)}</span>
                   </div>
+                  {authUser ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
+                      </div>
+                      <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After purchase</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalance)}</p>
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="mt-1 text-xs leading-5 text-ink-soft">
                     Points are added to your account after the purchase is completed successfully.
                   </p>

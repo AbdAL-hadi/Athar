@@ -15,6 +15,8 @@ const asNonNegativeNumber = (value) => {
   return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
 };
 
+export const normalizeAtharPoints = (points) => Math.max(0, Math.round(Number(points) || 0));
+
 export const getProductCustomPointsValue = (product = {}) => {
   if (!product || typeof product !== 'object') {
     return null;
@@ -56,6 +58,12 @@ export const calculateProductPoints = (productOrPrice, quantity = 1) => {
 };
 
 export const formatAtharPoints = (points) => {
-  const normalizedPoints = Math.max(0, Math.round(Number(points) || 0));
+  const normalizedPoints = normalizeAtharPoints(points);
   return `${normalizedPoints} Athar Point${normalizedPoints === 1 ? '' : 's'}`;
 };
+
+export const getCurrentAtharPointsBalance = (user = null) =>
+  Math.max(
+    normalizeAtharPoints(user?.atharPoints ?? 0),
+    normalizeAtharPoints(user?.loyaltyPoints ?? 0),
+  );

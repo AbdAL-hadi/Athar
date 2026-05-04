@@ -410,22 +410,28 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
           </div>
         </div>
 
-        <div className="mb-8 overflow-hidden rounded-2xl border-2 border-[#dfbd79]/50 bg-white shadow-md">
-          <div className="border-b-2 border-line bg-[#fff7f0] px-8 py-6">
-            <h3 className="text-3xl font-bold text-ink">My Athar Points</h3>
+        <div className="heritage-surface mb-8 overflow-hidden rounded-[32px] border">
+          <div className="border-b border-line/80 bg-[linear-gradient(90deg,rgba(255,247,240,0.95),rgba(248,242,238,0.92))] px-8 py-6">
+            <div className="athar-gold-rule mb-4" />
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#8f5f45]">Athar Rewards</p>
+            <h3 className="mt-3 font-display text-4xl font-bold text-ink">My Athar Points</h3>
           </div>
           <div className="grid gap-5 p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div>
-              <p className="text-lg font-semibold text-ink-soft">My Athar Points: {currentAtharPoints}</p>
+              <div className="flex flex-wrap gap-2">
+                <span className="heritage-pill">Member balance</span>
+                <span className="heritage-pill">Rewards ready</span>
+              </div>
+              <p className="mt-5 text-lg font-semibold text-ink-soft">My Athar Points: {currentAtharPoints}</p>
               <p className="mt-2 font-display text-6xl text-ink">{formatAtharPoints(currentAtharPoints)}</p>
               <p className="mt-3 text-sm leading-6 text-ink-soft">
                 This balance reflects points earned from completed Athar purchases.
               </p>
             </div>
-            <div className="rounded-2xl bg-cream px-5 py-4 text-left lg:min-w-[16rem]">
+            <div className="heritage-panel rounded-[24px] px-5 py-4 text-left lg:min-w-[16rem]">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Lifetime earned</p>
               <p className="mt-2 text-2xl font-bold text-ink">{formatAtharPoints(lifetimeAtharPoints)}</p>
-              <Link to="/rewards" className="mt-4 inline-flex text-sm font-semibold text-rose transition hover:text-ink">
+              <Link to="/rewards" className="mt-4 inline-flex text-sm font-semibold text-[#8f5f45] transition hover:text-ink">
                 View rewards
               </Link>
             </div>

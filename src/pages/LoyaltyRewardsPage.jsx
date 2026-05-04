@@ -160,6 +160,8 @@ const CityBadgeIcon = ({ city, accent }) => {
   );
 };
 
+const formatPointsCount = (points) => Math.max(0, Math.round(Number(points) || 0)).toLocaleString('en-US');
+
 const EarnIcon = ({ type }) => {
   const commonProps = {
     'aria-hidden': 'true',
@@ -256,6 +258,7 @@ const LoyaltyRewardsPage = ({ authUser }) => {
   const readyRewardSummary = readyRewards.length > 0
     ? readyRewards.map((reward) => reward.title).join(' + ')
     : 'Keep earning';
+  const heritageMoments = ['Handcrafted rewards', 'Warm member benefits', 'Heritage-inspired tiers'];
 
   return (
     <div className="athar-rewards-page min-h-screen overflow-hidden pb-14">
@@ -270,6 +273,13 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                   <h1 className="mt-3 font-display text-5xl font-bold leading-tight text-ink sm:text-6xl">
                     My Athar Points
                   </h1>
+                  <div className="mt-5 flex flex-wrap gap-2.5">
+                    {heritageMoments.map((item) => (
+                      <span key={item} className="heritage-pill">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 {authUser ? (
@@ -294,13 +304,13 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                   <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Available balance</p>
                   <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
                     <span className="font-display text-8xl font-bold leading-none text-ink sm:text-9xl">
-                      {currentPoints}
+                      {formatPointsCount(currentPoints)}
                     </span>
                     <span className="pb-3 text-xl font-semibold text-ink-soft">points</span>
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[#dfcdbd] bg-[#fffaf7]/90 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                <div className="heritage-panel rounded-[24px] px-5 py-5">
                   <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Current tier</p>
                   <p className="mt-3 font-display text-4xl font-bold text-ink">{currentTier.name}</p>
                   <p className="mt-2 text-sm leading-6 text-ink-soft">
@@ -312,7 +322,7 @@ const LoyaltyRewardsPage = ({ authUser }) => {
               <div className="mt-10">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-base font-semibold text-ink">Progress toward free shipping</p>
-                  <p className="text-base font-bold text-ink">{currentPoints} / {nextRewardPoints} points</p>
+                  <p className="text-base font-bold text-ink">{formatPointsCount(currentPoints)} / {formatPointsCount(nextRewardPoints)} points</p>
                 </div>
 
                 <div
@@ -345,9 +355,9 @@ const LoyaltyRewardsPage = ({ authUser }) => {
               />
               <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(59,38,31,0.93),rgba(84,113,95,0.5))]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(223,189,121,0.22),transparent_24%)]" />
-              <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
-                <div className="flex items-center gap-3">
-                  <img src={logoImage} alt="Athar" className="h-14 w-14 rounded-full object-cover" />
+                <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
+                  <div className="flex items-center gap-3">
+                    <img src={logoImage} alt="Athar" className="h-14 w-14 rounded-full object-cover" />
                   <div>
                     <p className="font-display text-3xl font-bold leading-none">Athar</p>
                     <p className="text-sm text-white/75">Culture carried forward</p>
@@ -355,6 +365,9 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                 </div>
 
                 <div>
+                  <span className="inline-flex rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white/88 backdrop-blur-sm">
+                    Crafted with story
+                  </span>
                   <p className="max-w-sm font-display text-4xl font-bold leading-tight">
                     Points with roots in cities, craft, and traditional stories.
                   </p>
@@ -368,41 +381,41 @@ const LoyaltyRewardsPage = ({ authUser }) => {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          <article className="rounded-[24px] border border-[#ead9ca] bg-white/90 px-5 py-5 shadow-card">
+          <article className="heritage-metric-card">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Points</p>
-            <p className="mt-2 font-display text-4xl font-bold text-ink">{currentPoints}</p>
+            <p className="mt-2 font-display text-4xl font-bold text-ink">{formatPointsCount(currentPoints)}</p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">Ready to use or save.</p>
           </article>
 
-          <article className="rounded-[24px] border border-[#ead9ca] bg-white/90 px-5 py-5 shadow-card">
+          <article className="heritage-metric-card">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Next reward</p>
             <p className="mt-2 font-display text-3xl font-bold text-ink">
-              {freeShippingUnlocked ? 'Unlocked' : `${remainingPoints} points`}
+              {freeShippingUnlocked ? 'Unlocked' : `${formatPointsCount(remainingPoints)} points`}
             </p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">
               {freeShippingUnlocked ? 'Free shipping is ready.' : 'Until free shipping.'}
             </p>
           </article>
 
-          <article className="rounded-[24px] border border-[#ead9ca] bg-white/90 px-5 py-5 shadow-card">
+          <article className="heritage-metric-card">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Tier</p>
             <p className="mt-2 font-display text-3xl font-bold text-ink">{currentTier.name}</p>
-            <p className="mt-1 text-sm leading-6 text-ink-soft">{pointsToNextTier} points to {nextTier?.name ?? 'top tier'}.</p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">{formatPointsCount(pointsToNextTier)} points to {nextTier?.name ?? 'top tier'}.</p>
           </article>
 
-          <article className="rounded-[24px] border border-[#ead9ca] bg-white/90 px-5 py-5 shadow-card">
+          <article className="heritage-metric-card">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Earn</p>
             <p className="mt-2 font-display text-3xl font-bold text-ink">{earnOptions.length} ways</p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">Shop, review, refer, celebrate.</p>
           </article>
 
-          <article className="rounded-[24px] border border-[#b88746] bg-[#fff7f0] px-5 py-5 shadow-card">
+          <article className="heritage-metric-card heritage-metric-card--highlight">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8f5f45]">Redeem</p>
             <p className="mt-2 font-display text-3xl font-bold text-ink">{readyRewards.length} ready</p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">{readyRewardSummary}</p>
           </article>
 
-          <article className="rounded-[24px] border border-[#d6dec8] bg-[#f7f8f0] px-5 py-5 shadow-card">
+          <article className="heritage-metric-card heritage-metric-card--olive">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#54715f]">City badges</p>
             <p className="mt-2 font-display text-3xl font-bold text-ink">{collectedCityBadgeCount} collected</p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">Next: {nextCityBadge.city}.</p>
@@ -432,7 +445,7 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                     isCurrentTier
                       ? 'border-[#b88746] bg-[linear-gradient(145deg,#fffaf7_0%,#f3e1d1_64%,#eef2e7_100%)]'
                       : isUnlocked
-                        ? 'border-[#d8c6bc] bg-white'
+                        ? 'border-[#d8c6bc] bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(255,247,240,0.84))]'
                         : 'border-line bg-white/80'
                   }`}
                 >
@@ -451,8 +464,8 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                   <p className="mt-2 text-sm font-bold text-[#8f5f45]">{tier.range}</p>
                   <p className="mt-4 min-h-[5.25rem] text-sm leading-7 text-ink-soft">{tier.description}</p>
                   {!isUnlocked ? (
-                    <p className="mt-4 rounded-full bg-cream px-3 py-2 text-sm font-semibold text-ink">
-                      {tier.minPoints - currentPoints} points to unlock
+                    <p className="mt-4 inline-flex rounded-full bg-cream px-3 py-2 text-sm font-semibold text-ink">
+                      {formatPointsCount(tier.minPoints - currentPoints)} points to unlock
                     </p>
                   ) : null}
                 </article>
@@ -460,10 +473,10 @@ const LoyaltyRewardsPage = ({ authUser }) => {
             })}
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-line bg-white px-5 py-5 shadow-card">
+          <div className="heritage-outline mt-5 px-5 py-5">
             <p className="text-base font-semibold leading-8 text-ink">
               {nextTier
-                ? `Collect ${pointsToNextTier} more points to reach ${nextTier.name}.`
+                ? `Collect ${formatPointsCount(pointsToNextTier)} more points to reach ${nextTier.name}.`
                 : 'You have reached the highest Athar tier.'}
             </p>
             <p className="mt-1 text-sm leading-7 text-ink-soft">
@@ -473,7 +486,7 @@ const LoyaltyRewardsPage = ({ authUser }) => {
         </section>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          <div className="rounded-[24px] border border-line bg-white px-5 py-5 shadow-card">
+          <div className="heritage-outline px-5 py-5">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Account access</p>
             <p className="mt-3 text-lg font-semibold text-ink">
               {authUser ? `Welcome back, ${firstName}.` : 'Log in to keep your rewards close.'}
@@ -490,13 +503,13 @@ const LoyaltyRewardsPage = ({ authUser }) => {
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-line bg-white px-5 py-5 shadow-card">
+          <div className="heritage-outline px-5 py-5">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Next reward</p>
             <p className="mt-3 font-display text-3xl font-bold text-ink">Free shipping</p>
             <p className="mt-2 text-sm leading-6 text-ink-soft">Reach 300 points and redeem delivery on a future order.</p>
           </div>
 
-          <div className="rounded-[24px] border border-line bg-white px-5 py-5 shadow-card">
+          <div className="heritage-outline px-5 py-5">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Member note</p>
             <p className="mt-3 text-lg font-semibold text-ink">Rewards are applied at checkout.</p>
             <p className="mt-2 text-sm leading-6 text-ink-soft">Keep earning through purchases, reviews, and profile milestones.</p>
@@ -518,13 +531,13 @@ const LoyaltyRewardsPage = ({ authUser }) => {
 
             <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {earnOptions.map((option) => (
-                <article key={option.title} className="rounded-[24px] border border-[#ead9ca] bg-white/[0.92] p-5 shadow-card transition hover:-translate-y-1 hover:border-[#d8b36c] hover:shadow-soft">
+                <article key={option.title} className="heritage-panel rounded-[24px] p-5 transition hover:-translate-y-1 hover:border-[#d8b36c] hover:shadow-soft">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff7f0] text-[#8f5f45] shadow-[inset_0_0_0_1px_rgba(143,95,69,0.14)] ring-1 ring-[#dfbd79]/25">
                     <EarnIcon type={option.icon} />
                   </div>
                   <div className="mt-5">
                     <p className="font-display text-3xl font-bold text-ink">{option.title}</p>
-                    <p className="mt-2 inline-flex rounded-full bg-blush px-3 py-1 text-sm font-bold text-ink">
+                    <p className="heritage-pill mt-3 bg-blush px-3 py-1 text-sm font-bold normal-case tracking-[0.04em] text-ink">
                       {option.value}
                     </p>
                     <p className="mt-4 text-sm leading-7 text-ink-soft">{option.description}</p>
@@ -551,7 +564,7 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                   <article
                     key={reward.title}
                     className={`rounded-[22px] border px-4 py-4 ${
-                      isAvailable ? 'border-[#b88746] bg-[#fff7f0]' : 'border-line bg-cream/60'
+                      isAvailable ? 'border-[#b88746] bg-[linear-gradient(145deg,#fff7f0_0%,#fffdfb_100%)]' : 'border-line bg-cream/60'
                     }`}
                   >
                     <div className="flex items-start gap-4">
@@ -561,11 +574,11 @@ const LoyaltyRewardsPage = ({ authUser }) => {
                       <div className="min-w-0 flex-1">
                         <div className={`h-1.5 w-16 rounded-full ${reward.accent}`} />
                         <p className="mt-3 font-display text-2xl font-bold leading-tight text-ink">
-                          {reward.cost} points = {reward.title}
+                          {formatPointsCount(reward.cost)} points = {reward.title}
                         </p>
                         <p className="mt-2 text-sm leading-6 text-ink-soft">{reward.description}</p>
                         <p className={`mt-3 text-sm font-bold ${isAvailable ? 'text-[#54715f]' : 'text-[#8f5f45]'}`}>
-                          {isAvailable ? 'Ready to redeem' : `${pointsNeeded} points away`}
+                          {isAvailable ? 'Ready to redeem' : `${formatPointsCount(pointsNeeded)} points away`}
                         </p>
                       </div>
                     </div>
@@ -611,13 +624,13 @@ const LoyaltyRewardsPage = ({ authUser }) => {
 
             <div className="grid gap-4 md:grid-cols-2">
               {cityBadges.map((badge) => (
-                <article key={badge.city} className="rounded-[28px] border border-[#ead9ca] bg-white/90 p-5 shadow-card backdrop-blur transition hover:-translate-y-1 hover:shadow-soft">
+                <article key={badge.city} className="heritage-panel rounded-[28px] p-5 backdrop-blur transition hover:-translate-y-1 hover:shadow-soft">
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                     <CityBadgeIcon city={badge.city} accent={badge.accent} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-display text-3xl font-bold text-ink">{badge.city}</p>
-                        <span className="rounded-full bg-cream px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#8f5f45]">
+                        <span className="heritage-pill px-3 py-1 text-xs tracking-[0.14em]">
                           {badge.status}
                         </span>
                       </div>

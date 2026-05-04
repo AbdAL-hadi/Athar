@@ -9,7 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
-import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
+import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
 import { findProductByReference, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
 
 const getDefaultMedia = (product) => {
@@ -358,6 +358,8 @@ const ProductDetailsPage = ({
 }));
   const unitProductPoints = calculateProductPoints(product);
   const purchasePoints = calculateProductPoints(product, quantity);
+  const currentBalance = getCurrentAtharPointsBalance(authUser);
+  const projectedBalance = currentBalance + purchasePoints;
 
   const handleAdd = () => {
     if (product.stock < 1) return;
@@ -421,6 +423,22 @@ const ProductDetailsPage = ({
               <p className="mt-1 text-sm leading-6 text-ink-soft">
                 {formatAtharPoints(unitProductPoints)} per piece will be added to your Athar balance after checkout.
               </p>
+              {authUser ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[18px] bg-white/80 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
+                  </div>
+                  <div className="rounded-[18px] bg-white/80 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After this order</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(projectedBalance)}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm leading-6 text-ink-soft">
+                  Log in before checkout to save these points to your Athar balance.
+                </p>
+              )}
             </div>
           ) : null}
           <div className="mt-8 space-y-4">

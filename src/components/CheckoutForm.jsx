@@ -65,6 +65,16 @@ const CheckoutForm = ({
         <div className="rounded-[24px] border border-[#dfbd79]/50 bg-[#fff7f0] px-5 py-4">
           <p className="text-lg font-semibold text-ink">{pointsSummary.title}</p>
           <p className="mt-1 text-sm leading-6 text-ink-soft">{pointsSummary.description}</p>
+          {Array.isArray(pointsSummary.metrics) && pointsSummary.metrics.length > 0 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {pointsSummary.metrics.map((metric) => (
+                <div key={metric.label} className="rounded-[18px] bg-white/70 px-4 py-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{metric.label}</p>
+                  <p className="mt-2 text-base font-semibold text-ink">{metric.value}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -85,9 +85,14 @@ const ProductCard = ({
                 ) : null}
               </div>
               {productPoints > 0 ? (
-                <span className="mt-2 inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                  +{formatAtharPoints(productPoints)}
-                </span>
+                <div className="mt-2 space-y-1.5">
+                  <span className="inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+                    Earn {formatAtharPoints(productPoints)}
+                  </span>
+                  <p className="text-xs leading-5 text-ink-soft">
+                    Added to your balance after a successful checkout.
+                  </p>
+                </div>
               ) : null}
               {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}
             </div>
