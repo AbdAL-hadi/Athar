@@ -9,6 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
 import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
+import { formatCurrency } from '../utils/format';
 
 const ProductIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -35,7 +36,25 @@ const sortOptions = [
   { value: 'price-asc', label: 'Price: low to high' },
   { value: 'price-desc', label: 'Price: high to low' },
   { value: 'name-asc', label: 'Name: A to Z' },
+  { value: 'most-viewed', label: 'Most viewed' },
+  { value: 'best-selling', label: 'Best selling' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
 ];
+
+const getNumberValue = (product, fields) => {
+  for (const field of fields) {
+    const value = Number(product?.[field] ?? 0);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return 0;
+};
+
+const getCreatedTime = (product) => {
+  const timestamp = Date.parse(product?.createdAt ?? product?.created_at ?? '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
 
 const sortProducts = (productList, sortBy) => {
   const nextProducts = [...productList];
@@ -47,6 +66,18 @@ const sortProducts = (productList, sortBy) => {
       return nextProducts.sort((a, b) => b.price - a.price);
     case 'name-asc':
       return nextProducts.sort((a, b) => a.title.localeCompare(b.title));
+    case 'most-viewed':
+      return nextProducts.sort((a, b) => getNumberValue(b, ['viewCount', 'views', 'viewsCount']) - getNumberValue(a, ['viewCount', 'views', 'viewsCount']));
+    case 'best-selling':
+      return nextProducts.sort(
+        (a, b) =>
+          getNumberValue(b, ['soldCount', 'totalSold', 'salesCount', 'orderCount', 'purchases']) -
+          getNumberValue(a, ['soldCount', 'totalSold', 'salesCount', 'orderCount', 'purchases']),
+      );
+    case 'newest':
+      return nextProducts.sort((a, b) => getCreatedTime(b) - getCreatedTime(a));
+    case 'oldest':
+      return nextProducts.sort((a, b) => getCreatedTime(a) - getCreatedTime(b));
     default:
       return nextProducts.sort((a, b) => {
         if (a.featured && !b.featured) return -1;
@@ -70,6 +101,15 @@ const buildEditForm = (product) => ({
   color: product.color || product.dominantColors?.[0] || '',
   sku: product.sku || product.motifCode || '',
   images: product.images || (product.image ? [product.image] : []),
+  inspiredByCity: product.inspiredByCity || '',
+  motifTags: Array.isArray(product.motifTags) ? product.motifTags.join(', ') : product.motifTags || '',
+  patternStoryId: product.patternStoryId || product.patternStory?.id || '',
+  attachPatternStory: Boolean(product.patternStoryId || product.patternStory),
+  patternMode: product.patternStoryId || product.patternStory ? 'existing' : 'new',
+  patternTitle: product.patternStory?.title || '',
+  patternDescription: product.patternStory?.description || '',
+  patternImage: product.patternStory?.image || '',
+  patternMotifTags: Array.isArray(product.patternStory?.motifTags) ? product.patternStory.motifTags.join(', ') : '',
   styleTags: product.styleTags || [],
   occasionTags: product.occasionTags || [],
   semanticTags: product.semanticTags || [],
@@ -102,6 +142,15 @@ const buildEmptyProductForm = () => ({
   color: '',
   sku: '',
   images: [],
+  inspiredByCity: '',
+  motifTags: '',
+  patternStoryId: '',
+  attachPatternStory: false,
+  patternMode: 'new',
+  patternTitle: '',
+  patternDescription: '',
+  patternImage: '',
+  patternMotifTags: '',
   styleTags: [],
   occasionTags: [],
   semanticTags: [],
@@ -122,8 +171,18 @@ const buildEmptyProductForm = () => ({
 
 const appendProductFormData = (form, imageFiles) => {
   const data = new FormData();
+  const patternFields = new Set([
+    'attachPatternStory',
+    'patternMode',
+    'patternTitle',
+    'patternDescription',
+    'patternImage',
+    'patternMotifTags',
+  ]);
 
   Object.entries(form).forEach(([key, value]) => {
+    if (patternFields.has(key)) return;
+
     if (key === 'images') {
       data.append('existingImages', JSON.stringify(Array.isArray(value) ? value : []));
       return;
@@ -141,6 +200,22 @@ const appendProductFormData = (form, imageFiles) => {
   return data;
 };
 
+const appendPatternStoryFormData = (form, patternImageFile, productCode = '') => {
+  const data = new FormData();
+
+  data.append('title', form.patternTitle || '');
+  data.append('description', form.patternDescription || '');
+  data.append('existingImage', form.patternImage || '');
+  data.append('productCode', productCode || '');
+  data.append('motifTags', form.patternMotifTags || '');
+
+  if (patternImageFile) {
+    data.append('patternImage', patternImageFile);
+  }
+
+  return data;
+};
+
 const getCategoryList = (products) => {
   const categories = new Set();
   products.forEach((p) => {
@@ -149,10 +224,11 @@ const getCategoryList = (products) => {
   return Array.from(categories).sort();
 };
 
-const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
+const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProductSaved }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
+  const [patternStories, setPatternStories] = useState([]);
   const [orders, setOrders] = useState([]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
@@ -162,6 +238,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [productEditorMode, setProductEditorMode] = useState('');
   const [productImageFiles, setProductImageFiles] = useState([]);
+  const [patternImageFile, setPatternImageFile] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -209,6 +286,23 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
   }, [authToken, canManageProducts]);
 
   useEffect(() => {
+    const loadPatternStories = async () => {
+      if (!authToken || !canManageProducts) {
+        return;
+      }
+
+      try {
+        const response = await apiRequest('/api/pattern-stories');
+        setPatternStories(Array.isArray(response?.data) ? response.data : []);
+      } catch (_error) {
+        setPatternStories([]);
+      }
+    };
+
+    loadPatternStories();
+  }, [authToken, canManageProducts]);
+
+  useEffect(() => {
     const loadOrders = async () => {
       if (!authToken || !canManageProducts || activeTab !== 'orders') {
         return;
@@ -251,6 +345,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     setEditingProduct(product);
     setProductEditorMode('edit');
     setProductImageFiles([]);
+    setPatternImageFile(null);
     setEditForm(buildEditForm(product));
   };
 
@@ -258,6 +353,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     setEditingProduct({ _id: '', images: [] });
     setProductEditorMode('create');
     setProductImageFiles([]);
+    setPatternImageFile(null);
     setEditForm(buildEmptyProductForm());
   };
 
@@ -265,11 +361,28 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     setEditingProduct(null);
     setProductEditorMode('');
     setProductImageFiles([]);
+    setPatternImageFile(null);
     setError('');
   };
 
   const updateEditFormField = (field, value) => {
-    setEditForm((current) => ({ ...current, [field]: value }));
+    setEditForm((current) => {
+      if (field === 'patternStoryId') {
+        const selectedStory = patternStories.find((story) => story.id === value || story._id === value);
+
+        return {
+          ...current,
+          patternStoryId: value,
+          patternMode: value ? 'existing' : current.patternMode,
+          patternTitle: selectedStory?.title || current.patternTitle,
+          patternDescription: selectedStory?.description || current.patternDescription,
+          patternImage: selectedStory?.image || current.patternImage,
+          patternMotifTags: Array.isArray(selectedStory?.motifTags) ? selectedStory.motifTags.join(', ') : current.patternMotifTags,
+        };
+      }
+
+      return { ...current, [field]: value };
+    });
   };
 
   const handleSaveProduct = async () => {
@@ -310,9 +423,56 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
         throw new Error('Upload at least one product image before saving.');
       }
 
+      let patternStoryId = '';
+
+      if (editForm.attachPatternStory) {
+        if (editForm.patternMode === 'existing') {
+          patternStoryId = editForm.patternStoryId || '';
+
+          if (!patternStoryId) {
+            throw new Error('Choose an existing pattern story or switch to creating a new one.');
+          }
+        } else {
+          if (!String(editForm.patternTitle || '').trim()) {
+            throw new Error('Pattern title is required when attaching a new pattern story.');
+          }
+
+          if (!String(editForm.patternDescription || '').trim()) {
+            throw new Error('Pattern description is required when attaching a new pattern story.');
+          }
+
+          const existingPatternId = editForm.patternStoryId || '';
+          const patternResponse = await apiRequest(existingPatternId ? `/api/pattern-stories/${existingPatternId}` : '/api/pattern-stories', {
+            method: existingPatternId ? 'PATCH' : 'POST',
+            body: appendPatternStoryFormData(editForm, patternImageFile, editForm.sku),
+            token: authToken,
+          });
+
+          if (!patternResponse?.success || !patternResponse?.data?.id) {
+            throw new Error(patternResponse?.message || 'Failed to save the pattern story.');
+          }
+
+          patternStoryId = patternResponse.data.id;
+          setPatternStories((currentStories) => {
+            const existingIndex = currentStories.findIndex((story) => story.id === patternResponse.data.id || story._id === patternResponse.data.id);
+
+            if (existingIndex === -1) {
+              return [patternResponse.data, ...currentStories];
+            }
+
+            return currentStories.map((story, index) => (index === existingIndex ? patternResponse.data : story));
+          });
+        }
+      }
+
+      const productForm = {
+        ...editForm,
+        patternStoryId,
+      };
+
       const response = await apiRequest(isCreate ? '/api/products' : `/api/products/${editingProduct._id}`, {
         method: isCreate ? 'POST' : 'PATCH',
-        body: appendProductFormData(editForm, productImageFiles),
+        body: appendProductFormData(productForm, productImageFiles),
         token: authToken,
       });
 
@@ -321,13 +481,14 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
           if (isCreate) return [response.data, ...prev];
           return prev.map((p) => (p._id === editingProduct._id ? response.data : p));
         });
+        onProductSaved?.(response.data);
 
         handleCloseProductEditor();
       } else {
         throw new Error(response.message || 'Failed to save product');
       }
     } catch (err) {
-      setError(err.message || 'Failed to save product. Please try again.');
+      setError(err.data?.error || err.message || 'Failed to save product. Please try again.');
       console.error('Product save error:', err);
     }
   };
@@ -633,7 +794,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                                   {product.description}
                                 </p>
                                 <div className="flex justify-between items-center mb-4">
-                                  <span className="text-blush font-bold text-lg">{product.price}JD</span>
+                                  <span className="text-blush font-bold text-lg">{formatCurrency(product.price)}</span>
                                   <span className="text-sm text-muted uppercase tracking-[0.18em]">{product.category}</span>
                                 </div>
                                 <div className="grid gap-2 sm:grid-cols-2">
@@ -744,8 +905,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                       </div>
                       <div>
                         <p className="text-sm text-text">Total</p>
-                        <p className="font-semibold text-blush">{orderTotal.toFixed(2)}JD</p>
-                        {rewardTitle ? <p className="text-xs text-[#54715f]">{rewardTitle} applied</p> : null}
+                        <p className="font-semibold text-blush">${order.total?.toFixed(2)}</p>
                       </div>
                     </div>
 
@@ -756,7 +916,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span>{item.title} x {item.quantity}</span>
-                            <span className="text-text">{(item.price * item.quantity).toFixed(2)}JD</span>
+                            <span className="text-text">${(item.price * item.quantity).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
@@ -834,10 +994,13 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
           imageFiles={productImageFiles}
           isAdmin={isAdmin}
           mode={productEditorMode}
+          patternImageFile={patternImageFile}
+          patternStories={patternStories}
           product={editingProduct}
           onCancel={handleCloseProductEditor}
           onFieldChange={updateEditFormField}
           onImagesChange={setProductImageFiles}
+          onPatternImageChange={setPatternImageFile}
           onSave={handleSaveProduct}
         />
       )}

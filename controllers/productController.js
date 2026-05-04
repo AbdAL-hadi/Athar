@@ -11,6 +11,7 @@ import {
 } from '../services/visualDescriber/productVisualDescriptionService.js';
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
+const heritageCityIds = new Set(['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem']);
 
 const createSlug = (value) =>
   String(value ?? '')
@@ -47,6 +48,16 @@ const normalizeArrayField = (value) => {
   }
 
   return [];
+};
+
+const normalizeHeritageCity = (value) => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return heritageCityIds.has(normalized) ? normalized : '';
+};
+
+const normalizeOptionalObjectId = (value) => {
+  const normalized = String(value ?? '').trim();
+  return mongoose.isValidObjectId(normalized) ? normalized : null;
 };
 
 const normalizeBoolean = (value) => value === true || value === 'true' || value === '1' || value === 1;
@@ -86,12 +97,15 @@ const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
     'promoHeadline',
     'promoSubtitle',
     'ctaText',
+    'inspiredByCity',
   ].forEach((field) => {
     if (body[field] !== undefined) payload[field] = String(body[field] ?? '').trim();
   });
 
   if (payload.color !== undefined) payload.color = payload.color.toLowerCase();
   if (payload.tryOnCategory !== undefined) payload.tryOnCategory = payload.tryOnCategory.toLowerCase();
+  if (payload.inspiredByCity !== undefined) payload.inspiredByCity = normalizeHeritageCity(payload.inspiredByCity);
+  if (body.patternStoryId !== undefined) payload.patternStoryId = normalizeOptionalObjectId(body.patternStoryId);
   if (body.price !== undefined) payload.price = Number(body.price);
   if (body.compareAt !== undefined) payload.compareAt = Number(body.compareAt) || 0;
 
@@ -125,6 +139,7 @@ const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
     'bestFor',
     'seoKeywords',
     'highlightBullets',
+    'motifTags',
   ].forEach((field) => {
     if (body[field] !== undefined) payload[field] = normalizeArrayField(body[field]);
   });
@@ -143,6 +158,43 @@ const hasInvalidPointsValue = (payload = {}) => {
 
   return !Number.isFinite(payload.pointsValue) || payload.pointsValue < 0;
 };
+
+const sendProductSaveError = (res, fallbackMessage, error) => {
+  const status = error?.name === 'ValidationError' ? 400 : 500;
+
+  return res.status(status).json({
+    success: false,
+    message: fallbackMessage,
+    error: error.message,
+  });
+};
+
+const serializeProduct = (product) => {
+  const plainProduct = typeof product?.toObject === 'function' ? product.toObject() : product;
+
+  return {
+    ...plainProduct,
+    inspiredByCity: normalizeHeritageCity(plainProduct?.inspiredByCity),
+    motifTags: normalizeArrayField(plainProduct?.motifTags),
+    patternStoryId: plainProduct?.patternStoryId?._id?.toString?.() ?? plainProduct?.patternStoryId?.toString?.() ?? '',
+    patternStory:
+      plainProduct?.patternStoryId && typeof plainProduct.patternStoryId === 'object' && plainProduct.patternStoryId.title
+        ? {
+            id: plainProduct.patternStoryId._id?.toString?.() ?? plainProduct.patternStoryId.id ?? '',
+            title: plainProduct.patternStoryId.title ?? '',
+            slug: plainProduct.patternStoryId.slug ?? '',
+            image: plainProduct.patternStoryId.image ?? '',
+            description: plainProduct.patternStoryId.description ?? '',
+            productCode: plainProduct.patternStoryId.productCode ?? '',
+            motifTags: normalizeArrayField(plainProduct.patternStoryId.motifTags),
+          }
+        : null,
+    viewCount: Number(plainProduct?.viewCount ?? 0),
+    soldCount: Number(plainProduct?.soldCount ?? 0),
+  };
+};
+
+const serializeProducts = (products = []) => products.map(serializeProduct);
 
 const ensureUniqueSlug = async (title, productIdToIgnore = null) => {
   const baseSlug = createSlug(title) || `product-${Date.now()}`;
@@ -164,12 +216,12 @@ const ensureUniqueSlug = async (title, productIdToIgnore = null) => {
 
 export const getProducts = async (_req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const products = await Product.find().populate('patternStoryId').sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
       count: products.length,
-      data: products,
+      data: serializeProducts(products),
     });
   } catch (error) {
     return res.status(500).json({
@@ -184,8 +236,12 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     const product = mongoose.isValidObjectId(id)
-      ? await Product.findById(id)
-      : await Product.findOne({ slug: String(id).toLowerCase().trim() });
+      ? await Product.findByIdAndUpdate(id, { $inc: { viewCount: 1 } }, { new: true }).populate('patternStoryId')
+      : await Product.findOneAndUpdate(
+          { slug: String(id).toLowerCase().trim() },
+          { $inc: { viewCount: 1 } },
+          { new: true },
+        ).populate('patternStoryId');
 
     if (!product) {
       return res.status(404).json({
@@ -196,7 +252,7 @@ export const getProductById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: product,
+      data: serializeProduct(product),
     });
   } catch (error) {
     return res.status(500).json({
@@ -255,14 +311,10 @@ export const createProduct = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Product created successfully',
-      data: product,
+      data: serializeProduct(product),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create product',
-      error: error.message,
-    });
+    return sendProductSaveError(res, 'Failed to create product', error);
   }
 };
 
@@ -318,14 +370,10 @@ export const updateProduct = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Product updated successfully',
-      data: product,
+      data: serializeProduct(product),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update product',
-      error: error.message,
-    });
+    return sendProductSaveError(res, 'Failed to update product', error);
   }
 };
 

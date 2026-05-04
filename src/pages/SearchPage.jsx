@@ -7,9 +7,10 @@ import FavoriteButton from '../components/FavoriteButton';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
 import { resolveApiAssetUrl } from '../utils/api';
+import { formatCurrency } from '../utils/format';
 import { isProductFavorite } from '../utils/productCatalog';
 
-const SearchPage = ({ products, favoriteIds, onToggleFavorite, onOpenTryOn }) => {
+const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeQuery = searchParams.get('q') ?? '';
   const [inputValue, setInputValue] = useState(activeQuery);
@@ -59,20 +60,11 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite, onOpenTryOn }) =>
                   <img src={resolveApiAssetUrl(product?.images?.[0])} alt={product.name} className="h-12 w-12 rounded-full object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-3xl text-ink">{product.name}</p>
-                    <p className="text-sm text-ink-soft">{product.category}</p>
+                    <p className="text-sm text-ink-soft">{product.category} · {formatCurrency(product.price)}</p>
                   </div>
-                  <span className="text-sm font-semibold text-ink-soft">Open</span>
+                  <span className="hidden rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream sm:inline-flex">More Details</span>
                 </Link>
 
-                {onOpenTryOn ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenTryOn(product)}
-                    className="hidden rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream sm:inline-flex"
-                  >
-                    AI Try-On
-                  </button>
-                ) : null}
                 <FavoriteButton active={isProductFavorite(favoriteIds, product)} onClick={() => onToggleFavorite(product)} className="h-10 w-10 shrink-0" />
               </article>
             </StaggerItem>

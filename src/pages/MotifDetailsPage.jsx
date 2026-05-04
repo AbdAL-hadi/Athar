@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motifStoryLookup } from '../data/motifs';
-import { resolveApiAssetUrl } from '../utils/api';
+import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { findProductByReference } from '../utils/productCatalog';
 
 const SearchIcon = () => (
@@ -13,13 +14,75 @@ const SearchIcon = () => (
 const MotifDetailsPage = ({ products = [] }) => {
   const { motifId } = useParams();
   const [searchParams] = useSearchParams();
-  const motif = motifStoryLookup.get(motifId);
+  const staticMotif = motifStoryLookup.get(motifId);
+  const [remoteMotif, setRemoteMotif] = useState(null);
+  const [isLoading, setIsLoading] = useState(!staticMotif);
+  const [loadError, setLoadError] = useState('');
+  const motif = staticMotif ?? remoteMotif;
   const requestedProductId = searchParams.get('product') ?? '';
   const requestedProduct = requestedProductId ? findProductByReference(products, requestedProductId) : null;
-  const linkedProducts = motif?.productIds?.map((productId) => findProductByReference(products, productId)).filter(Boolean) ?? [];
-  const featuredProduct = requestedProduct && motif?.productIds?.includes(requestedProduct.id) ? requestedProduct : linkedProducts[0] ?? null;
+  const linkedProducts =
+    staticMotif?.productIds?.map((productId) => findProductByReference(products, productId)).filter(Boolean) ??
+    remoteMotif?.products?.map((product) => findProductByReference(products, product.slug || product.id || product.productId) ?? product).filter(Boolean) ??
+    [];
+  const featuredProduct =
+    requestedProduct && (staticMotif?.productIds?.includes(requestedProduct.id) || linkedProducts.some((product) => product.id === requestedProduct.id || product.slug === requestedProduct.slug))
+      ? requestedProduct
+      : linkedProducts[0] ?? null;
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const motifImageUrl = resolveApiAssetUrl(motif?.image ?? '');
+
+  useEffect(() => {
+    if (staticMotif) {
+      setIsLoading(false);
+      setRemoteMotif(null);
+      setLoadError('');
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const loadRemoteMotif = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const response = await apiRequest(`/api/pattern-stories/${encodeURIComponent(motifId)}`);
+
+        if (!isCancelled) {
+          setRemoteMotif(response?.data ?? null);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setRemoteMotif(null);
+          setLoadError(error.message || 'The Athar pattern story you requested is not available right now.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadRemoteMotif();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [motifId, staticMotif]);
+
+  if (isLoading) {
+    return (
+      <div className="section-shell pt-14">
+        <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
+          <h1 className="font-display text-5xl text-ink">Loading pattern story</h1>
+          <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-ink-soft">
+            Preparing the heritage story for this piece.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!motif) {
     return (
@@ -27,7 +90,7 @@ const MotifDetailsPage = ({ products = [] }) => {
         <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
           <h1 className="font-display text-5xl text-ink">Pattern not found</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-ink-soft">
-            The Athar pattern story you requested is not available right now.
+            {loadError || 'The Athar pattern story you requested is not available right now.'}
           </p>
           <Link to="/products" className="button-primary mt-8">
             Back to products
@@ -48,7 +111,7 @@ const MotifDetailsPage = ({ products = [] }) => {
             <img src={logo} alt="Athar logo" className="h-14 w-14 rounded-[18px] object-cover" />
           </div>
           <div className="flex flex-1 items-center justify-between rounded-full bg-blush px-6 py-4 text-ink shadow-[inset_0_0_0_1px_rgba(140,101,70,0.04)]">
-            <span className="font-display text-2xl font-semibold tracking-[0.03em]">{motif.code}</span>
+            <span className="font-display text-2xl font-semibold tracking-[0.03em]">{motif.code || motif.productCode || 'Athar'}</span>
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-ink-soft">
               <SearchIcon />
             </span>
@@ -77,11 +140,11 @@ const MotifDetailsPage = ({ products = [] }) => {
               <div className="mt-4 flex flex-wrap gap-3">
                 {linkedProducts.map((product) => (
                   <Link
-                    key={product.id}
-                    to={`/products/${product.id}`}
+                    key={product.id || product.slug || product.productId}
+                    to={`/products/${product.slug || product.id || product.productId}`}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-rose hover:bg-blush"
                   >
-                    {product.name}
+                    {product.name || product.title}
                   </Link>
                 ))}
               </div>

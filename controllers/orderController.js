@@ -84,6 +84,21 @@ const scheduleSalesWorkbookRefresh = () => {
   });
 };
 
+const incrementProductSoldCounts = async (orderItems = []) => {
+  const operations = orderItems
+    .filter((item) => item.product && Number(item.quantity || 0) > 0)
+    .map((item) => ({
+      updateOne: {
+        filter: { _id: item.product },
+        update: { $inc: { soldCount: Number(item.quantity || 0) } },
+      },
+    }));
+
+  if (operations.length === 0) return;
+
+  await Product.bulkWrite(operations);
+};
+
 export const createOrder = async (req, res) => {
   try {
     const {
@@ -229,6 +244,12 @@ export const createOrder = async (req, res) => {
     if (loyaltyAward.appliedAt) {
       populatedOrder.loyaltyPointsAppliedAt = loyaltyAward.appliedAt;
       populatedOrder.pointsAdded = true;
+    }
+
+    try {
+      await incrementProductSoldCounts(orderItems);
+    } catch (counterError) {
+      console.error('[Athar orders] Failed to update product sold counters:', counterError.message);
     }
 
     scheduleSalesWorkbookRefresh();
