@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Order from '../../models/Order.js';
 import User from '../../models/User.js';
+import { getLoyaltyRewardById, getLoyaltyRewardDiscount, normalizeAtharPoints } from '../../src/utils/loyaltyPoints.js';
 
 const POINTS_AWARD_STATUSES = ['Confirmed', 'Shipped', 'Delivered'];
 
@@ -9,7 +10,7 @@ const isTransactionUnsupported = (error) => {
   return message.includes('replica set member or mongos') || message.includes('transaction numbers are only allowed');
 };
 
-const runWithLoyaltyTransaction = async (handler) => {
+export const runWithLoyaltyTransaction = async (handler) => {
   const session = await mongoose.startSession();
 
   try {
@@ -39,6 +40,9 @@ const getUserById = (userId, session) => {
   const query = User.findById(userId).select('-password');
   return session ? query.session(session) : query;
 };
+
+const getCurrentBalance = (user = null) =>
+  Math.max(Number(user?.atharPoints ?? 0), Number(user?.loyaltyPoints ?? 0));
 
 const getOrderEarnedPoints = (order = null) => {
   const earnedPoints = Number(order?.earnedPoints ?? 0);
@@ -115,4 +119,70 @@ export const awardLoyaltyPointsForOrder = async (orderId) => {
       user: updatedUser,
     };
   });
+};
+
+export const redeemLoyaltyRewardForCheckout = async ({
+  userId,
+  rewardId,
+  subtotal = 0,
+  shippingFee = 0,
+  session = null,
+}) => {
+  if (!rewardId) {
+    return {
+      reward: null,
+      discountAmount: 0,
+      appliedShippingFee: Math.max(0, Number(shippingFee) || 0),
+      finalTotal: Math.max(0, (Number(subtotal) || 0) + (Number(shippingFee) || 0)),
+      updatedUser: null,
+      remainingBalance: null,
+      pointsRedeemed: 0,
+    };
+  }
+
+  if (!userId || !mongoose.isValidObjectId(userId)) {
+    const error = new Error('Log in to redeem Athar Points at checkout.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const reward = getLoyaltyRewardById(rewardId);
+
+  if (!reward) {
+    const error = new Error('The selected Athar reward is not valid.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const updatedUser = await getUserById(userId, session);
+
+  if (!updatedUser) {
+    const error = new Error('Unable to find your Athar account for reward redemption.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const currentBalance = getCurrentBalance(updatedUser);
+
+  if (currentBalance < reward.cost) {
+    const error = new Error('You do not have enough Athar Points for this reward.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const pricing = getLoyaltyRewardDiscount(reward, { subtotal, shippingFee });
+
+  updatedUser.atharPoints = normalizeAtharPoints(currentBalance - reward.cost);
+  updatedUser.loyaltyPoints = normalizeAtharPoints(currentBalance - reward.cost);
+  await updatedUser.save({ session });
+
+  return {
+    reward,
+    discountAmount: pricing.discountAmount,
+    appliedShippingFee: pricing.appliedShippingFee,
+    finalTotal: pricing.finalTotal,
+    updatedUser,
+    remainingBalance: getCurrentBalance(updatedUser),
+    pointsRedeemed: reward.cost,
+  };
 };

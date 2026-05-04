@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { resolveApiAssetUrl } from '../utils/api';
+import { LOYALTY_REWARDS } from '../utils/loyaltyPoints';
 
 const FALLBACK_LOYALTY_POINTS = 240;
 const FREE_SHIPPING_REWARD_POINTS = 300;
@@ -43,32 +44,7 @@ const earnOptions = [
   },
 ];
 
-const redeemOptions = [
-  {
-    title: '$5 discount',
-    cost: 100,
-    description: 'Exchange 100 points for $5 off your next Athar order.',
-    accent: 'bg-[#8f5f45]',
-  },
-  {
-    title: '$12 discount',
-    cost: 200,
-    description: 'Use 200 points for a richer $12 discount at checkout.',
-    accent: 'bg-[#54715f]',
-  },
-  {
-    title: 'Free shipping',
-    cost: 300,
-    description: 'Redeem 300 points to unlock complimentary delivery.',
-    accent: 'bg-[#a8704c]',
-  },
-  {
-    title: 'Free gift',
-    cost: 500,
-    description: 'Save 500 points and receive a special Athar gift with your order.',
-    accent: 'bg-[#574338]',
-  },
-];
+const redeemOptions = LOYALTY_REWARDS;
 
 const tierLevels = [
   {

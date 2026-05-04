@@ -5,6 +5,7 @@ import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { formatCurrency, formatDate } from '../utils/format';
+import { getOrderDiscountAmount, getOrderRewardTitle, getOrderShippingFee, getOrderSubtotal, getOrderTotal } from '../utils/orderPricing';
 import { loadRecentOrders } from '../utils/orders';
 
 const trackerSteps = [
@@ -294,6 +295,8 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 const orderIdentifier = order.orderNumber ?? order._id;
                 const visibleStatus = getCustomerFacingStatus(order.status);
                 const statusStyles = getOrderStatusStyles(visibleStatus);
+                const orderTotal = getOrderTotal(order);
+                const rewardTitle = getOrderRewardTitle(order);
 
                 return (
                   <article key={orderIdentifier} className={`rounded-[24px] bg-cream px-5 py-5 ${statusStyles.card}`}>
@@ -310,7 +313,12 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                         </div>
                       </div>
                       <div className="flex flex-col gap-3 text-left lg:items-end">
-                        <p className="font-display text-3xl text-ink">{formatCurrency(order.total)}</p>
+                        <div className="text-left lg:text-right">
+                          <p className="font-display text-3xl text-ink">{formatCurrency(orderTotal)}</p>
+                          {rewardTitle ? (
+                            <p className="mt-1 text-sm text-[#54715f]">{rewardTitle} applied</p>
+                          ) : null}
+                        </div>
                         <button type="button" onClick={() => handleTrack(orderIdentifier)} className="button-primary">
                           Track Order
                         </button>
@@ -333,6 +341,15 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
           </div>
         ) : trackedOrder ? (
           <div className="space-y-8">
+            {(() => {
+              const trackedSubtotal = getOrderSubtotal(trackedOrder);
+              const trackedShippingFee = getOrderShippingFee(trackedOrder);
+              const trackedDiscountAmount = getOrderDiscountAmount(trackedOrder);
+              const trackedTotal = getOrderTotal(trackedOrder);
+              const trackedRewardTitle = getOrderRewardTitle(trackedOrder);
+
+              return (
+                <>
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 <img src={resolveApiAssetUrl('design/logo.jpeg')} alt="Athar logo" className="h-24 w-24 rounded-[18px] object-cover" />
@@ -516,15 +533,21 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
               <div className="space-y-3 rounded-[24px] bg-cream px-5 py-5 text-ink-soft">
                 <div className="flex items-center justify-between">
                   <span>Subtotal</span>
-                  <span>{formatCurrency(trackedOrder.subtotal)}</span>
+                  <span>{formatCurrency(trackedSubtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Shipping</span>
-                  <span>{formatCurrency(trackedOrder.shippingFee)}</span>
+                  <span>{formatCurrency(trackedShippingFee)}</span>
                 </div>
+                {trackedDiscountAmount > 0 ? (
+                  <div className="flex items-center justify-between text-[#54715f]">
+                    <span>{trackedRewardTitle || 'Reward applied'}</span>
+                    <span>-{formatCurrency(trackedDiscountAmount)}</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between font-semibold text-ink">
                   <span>Total</span>
-                  <span>{formatCurrency(trackedOrder.total)}</span>
+                  <span>{formatCurrency(trackedTotal)}</span>
                 </div>
               </div>
             </div>
@@ -534,6 +557,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 Return to the home page
               </Link>
             </div>
+                </>
+              );
+            })()}
           </div>
         ) : (
           <div className="text-center">

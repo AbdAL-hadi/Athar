@@ -8,6 +8,7 @@ import Filter from '../components/Filter';
 import SectionTitle from '../components/SectionTitle';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
+import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
 
 const ProductIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -721,6 +722,13 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                     key={order._id}
                     className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-blush"
                   >
+                    {(() => {
+                      const orderTotal = getOrderTotal(order);
+                      const rewardTitle = getOrderRewardTitle(order);
+                      const discountAmount = getOrderDiscountAmount(order);
+
+                      return (
+                        <>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-text">Order ID</p>
@@ -736,7 +744,8 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                       </div>
                       <div>
                         <p className="text-sm text-text">Total</p>
-                        <p className="font-semibold text-blush">${order.total?.toFixed(2)}</p>
+                        <p className="font-semibold text-blush">{orderTotal.toFixed(2)}JD</p>
+                        {rewardTitle ? <p className="text-xs text-[#54715f]">{rewardTitle} applied</p> : null}
                       </div>
                     </div>
 
@@ -747,9 +756,19 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span>{item.title} x {item.quantity}</span>
-                            <span className="text-text">${(item.price * item.quantity).toFixed(2)}</span>
+                            <span className="text-text">{(item.price * item.quantity).toFixed(2)}JD</span>
                           </div>
                         ))}
+                      </div>
+                      {discountAmount > 0 ? (
+                        <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm text-[#54715f]">
+                          <span>{rewardTitle || 'Reward applied'}</span>
+                          <span>-{discountAmount.toFixed(2)}JD</span>
+                        </div>
+                      ) : null}
+                      <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold text-ink">
+                        <span>Total</span>
+                        <span>{orderTotal.toFixed(2)}JD</span>
                       </div>
                     </div>
 
@@ -796,6 +815,9 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                         </div>
                       )}
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

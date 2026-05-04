@@ -3,7 +3,11 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
-import { awardLoyaltyPointsForOrder } from '../services/loyalty/loyaltyPointsService.js';
+import {
+  awardLoyaltyPointsForOrder,
+  redeemLoyaltyRewardForCheckout,
+  runWithLoyaltyTransaction,
+} from '../services/loyalty/loyaltyPointsService.js';
 import { calculateProductPoints } from '../src/utils/loyaltyPoints.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
@@ -82,7 +86,13 @@ const scheduleSalesWorkbookRefresh = () => {
 
 export const createOrder = async (req, res) => {
   try {
-    const { items = [], shippingFee = 0, paymentMethod = 'Cash on Delivery', phone = '' } = req.body ?? {};
+    const {
+      items = [],
+      shippingFee = 0,
+      paymentMethod = 'Cash on Delivery',
+      phone = '',
+      loyaltyRedemption = null,
+    } = req.body ?? {};
     const address = normalizeAddress(req.body ?? {});
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -155,35 +165,66 @@ export const createOrder = async (req, res) => {
     });
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const normalizedShippingFee = Number(shippingFee) || 0;
-    const total = subtotal + normalizedShippingFee;
+    const normalizedShippingFee = Math.max(0, Number(shippingFee) || 0);
     const loyaltyPointsEarned = orderItems.reduce((sum, item) => sum + item.pointsEarned, 0);
     const persistentUserId =
       req.user?._id && mongoose.isValidObjectId(req.user._id) ? req.user._id : null;
+    const selectedRewardId =
+      loyaltyRedemption && typeof loyaltyRedemption === 'object' ? loyaltyRedemption.rewardId ?? '' : '';
 
-    const order = await Order.create({
-      user: persistentUserId,
-      orderNumber: generateOrderNumber(),
-      items: orderItems,
-      subtotal,
-      shippingFee: normalizedShippingFee,
-      total,
-      loyaltyPointsEarned,
-      earnedPoints: loyaltyPointsEarned,
-      pointsAdded: false,
-      status: 'Pending',
-      paymentMethod,
-      address,
-      phone,
+    const checkoutDraft = await runWithLoyaltyTransaction(async (session) => {
+      const redemption = await redeemLoyaltyRewardForCheckout({
+        userId: persistentUserId,
+        rewardId: selectedRewardId,
+        subtotal,
+        shippingFee: normalizedShippingFee,
+        session,
+      });
+
+      const orderPayload = {
+        user: persistentUserId,
+        orderNumber: generateOrderNumber(),
+        items: orderItems,
+        subtotal,
+        shippingFee: redemption.appliedShippingFee,
+        discountAmount: redemption.discountAmount,
+        total: redemption.finalTotal,
+        loyaltyReward: redemption.reward
+          ? {
+              id: redemption.reward.id,
+              title: redemption.reward.title,
+              pointsRedeemed: redemption.pointsRedeemed,
+            }
+          : undefined,
+        loyaltyPointsEarned,
+        earnedPoints: loyaltyPointsEarned,
+        pointsAdded: false,
+        status: 'Pending',
+        paymentMethod,
+        address,
+        phone,
+      };
+
+      const [createdOrder] = await Order.create([orderPayload], session ? { session } : undefined);
+
+      return {
+        orderId: createdOrder._id,
+        total: redemption.finalTotal,
+        reward: redemption.reward,
+        discountAmount: redemption.discountAmount,
+        pointsRedeemed: redemption.pointsRedeemed,
+        updatedUser: redemption.updatedUser,
+        remainingBalance: redemption.remainingBalance,
+      };
     });
 
     const populatedOrder = await transitionOrderStatusWithInventory({
-      orderId: order._id,
+      orderId: checkoutDraft.orderId,
       nextStatus: 'Confirmed',
     });
 
     const loyaltyAward = await awardLoyaltyPointsForOrder(populatedOrder._id);
-    const updatedUser = loyaltyAward.user;
+    const updatedUser = loyaltyAward.user ?? checkoutDraft.updatedUser;
 
     if (loyaltyAward.appliedAt) {
       populatedOrder.loyaltyPointsAppliedAt = loyaltyAward.appliedAt;
@@ -201,8 +242,8 @@ export const createOrder = async (req, res) => {
       whatsappNotification = await sendOrderWhatsAppMessage({
         phone,
         customerName: address.fullName,
-        orderNumber: order.orderNumber,
-        total,
+        orderNumber: populatedOrder.orderNumber,
+        total: checkoutDraft.total,
       });
     } catch (notificationError) {
       console.error('[Athar WhatsApp] Failed to send order message:', notificationError.message);
@@ -216,6 +257,14 @@ export const createOrder = async (req, res) => {
         pointsEarned: loyaltyPointsEarned,
         balance: loyaltyAward.balance,
         applied: loyaltyAward.applied,
+        redeemedReward: checkoutDraft.reward
+          ? {
+              id: checkoutDraft.reward.id,
+              title: checkoutDraft.reward.title,
+              pointsRedeemed: checkoutDraft.pointsRedeemed,
+              discountAmount: checkoutDraft.discountAmount,
+            }
+          : null,
       },
       user: updatedUser ? sanitizeCheckoutUser(updatedUser) : null,
       notifications: {

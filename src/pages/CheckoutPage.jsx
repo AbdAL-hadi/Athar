@@ -5,9 +5,16 @@ import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
-import { getCartGrandTotal, getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
+import { getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
-import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
+import {
+  calculateProductPoints,
+  formatAtharPoints,
+  getCurrentAtharPointsBalance,
+  getLoyaltyRewardById,
+  getLoyaltyRewardDiscount,
+  LOYALTY_REWARDS,
+} from '../utils/loyaltyPoints';
 import { getOrderIdentifier, saveRecentOrder } from '../utils/orders';
 import { findProductByReference } from '../utils/productCatalog';
 
@@ -44,6 +51,7 @@ const CheckoutPage = ({
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', variant: 'success' });
+  const [selectedRewardId, setSelectedRewardId] = useState('');
 
   useEffect(() => {
     if (authUser) {
@@ -93,7 +101,6 @@ const CheckoutPage = ({
   }, [authToken, isSuccessRoute, loyaltyAward?.pointsEarned, orderNumberFromUrl]);
 
   const subtotal = useMemo(() => getCartSubtotal(items), [items]);
-  const total = useMemo(() => getCartGrandTotal(items), [items]);
   const cartPoints = useMemo(
     () =>
       items.reduce((sum, item) => {
@@ -103,7 +110,26 @@ const CheckoutPage = ({
     [items, products],
   );
   const currentBalance = useMemo(() => getCurrentAtharPointsBalance(authUser), [authUser]);
-  const projectedBalance = currentBalance + cartPoints;
+  const availableRewards = useMemo(
+    () => LOYALTY_REWARDS.filter((reward) => currentBalance >= reward.cost),
+    [currentBalance],
+  );
+  const selectedReward = useMemo(() => getLoyaltyRewardById(selectedRewardId), [selectedRewardId]);
+  const pricingWithReward = useMemo(
+    () => getLoyaltyRewardDiscount(selectedReward, { subtotal, shippingFee: items.length > 0 ? SHIPPING_FEE : 0 }),
+    [items.length, selectedReward, subtotal],
+  );
+  const discountAmount = pricingWithReward.discountAmount;
+  const shippingTotal = pricingWithReward.appliedShippingFee;
+  const finalTotal = pricingWithReward.finalTotal;
+  const projectedBalanceAfterReward = Math.max(0, currentBalance - (selectedReward?.cost ?? 0) + cartPoints);
+
+  useEffect(() => {
+    if (selectedRewardId && !availableRewards.some((reward) => reward.id === selectedRewardId)) {
+      setSelectedRewardId('');
+    }
+  }, [availableRewards, selectedRewardId]);
+
   const checkoutPointsSummary = useMemo(() => {
     if (items.length === 0) {
       return null;
@@ -118,15 +144,16 @@ const CheckoutPage = ({
         ? [
             { label: 'Current balance', value: formatAtharPoints(currentBalance) },
             { label: 'This checkout', value: formatAtharPoints(cartPoints) },
-            { label: 'After purchase', value: formatAtharPoints(projectedBalance) },
+            { label: 'After purchase', value: formatAtharPoints(projectedBalanceAfterReward) },
           ]
         : [
             { label: 'This checkout', value: formatAtharPoints(cartPoints) },
             { label: 'Account status', value: 'Log in to save' },
           ],
     };
-  }, [authUser, cartPoints, currentBalance, items.length, projectedBalance]);
+  }, [authUser, cartPoints, currentBalance, items.length, projectedBalanceAfterReward]);
   const successPointsEarned = Number(loyaltyAward?.pointsEarned ?? successOrder?.earnedPoints ?? successOrder?.loyaltyPointsEarned ?? 0);
+  const successRedeemedReward = loyaltyAward?.redeemedReward ?? successOrder?.loyaltyReward ?? null;
   const successBalance =
     loyaltyAward?.balance !== null && loyaltyAward?.balance !== undefined
       ? Number(loyaltyAward.balance)
@@ -191,6 +218,7 @@ const CheckoutPage = ({
         shippingFee: items.length > 0 ? SHIPPING_FEE : 0,
         paymentMethod: formData.paymentMethod,
         phone: formData.phone,
+        loyaltyRedemption: selectedReward ? { rewardId: selectedReward.id } : null,
         address: {
           fullName: formData.fullName,
           line1: formData.line1,
@@ -211,6 +239,7 @@ const CheckoutPage = ({
       const loyalty = response?.loyalty ?? {
         pointsEarned: order?.earnedPoints ?? order?.loyaltyPointsEarned ?? cartPoints,
         balance: response?.user?.atharPoints ?? response?.user?.loyaltyPoints ?? null,
+        redeemedReward: order?.loyaltyReward ?? null,
       };
       saveRecentOrder(orderIdentifier, authUser);
 
@@ -254,6 +283,12 @@ const CheckoutPage = ({
               <p className="text-lg font-semibold text-ink">
                 Congratulations! You earned {formatAtharPoints(successPointsEarned)} from this order.
               </p>
+              {successRedeemedReward?.title ? (
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
+                  Reward used: {successRedeemedReward.title}
+                  {successRedeemedReward?.pointsRedeemed ? ` for ${formatAtharPoints(successRedeemedReward.pointsRedeemed)}` : ''}.
+                </p>
+              ) : null}
               {successBalance !== null && successBalance !== undefined ? (
                 <div className="mt-4 grid gap-3 text-left">
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
@@ -346,12 +381,89 @@ const CheckoutPage = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Shipping</span>
-                  <span>{formatCurrency(items.length > 0 ? SHIPPING_FEE : 0)}</span>
+                  <span>{formatCurrency(shippingTotal)}</span>
                 </div>
+                {selectedReward ? (
+                  <div className="flex items-center justify-between text-[#54715f]">
+                    <span>Reward applied</span>
+                    <span>-{formatCurrency(discountAmount)}</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between font-semibold text-ink">
                   <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
+                  <span>{formatCurrency(finalTotal)}</span>
                 </div>
+                {authUser ? (
+                  <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-ink">Use your Athar Points</p>
+                        <p className="mt-1 text-sm leading-6 text-ink-soft">
+                          Available balance: {formatAtharPoints(currentBalance)}
+                        </p>
+                      </div>
+                      {selectedReward ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRewardId('')}
+                          className="text-sm font-semibold text-[#8f5f45] transition hover:text-ink"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    {availableRewards.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {availableRewards.map((reward) => {
+                          const rewardPricing = getLoyaltyRewardDiscount(reward, {
+                            subtotal,
+                            shippingFee: items.length > 0 ? SHIPPING_FEE : 0,
+                          });
+                          const isSelected = reward.id === selectedRewardId;
+
+                          return (
+                            <button
+                              key={reward.id}
+                              type="button"
+                              onClick={() => setSelectedRewardId(isSelected ? '' : reward.id)}
+                              className={`w-full rounded-[18px] border px-4 py-3 text-left transition ${
+                                isSelected
+                                  ? 'border-[#b88746] bg-[#fff7f0] shadow-[0_10px_25px_rgba(80,45,28,0.08)]'
+                                  : 'border-line bg-white hover:border-[#d9c2b0]'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-ink">{reward.title}</p>
+                                  <p className="mt-1 text-sm leading-6 text-ink-soft">{reward.description}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
+                                    {formatAtharPoints(reward.cost)}
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-[#54715f]">
+                                    Save {formatCurrency(rewardPricing.discountAmount)}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-ink-soft">
+                        Keep collecting points to unlock checkout rewards.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
+                    <p className="font-semibold text-ink">Use your Athar Points</p>
+                    <p className="mt-1 text-sm leading-6 text-ink-soft">
+                      Log in to apply your saved discounts and shipping rewards at checkout.
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-[22px] border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-3">
                   <div className="flex items-center justify-between gap-3 font-semibold text-ink">
                     <span>Athar Points earned</span>
@@ -365,7 +477,7 @@ const CheckoutPage = ({
                       </div>
                       <div className="rounded-[18px] bg-white/75 px-4 py-3">
                         <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After purchase</p>
-                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalance)}</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalanceAfterReward)}</p>
                       </div>
                     </div>
                   ) : null}
