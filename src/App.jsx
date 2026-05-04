@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
+import AccessibilityToolbar from './components/accessibility/AccessibilityToolbar';
 import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
 import AdminCommentModerationPage from './pages/AdminCommentModerationPage';
@@ -343,6 +344,7 @@ const App = () => {
       <Route path="/delivery-dashboard" element={<DeliveryDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
     </Routes>
     <AITryOnModal product={tryOnProduct} open={Boolean(tryOnProduct)} onClose={handleCloseTryOn} />
+    <AccessibilityToolbar />
     <Toast
       open={Boolean(cartAuthMessage)}
       variant="error"
