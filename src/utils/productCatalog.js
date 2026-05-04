@@ -26,6 +26,15 @@ const asNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const asOptionalNumber = (value) => {
+  if (!hasValue(value)) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
 const asArray = (value, fallback = []) => (Array.isArray(value) && value.length > 0 ? value : fallback);
 
 export const normalizeProduct = (product, fallbackProduct = null) => {
@@ -54,6 +63,18 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     category: pickValue(product?.category, fallback.category, ''),
     price: asNumber(pickValue(product?.price, fallback.price), 0),
     compareAt: asNumber(pickValue(product?.compareAt, fallback.compareAt, product?.price, fallback.price), 0),
+    pointsValue: asOptionalNumber(
+      pickValue(
+        product?.pointsValue,
+        product?.atharPoints,
+        product?.customPoints,
+        product?.points,
+        fallback.pointsValue,
+        fallback.atharPoints,
+        fallback.customPoints,
+        fallback.points,
+      ),
+    ),
     sku: pickValue(product?.sku, fallback.sku, ''),
     material: pickValue(product?.material, fallback.material, ''),
     description: pickValue(product?.description, fallback.description, ''),

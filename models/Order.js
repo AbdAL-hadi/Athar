@@ -31,6 +31,11 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    pointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { _id: false },
 );
@@ -79,10 +84,51 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    discountAmount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
     total: {
       type: Number,
       required: true,
       min: 0,
+    },
+    loyaltyReward: {
+      id: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      title: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      pointsRedeemed: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+    },
+    loyaltyPointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    earnedPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsAdded: {
+      type: Boolean,
+      default: false,
+    },
+    loyaltyPointsAppliedAt: {
+      type: Date,
+      default: null,
     },
     status: {
       type: String,

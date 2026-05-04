@@ -8,6 +8,7 @@ import Filter from '../components/Filter';
 import SectionTitle from '../components/SectionTitle';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
+import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
 import { formatCurrency } from '../utils/format';
 
 const ProductIcon = () => (
@@ -93,6 +94,7 @@ const buildEditForm = (product) => ({
   accessibilityDescription: product.accessibilityDescription || '',
   price: product.price ?? '',
   compareAt: product.compareAt ?? '',
+  pointsValue: product.pointsValue ?? product.atharPoints ?? product.customPoints ?? product.points ?? '',
   stock: product.stock ?? '',
   category: product.category || '',
   material: product.material || '',
@@ -133,6 +135,7 @@ const buildEmptyProductForm = () => ({
   accessibilityDescription: '',
   price: '',
   compareAt: '',
+  pointsValue: '',
   stock: '',
   category: '',
   material: '',
@@ -406,6 +409,10 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
 
       if (!String(editForm.price ?? '').trim() || !Number.isFinite(Number(editForm.price))) {
         throw new Error('Price must be numeric.');
+      }
+
+      if (String(editForm.pointsValue ?? '').trim() && !Number.isFinite(Number(editForm.pointsValue))) {
+        throw new Error('Points Value must be numeric.');
       }
 
       if (!String(editForm.stock ?? '').trim() || !Number.isFinite(Number(editForm.stock))) {
@@ -876,6 +883,13 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                     key={order._id}
                     className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-blush"
                   >
+                    {(() => {
+                      const orderTotal = getOrderTotal(order);
+                      const rewardTitle = getOrderRewardTitle(order);
+                      const discountAmount = getOrderDiscountAmount(order);
+
+                      return (
+                        <>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-text">Order ID</p>
@@ -891,7 +905,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                       </div>
                       <div>
                         <p className="text-sm text-text">Total</p>
-                        <p className="font-semibold text-blush">{formatCurrency(order.total)}</p>
+                        <p className="font-semibold text-blush">${order.total?.toFixed(2)}</p>
                       </div>
                     </div>
 
@@ -902,9 +916,19 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span>{item.title} x {item.quantity}</span>
-                            <span className="text-text">{formatCurrency(item.price * item.quantity)}</span>
+                            <span className="text-text">${(item.price * item.quantity).toFixed(2)}</span>
                           </div>
                         ))}
+                      </div>
+                      {discountAmount > 0 ? (
+                        <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm text-[#54715f]">
+                          <span>{rewardTitle || 'Reward applied'}</span>
+                          <span>-{discountAmount.toFixed(2)}JD</span>
+                        </div>
+                      ) : null}
+                      <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold text-ink">
+                        <span>Total</span>
+                        <span>{orderTotal.toFixed(2)}JD</span>
                       </div>
                     </div>
 
@@ -951,6 +975,9 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                         </div>
                       )}
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

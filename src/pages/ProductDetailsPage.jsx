@@ -9,13 +9,18 @@ import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
+import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
 import { findProductByReference, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
 
 const getDefaultMedia = (product) => {
   const firstImage = product?.images?.[0];
 
   if (firstImage) {
-    return { type: 'image', src: firstImage, alt: product.name };
+    return {
+      type: 'image',
+      src: resolveApiAssetUrl(firstImage),
+      alt: product.name,
+    };
   }
 
   return { type: 'image', src: '', alt: '' };
@@ -328,6 +333,17 @@ const ProductDetailsPage = ({
     );
   }
 
+  const relatedProducts = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 3);
+  const galleryItems = product.images.map((image, index) => ({
+  type: 'image',
+  src: resolveApiAssetUrl(image),
+  alt: `${product.name} view ${index + 1}`,
+}));
+  const unitProductPoints = calculateProductPoints(product);
+  const purchasePoints = calculateProductPoints(product, quantity);
+  const currentBalance = getCurrentAtharPointsBalance(authUser);
+  const projectedBalance = currentBalance + purchasePoints;
+
   const handleAdd = () => {
     if (product.stock < 1) return;
     const wasAdded = onAddToCart?.(product, quantity);
@@ -392,6 +408,32 @@ const ProductDetailsPage = ({
               ) : null}
             </div>
           </div>
+          {purchasePoints > 0 ? (
+            <div className="mt-5 rounded-[24px] border border-[#dfbd79]/50 bg-[#fff7f0] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <p className="text-lg font-semibold leading-8 text-ink">
+                You will earn <span className="text-[#8f5f45]">{formatAtharPoints(purchasePoints)}</span> with this purchase.
+              </p>
+              <p className="mt-1 text-sm leading-6 text-ink-soft">
+                {formatAtharPoints(unitProductPoints)} per piece will be added to your Athar balance after checkout.
+              </p>
+              {authUser ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[18px] bg-white/80 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
+                  </div>
+                  <div className="rounded-[18px] bg-white/80 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After this order</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(projectedBalance)}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm leading-6 text-ink-soft">
+                  Log in before checkout to save these points to your Athar balance.
+                </p>
+              )}
+            </div>
+          ) : null}
           <div className="mt-8 space-y-4">
             <p className="text-2xl leading-10 text-ink-soft">{product.description}</p>
             <div className="flex flex-wrap items-center gap-3" aria-live="polite">

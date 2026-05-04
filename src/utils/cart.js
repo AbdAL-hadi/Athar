@@ -1,3 +1,5 @@
+import { getProductCustomPointsValue } from './loyaltyPoints';
+
 export const SHIPPING_FEE = 20;
 
 const CART_KEY = 'athar.cart.items';
@@ -26,19 +28,28 @@ export const addCartItem = (items, product, quantity = 1) => {
       ...items,
       {
         id: product.id,
+        productId: product.productId || product._id || '',
         name: product.name,
         category: product.category,
         image: product.images?.[0] ?? '',
         material: product.material,
         price: product.price,
         compareAt: product.compareAt ?? product.price,
+        pointsValue: getProductCustomPointsValue(product),
         quantity,
       },
     ];
   }
 
   return items.map((item) =>
-    item.id === product.id ? { ...item, quantity: Math.max(1, item.quantity + quantity) } : item,
+    item.id === product.id
+      ? {
+          ...item,
+          productId: product.productId || product._id || item.productId || '',
+          pointsValue: getProductCustomPointsValue(product),
+          quantity: Math.max(1, item.quantity + quantity),
+        }
+      : item,
   );
 };
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import profileMotif from '../assets/products/Nprfile.png';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
+import { formatAtharPoints } from '../utils/loyaltyPoints';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -126,6 +127,42 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
     setContactForm(buildContactForm(authUser));
     setAddressForm(buildAddressForm(authUser));
   }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    const activeToken = getActiveAuthToken(authToken);
+
+    if (!activeToken) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const refreshCurrentUser = async () => {
+      try {
+        const response = await apiRequest('/api/auth/me', { token: activeToken });
+        const updatedUser = response?.data ?? null;
+
+        if (!isCancelled && updatedUser) {
+          setLocalAuthUser(updatedUser);
+          onUpdateProfile?.(updatedUser);
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.debug('[Athar profile] Unable to refresh profile balance', error?.message ?? error);
+        }
+      }
+    };
+
+    refreshCurrentUser();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, authUser?.id]);
 
   if (!authUser) {
     return (
@@ -345,18 +382,6 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
 
   const isEditingContact = editingSection === 'contact';
   const isEditingAddress = editingSection === 'address';
-  const fullName = getUserFullName(localAuthUser);
-  const accountType = formatRole(localAuthUser?.role);
-  const verificationDate = localAuthUser?.emailVerifiedAt || localAuthUser?.verifiedAt;
-  const verificationLine = verificationDate
-    ? `Account verified since ${formatDate(verificationDate)}`
-    : `Account created since ${formatDate(localAuthUser?.createdAt)}`;
-  const initials = fullName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('') || 'U';
 
   return (
     <div className="min-h-screen bg-cream">
@@ -418,7 +443,9 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                   <FeedbackMessage tone={profilePictureFeedbackTone} message={profilePictureFeedback} />
                 </div>
               </div>
-            </header>
+            </div>
+          </div>
+        </div>
 
             <div className="mt-8 space-y-6">
               <section className="overflow-hidden rounded-[26px] border border-line bg-white">
