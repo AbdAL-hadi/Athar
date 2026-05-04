@@ -4,6 +4,7 @@ import AdminNavigation from './admin/AdminNavigation';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
+  { to: '/heritage-map', label: 'Heritage Map', icon: 'map' },
   { to: '/products', label: 'Products', icon: 'product' },
   { to: '/rewards', label: 'Rewards', icon: 'reward' },
   { to: '/favorites', label: 'Favorite', icon: 'heart' },
@@ -41,6 +42,13 @@ const RewardIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
     <path d="M12 3.75 14.42 8.6l5.35.78-3.88 3.78.92 5.34L12 15.98 7.19 18.5l.92-5.34-3.88-3.78 5.35-.78L12 3.75Z" />
     <path d="M8.2 21h7.6" />
+  </svg>
+);
+
+const MapIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="m3.5 6.5 5-2 7 2 5-2v13l-5 2-7-2-5 2v-13Z" />
+    <path d="M8.5 4.5v13M15.5 6.5v13" />
   </svg>
 );
 
@@ -89,7 +97,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-[1200] border-b border-line bg-white/95 backdrop-blur">
       <div className="section-shell flex flex-col gap-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <Link to={homeTarget} className="flex items-center gap-4">
           <div className="rounded-[20px] bg-blush p-1.5">
@@ -114,8 +122,6 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <BagIcon />
                   ) : link.icon === 'track' ? (
                     <TrackIcon />
-                  ) : link.icon === 'reward' ? (
-                    <RewardIcon />
                   ) : link.icon === 'about' ? (
                     <AboutIcon />
                   ) : (
@@ -157,7 +163,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-line bg-white shadow-lg z-50">
+                <div className="absolute right-0 z-[1300] mt-2 w-56 rounded-lg border border-line bg-white shadow-lg">
                   {/* Profile Header in Dropdown */}
                   <div className="border-b border-line/30 px-4 py-4 flex items-center gap-3">
                     {authUser.profilePicture ? (

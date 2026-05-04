@@ -80,7 +80,7 @@ const FeedbackCard = ({ item }) => {
   );
 };
 
-const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken, onOpenTryOn }) => {
+const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken, onAddToCart }) => {
   const navigate = useNavigate();
   const prefersReducedMotion = useReducedMotion();
   const categoriesRowRef = useRef(null);
@@ -391,7 +391,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                       product={product}
                       isFavorite={isProductFavorite(favoriteIds, product)}
                       onToggleFavorite={onToggleFavorite}
-                      onOpenTryOn={onOpenTryOn}
+                      onAddToCart={onAddToCart}
                     />
                     {index < 2 ? (
                       <div className="absolute top-4 right-4 inline-block rounded-full bg-gradient-to-r from-rose to-pink-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg">

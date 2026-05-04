@@ -6,7 +6,7 @@ import ProductCard from '../components/ProductCard';
 import SectionTitle from '../components/SectionTitle';
 import { getFavoriteProducts } from '../utils/productCatalog';
 
-const FavoritesPage = ({ products, favoriteIds, onToggleFavorite, onOpenTryOn }) => {
+const FavoritesPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart }) => {
   const favoriteProducts = getFavoriteProducts(products, favoriteIds);
 
   return (
@@ -17,7 +17,7 @@ const FavoritesPage = ({ products, favoriteIds, onToggleFavorite, onOpenTryOn })
         <StaggerContainer immediate className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {favoriteProducts.map((product) => (
             <StaggerItem key={product.id}>
-              <ProductCard product={product} isFavorite onToggleFavorite={onToggleFavorite} onOpenTryOn={onOpenTryOn} />
+              <ProductCard product={product} isFavorite onToggleFavorite={onToggleFavorite} onAddToCart={onAddToCart} />
             </StaggerItem>
           ))}
         </StaggerContainer>

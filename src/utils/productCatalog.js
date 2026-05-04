@@ -82,11 +82,21 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     featured: Boolean(pickValue(product?.featured, fallback.featured, false)),
     rating: asNumber(pickValue(fallback.rating, product?.rating), 0),
     reviewsCount: asNumber(pickValue(fallback.reviewsCount, product?.reviewsCount), 0),
+    viewCount: asNumber(pickValue(product?.viewCount, product?.views, product?.viewsCount, fallback.viewCount, fallback.views, fallback.viewsCount), 0),
+    soldCount: asNumber(
+      pickValue(product?.soldCount, product?.totalSold, product?.salesCount, product?.orderCount, product?.purchases, fallback.soldCount, fallback.totalSold, fallback.salesCount, fallback.orderCount, fallback.purchases),
+      0,
+    ),
     badge: pickValue(product?.badge, fallback.badge, ''),
+    inspiredByCity: pickValue(product?.inspiredByCity, fallback.inspiredByCity, ''),
+    motifTags: asArray(product?.motifTags, asArray(fallback.motifTags, [])),
     motifId: pickValue(product?.motifId, fallback.motifId, motifDefaults.motifId, ''),
     motifCode: pickValue(product?.motifCode, fallback.motifCode, motifDefaults.motifCode, ''),
+    patternStoryId: pickValue(product?.patternStoryId, product?.patternStory?.id, fallback.patternStoryId, ''),
+    patternStory: product?.patternStory ?? fallback.patternStory ?? null,
     images: asArray(product?.images, asArray(fallback.images, [])).map(resolveApiAssetUrl),
     createdAt: pickValue(product?.createdAt, fallback.createdAt, null),
+    updatedAt: pickValue(product?.updatedAt, fallback.updatedAt, null),
   };
 };
 

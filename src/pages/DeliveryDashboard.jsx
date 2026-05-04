@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
-import { formatDate } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
@@ -186,8 +186,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                   <div>
                     <p className="font-semibold text-ink">Order #{order.orderNumber ?? order._id?.slice(-6).toUpperCase()}</p>
                     <p className="text-sm text-muted">Customer: {order.address?.fullName || 'N/A'}</p>
-                    <p className="text-sm text-muted">Total: {orderTotal}JD</p>
-                    {rewardTitle ? <p className="text-sm text-[#54715f]">{rewardTitle} applied</p> : null}
+                    <p className="text-sm text-muted">Total: {order.total || 0}JD</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="rounded-full bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800">
@@ -229,7 +228,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                         {order.items?.map((item, index) => (
                           <div key={`${item.title}-${index}`} className="flex justify-between text-sm">
                             <span>{item.title} x {item.quantity}</span>
-                            <span className="text-text">{(item.price * item.quantity).toFixed(2)}JD</span>
+                            <span className="text-text">{formatCurrency(item.price * item.quantity)}</span>
                           </div>
                         ))}
                       </div>
@@ -241,7 +240,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                       ) : null}
                       <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
                         <span>Total:</span>
-                        <span className="text-blush">{orderTotal}JD</span>
+                        <span className="text-blush">{order.total || 0}JD</span>
                       </div>
                     </div>
 
@@ -331,7 +330,7 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                             {order.items?.map((item, index) => (
                               <div key={`${item.title}-${index}`} className="flex justify-between text-sm">
                                 <span>{item.title} x {item.quantity}</span>
-                                <span className="text-text">{(item.price * item.quantity).toFixed(2)}JD</span>
+                                <span className="text-text">{formatCurrency(item.price * item.quantity)}</span>
                               </div>
                             ))}
                           </div>

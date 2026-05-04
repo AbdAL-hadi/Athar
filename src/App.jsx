@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
+import AccessibilityToolbar from './components/accessibility/AccessibilityToolbar';
 import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
 import AdminCommentModerationPage from './pages/AdminCommentModerationPage';
@@ -12,6 +13,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import DeliveryDashboard from './pages/DeliveryDashboard';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import FavoritesPage from './pages/FavoritesPage';
+import HeritageMapPage from './pages/HeritageMapPage';
 import HomePage from './pages/HomePage';
 import LoyaltyRewardsPage from './pages/LoyaltyRewardsPage';
 import MotifDetailsPage from './pages/MotifDetailsPage';
@@ -24,7 +26,7 @@ import Toast from './components/Toast';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
 import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, updateCartItemQuantity } from './utils/cart';
-import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProducts } from './utils/productCatalog';
+import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProduct, normalizeProducts } from './utils/productCatalog';
 
 const fallbackProducts = normalizeProducts(mockProducts);
 
@@ -52,7 +54,7 @@ const App = () => {
       setProducts(remoteProducts);
     } catch (error) {
       setProducts(fallbackProducts);
-      setProductsError(error.message || 'Unable to load products from the Athar API right now.');
+      setProductsError(error.message || 'Unable to refresh the Athar collection right now.');
     } finally {
       setProductsLoading(false);
     }
@@ -75,7 +77,7 @@ const App = () => {
       } catch (error) {
         if (!isCancelled) {
           setProducts(fallbackProducts);
-          setProductsError(error.message || 'Unable to load products from the Athar API right now.');
+          setProductsError(error.message || 'Unable to refresh the Athar collection right now.');
         }
       } finally {
         if (!isCancelled) {
@@ -181,12 +183,53 @@ const App = () => {
     setCartItems((currentItems) => removeCartItem(currentItems, productId));
   };
 
+  const handleProductLoaded = (updatedProduct) => {
+    if (!updatedProduct) return;
+
+    setProducts((currentProducts) =>
+      currentProducts.map((product) =>
+        [updatedProduct.id, updatedProduct.slug, updatedProduct.productId].some((reference) =>
+          reference && [product.id, product.slug, product.productId].includes(reference),
+        )
+          ? { ...product, ...updatedProduct }
+          : product,
+      ),
+    );
+  };
+
+  const handleProductSaved = (savedProduct) => {
+    if (!savedProduct) return;
+
+    const normalizedProduct = normalizeProduct(savedProduct);
+
+    setProducts((currentProducts) => {
+      const productExists = currentProducts.some((product) =>
+        [normalizedProduct.id, normalizedProduct.slug, normalizedProduct.productId].some((reference) =>
+          reference && [product.id, product.slug, product.productId].includes(reference),
+        ),
+      );
+
+      if (!productExists) {
+        return [normalizedProduct, ...currentProducts];
+      }
+
+      return currentProducts.map((product) =>
+        [normalizedProduct.id, normalizedProduct.slug, normalizedProduct.productId].some((reference) =>
+          reference && [product.id, product.slug, product.productId].includes(reference),
+        )
+          ? { ...product, ...normalizedProduct }
+          : product,
+      );
+    });
+  };
+
   const handleClearCart = (checkoutResult = {}) => {
     setCartItems([]);
 
     if (checkoutResult?.user) {
       syncAuthUser(checkoutResult.user);
     }
+    void refreshProducts();
   };
 
   const handleToggleFavorite = async (productOrReference) => {
@@ -284,15 +327,13 @@ const App = () => {
     <>
     <Routes>
       <Route element={<MainLayout cartCount={cartCount} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />}>
-        <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} />} />
-        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} onOpenTryOn={handleOpenTryOn} />} />
-        <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} />} />
+        <Route path="/" element={<HomePage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} authToken={authToken} onAddToCart={handleAddToCart} />} />
+        <Route path="/products" element={<ProductsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} isLoading={productsLoading} errorMessage={productsError} onRefreshProducts={refreshProducts} />} />
+        <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} onProductLoaded={handleProductLoaded} />} />
         <Route path="/motifs/:motifId" element={<MotifDetailsPage products={products} />} />
         <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
-        <Route path="/rewards" element={<LoyaltyRewardsPage authUser={authUser} />} />
-        <Route path="/loyalty" element={<LoyaltyRewardsPage authUser={authUser} />} />
-        <Route path="/cart" element={<CartPage items={cartItems} products={products} authUser={authUser} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
+        <Route path="/cart" element={<CartPage items={cartItems} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
@@ -303,10 +344,11 @@ const App = () => {
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
         <Route path="/login" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />
       </Route>
-      <Route path="/employee-dashboard" element={<EmployeeDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
+      <Route path="/employee-dashboard" element={<EmployeeDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onProductSaved={handleProductSaved} />} />
       <Route path="/delivery-dashboard" element={<DeliveryDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
     </Routes>
     <AITryOnModal product={tryOnProduct} open={Boolean(tryOnProduct)} onClose={handleCloseTryOn} />
+    <AccessibilityToolbar />
     <Toast
       open={Boolean(cartAuthMessage)}
       variant="error"
