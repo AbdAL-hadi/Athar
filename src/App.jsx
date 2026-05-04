@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
 import AccessibilityToolbar from './components/accessibility/AccessibilityToolbar';
@@ -29,6 +29,26 @@ import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, upda
 import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProduct, normalizeProducts } from './utils/productCatalog';
 
 const fallbackProducts = normalizeProducts(mockProducts);
+
+const ProtectedRewardsRoute = ({ authUser, authLoading }) => {
+  if (authLoading) {
+    return (
+      <div className="section-shell py-16">
+        <div className="rounded-[28px] border border-line bg-white px-6 py-8 text-center shadow-card">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">Athar Rewards</p>
+          <h1 className="mt-3 font-display text-4xl text-ink">Checking your account</h1>
+          <p className="mt-3 text-base text-ink-soft">Please wait while we confirm your sign-in status.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <Navigate to="/auth?mode=login" replace />;
+  }
+
+  return <LoyaltyRewardsPage authUser={authUser} />;
+};
 
 const App = () => {
   const navigate = useNavigate();
@@ -339,7 +359,7 @@ const App = () => {
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/heritage-map" element={<HeritageMapPage />} />
-        <Route path="/rewards" element={<LoyaltyRewardsPage authUser={authUser} />} />
+        <Route path="/rewards" element={<ProtectedRewardsRoute authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/comments" element={<AdminCommentModerationPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />
