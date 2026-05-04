@@ -1,6 +1,7 @@
 import PendingRegistration from '../models/PendingRegistration.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
+import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { products as localCatalogProducts } from '../src/data/products.js';
 import { createAuthToken, hashPassword, verifyPassword } from '../utils/auth.js';
 import { sendVerificationEmail } from '../utils/notifications.js';
@@ -21,6 +22,13 @@ const sanitizeUser = (userDocument) => ({
   role: userDocument.role,
   favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
+  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.lifetimeLoyaltyPoints ?? 0),
+    Number(userDocument.atharPoints ?? 0),
+    Number(userDocument.loyaltyPoints ?? 0),
+  ),
   createdAt: userDocument.createdAt,
   updatedAt: userDocument.updatedAt,
 });
@@ -34,6 +42,21 @@ const MAX_PROFILE_PICTURE_BYTES = 5 * 1024 * 1024;
 const normalizeReference = (value) => String(value ?? '').trim().toLowerCase();
 const getSafeFavoriteIds = (userDocument) =>
   Array.isArray(userDocument?.favorites) ? userDocument.favorites : [];
+
+const ADMIN_CREDENTIALS = {
+  email: 'admin@athar.com',
+  password: 'Admin@123',
+};
+
+const EMPLOYEE_CREDENTIALS = {
+  email: 'employee@athar.com',
+  password: 'Employee@123',
+};
+
+const DELIVERY_CREDENTIALS = {
+  email: 'delivery@athar.com',
+  password: 'Delivery@123',
+};
 
 const getBase64DecodedByteLength = (base64Value = '') => {
   const normalizedValue = String(base64Value).replace(/\s+/g, '');
@@ -149,7 +172,59 @@ const findLegacyUnverifiedUserByEmail = (email) => {
 
 const canPersistAuthenticatedUser = (authenticatedUser) => /^[0-9a-fA-F]{24}$/.test(String(authenticatedUser?._id ?? ''));
 
+const getPersistentAdminUser = async (authenticatedUser) => {
+  if (authenticatedUser?._id !== 'admin-001' || authenticatedUser?.role !== 'admin') {
+    return null;
+  }
+
+  const email = ADMIN_CREDENTIALS.email;
+  let adminUser = await User.findOne({ email }).select('-password');
+
+  if (!adminUser) {
+    try {
+      adminUser = await User.create({
+        name: authenticatedUser.name || 'Admin',
+        email,
+        password: await hashPassword(ADMIN_CREDENTIALS.password),
+        phone: authenticatedUser.phone || '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: authenticatedUser.emailVerifiedAt || new Date(),
+        role: 'admin',
+        profilePicture: authenticatedUser.profilePicture || '',
+        address: authenticatedUser.address || {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        favorites: [],
+      });
+
+      return User.findById(adminUser._id).select('-password');
+    } catch (error) {
+      if (error?.code !== 11000) {
+        throw error;
+      }
+
+      adminUser = await User.findOne({ email }).select('-password');
+    }
+  }
+
+  if (adminUser && adminUser.role !== 'admin') {
+    adminUser.role = 'admin';
+    await adminUser.save();
+  }
+
+  return adminUser;
+};
+
 const getPersistentAuthenticatedUser = async (authenticatedUser) => {
+  const persistentAdmin = await getPersistentAdminUser(authenticatedUser);
+
+  if (persistentAdmin) {
+    return persistentAdmin;
+  }
+
   if (!canPersistAuthenticatedUser(authenticatedUser)) {
     return null;
   }
@@ -191,6 +266,25 @@ const findProductByReference = async (reference) => {
 
 const getCanonicalFavoriteId = (productDocument) =>
   productDocument?.slug || productDocument?.id || productDocument?._id?.toString?.() || '';
+
+const getFavoriteReferenceCandidates = (productDocument) => {
+  return [
+    productDocument?.slug,
+    productDocument?.id,
+    productDocument?._id?.toString?.(),
+    productDocument?.title,
+    productDocument?.name,
+  ]
+    .filter(Boolean)
+    .map(normalizeReference);
+};
+
+// Refreshes the workbook quietly after user data changes that affect the Customers sheet.
+const scheduleCustomerWorkbookRefresh = () => {
+  void queueSalesExportRefreshWithRetry().catch((error) => {
+    console.error('[Athar exports] Customer workbook refresh failed:', error.message);
+  });
+};
 
 export const registerUser = async (req, res) => {
   try {
@@ -291,17 +385,6 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// Hardcoded employee credentials (temporary - to be replaced with database)
-const EMPLOYEE_CREDENTIALS = {
-  email: 'employee@athar.com',
-  password: 'Employee@123',
-};
-
-const DELIVERY_CREDENTIALS = {
-  email: 'delivery@athar.com',
-  password: 'Delivery@123',
-};
-
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body ?? {};
@@ -314,6 +397,39 @@ export const loginUser = async (req, res) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+
+    // Check for admin login first
+    if (normalizedEmail === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      const adminUser = {
+        _id: 'admin-001',
+        name: 'Admin',
+        email: ADMIN_CREDENTIALS.email,
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'admin',
+        profilePicture: '',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const token = createAuthToken(adminUser);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged in successfully as admin.',
+        data: {
+          token,
+          user: sanitizeUser(adminUser),
+        },
+      });
+    }
 
     // Check for employee login first
     if (normalizedEmail === EMPLOYEE_CREDENTIALS.email && password === EMPLOYEE_CREDENTIALS.password) {
@@ -530,6 +646,7 @@ export const verifyEmailCode = async (req, res) => {
       );
 
       await pendingRegistration.deleteOne();
+      scheduleCustomerWorkbookRefresh();
 
       const token = createAuthToken(user);
 
@@ -579,6 +696,7 @@ export const verifyEmailCode = async (req, res) => {
     legacyUser.emailVerificationCodeExpiresAt = null;
     legacyUser.lastVerificationSentAt = null;
     await legacyUser.save();
+    scheduleCustomerWorkbookRefresh();
 
     const token = createAuthToken(legacyUser);
 
@@ -679,10 +797,22 @@ export const resendVerificationCode = async (req, res) => {
 };
 
 export const getCurrentUser = async (req, res) => {
-  return res.status(200).json({
-    success: true,
-    data: sanitizeUser(req.user),
-  });
+  try {
+    const persistentUser = await getPersistentAuthenticatedUser(req.user);
+
+    return res.status(200).json({
+      success: true,
+      data: sanitizeUser(persistentUser || req.user),
+    });
+  } catch (error) {
+    console.error('[Athar auth] Current user lookup failed:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'We could not load your account right now.',
+      error: error.message,
+    });
+  }
 };
 
 export const updateCurrentUser = async (req, res) => {
@@ -798,6 +928,7 @@ export const updateCurrentUser = async (req, res) => {
     }
 
     await user.save();
+    scheduleCustomerWorkbookRefresh();
 
     return res.status(200).json({
       success: true,
@@ -874,6 +1005,8 @@ export const addFavorite = async (req, res) => {
 
     const favoriteId = getCanonicalFavoriteId(product);
     const currentFavoriteIds = getSafeFavoriteIds(user);
+    const existingFavoriteLookup = new Set(currentFavoriteIds.map(normalizeReference));
+    const productFavoriteCandidates = getFavoriteReferenceCandidates(product);
 
     if (!favoriteId) {
       return res.status(422).json({
@@ -882,7 +1015,7 @@ export const addFavorite = async (req, res) => {
       });
     }
 
-    if (!currentFavoriteIds.includes(favoriteId)) {
+    if (!productFavoriteCandidates.some((candidate) => existingFavoriteLookup.has(candidate))) {
       user.favorites = [...currentFavoriteIds, favoriteId];
       await user.save();
     } else {
@@ -938,7 +1071,11 @@ export const removeFavorite = async (req, res) => {
 
     const favoriteId = getCanonicalFavoriteId(product);
     const currentFavoriteIds = getSafeFavoriteIds(user);
-    user.favorites = currentFavoriteIds.filter((entry) => entry !== favoriteId);
+    const removableFavoriteLookup = new Set([
+      normalizeReference(favoriteId),
+      ...getFavoriteReferenceCandidates(product),
+    ]);
+    user.favorites = currentFavoriteIds.filter((entry) => !removableFavoriteLookup.has(normalizeReference(entry)));
     await user.save();
 
     return res.status(200).json({

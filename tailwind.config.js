@@ -13,7 +13,7 @@ export default {
         muted: '#a38373',
       },
       fontFamily: {
-        display: ['Georgia', 'serif'],
+        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         body: ['"Segoe UI"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {

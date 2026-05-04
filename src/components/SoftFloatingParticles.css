@@ -1,0 +1,97 @@
+.soft-floating-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;
+}
+
+.soft-floating-particles::before {
+  content: '';
+  position: absolute;
+  inset: -16%;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(255, 252, 239, 0.32), transparent 30%),
+    radial-gradient(circle at 80% 14%, rgba(218, 181, 122, 0.3), transparent 28%),
+    radial-gradient(circle at 54% 90%, rgba(255, 244, 223, 0.32), transparent 34%);
+  opacity: 0.95;
+}
+
+.soft-floating-particle {
+  position: absolute;
+  left: var(--particle-x);
+  top: var(--particle-y);
+  width: var(--particle-size);
+  height: var(--particle-size);
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    var(--particle-color) 0%,
+    rgba(255, 245, 215, 0.7) 38%,
+    rgba(255, 227, 167, 0.22) 62%,
+    transparent 78%
+  );
+  box-shadow:
+    0 0 10px rgba(255, 255, 245, 0.42),
+    0 0 22px rgba(224, 171, 88, 0.28);
+  opacity: 0;
+  filter: blur(var(--particle-blur));
+  transform: translate3d(0, 0, 0) scale(var(--particle-scale));
+  animation: soft-floating-particle-drift var(--particle-duration) ease-in-out infinite;
+  animation-delay: var(--particle-delay);
+  will-change: opacity, transform;
+}
+
+.soft-floating-particles--reduced .soft-floating-particle {
+  animation: none;
+  opacity: 0.16;
+}
+
+@keyframes soft-floating-particle-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(var(--particle-scale));
+  }
+
+  18% {
+    opacity: var(--particle-opacity);
+  }
+
+  58% {
+    opacity: calc(var(--particle-opacity) * 0.9);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--particle-drift-x), var(--particle-drift-y), 0)
+      scale(calc(var(--particle-scale) * 1.08));
+  }
+}
+
+@media (max-width: 900px) {
+  .soft-floating-particle:nth-child(n + 22) {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .soft-floating-particle:nth-child(n + 15) {
+    display: none;
+  }
+
+  .soft-floating-particles::before {
+    opacity: 0.62;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soft-floating-particle {
+    animation: none;
+    opacity: 0.16;
+  }
+
+  .soft-floating-particle:nth-child(n + 7) {
+    display: none;
+  }
+}

@@ -21,9 +21,19 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    fulfilledQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     price: {
       type: Number,
       required: true,
+      min: 0,
+    },
+    pointsEarned: {
+      type: Number,
+      default: 0,
       min: 0,
     },
   },
@@ -74,14 +84,55 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    discountAmount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
     total: {
       type: Number,
       required: true,
       min: 0,
     },
+    loyaltyReward: {
+      id: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      title: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      pointsRedeemed: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+    },
+    loyaltyPointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    earnedPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsAdded: {
+      type: Boolean,
+      default: false,
+    },
+    loyaltyPointsAppliedAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
-      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'],
+      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'],
       default: 'Pending',
     },
     paymentMethod: {
@@ -97,6 +148,30 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    confirmedAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+    inventoryApplied: {
+      type: Boolean,
+      default: false,
+    },
+    inventoryAppliedAt: {
+      type: Date,
+      default: null,
+    },
+    inventoryRestoredAt: {
+      type: Date,
+      default: null,
     },
     deliveryConfirmedByCustomer: {
       type: Boolean,

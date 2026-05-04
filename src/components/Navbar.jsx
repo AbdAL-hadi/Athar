@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import AdminNavigation from './admin/AdminNavigation';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
   { to: '/products', label: 'Products', icon: 'product' },
+  { to: '/rewards', label: 'Rewards', icon: 'reward' },
   { to: '/favorites', label: 'Favorite', icon: 'heart' },
   { to: '/cart', label: 'Cart', icon: 'bag' },
   { to: '/order-tracking', label: 'Track Order', icon: 'track' },
@@ -35,6 +37,13 @@ const TrackIcon = () => (
   </svg>
 );
 
+const RewardIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M12 3.75 14.42 8.6l5.35.78-3.88 3.78.92 5.34L12 15.98 7.19 18.5l.92-5.34-3.88-3.78 5.35-.78L12 3.75Z" />
+    <path d="M8.2 21h7.6" />
+  </svg>
+);
+
 const AboutIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="9" />
@@ -49,6 +58,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const dropdownRef = useRef(null);
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const productIcon = resolveApiAssetUrl('products/icons8-product-80.png');
+  const homeTarget = authUser?.role === 'admin' ? '/admin/dashboard' : '/';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -81,7 +91,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
       <div className="section-shell flex flex-col gap-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <Link to="/" className="flex items-center gap-4">
+        <Link to={homeTarget} className="flex items-center gap-4">
           <div className="rounded-[20px] bg-blush p-1.5">
             <img src={logo} alt="Athar logo" className="h-14 w-14 rounded-full object-cover" />
           </div>
@@ -92,29 +102,35 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
         </Link>
 
         <div className="flex flex-wrap items-center gap-6">
-          <nav className="flex flex-wrap items-center gap-6">
-            {links.map((link) => (
-              <NavLink key={link.to} to={link.to} className={iconLinkClass} aria-label={link.label} title={link.label}>
-                {link.icon === 'heart' ? (
-                  <HeartIcon />
-                ) : link.icon === 'bag' ? (
-                  <BagIcon />
-                ) : link.icon === 'track' ? (
-                  <TrackIcon />
-                ) : link.icon === 'about' ? (
-                  <AboutIcon />
-                ) : (
-                  <img src={productIcon} alt="" className="h-5 w-5 object-contain" />
-                )}
-                {link.icon === 'bag' && cartCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold text-white">
-                    {cartCount}
-                  </span>
-                ) : null}
-                <span className="sr-only">{link.label}</span>
-              </NavLink>
-            ))}
-          </nav>
+          {authUser?.role === 'admin' ? (
+            <AdminNavigation />
+          ) : (
+            <nav className="flex flex-wrap items-center gap-6">
+              {links.map((link) => (
+                <NavLink key={link.to} to={link.to} className={iconLinkClass} aria-label={link.label} title={link.label}>
+                  {link.icon === 'heart' ? (
+                    <HeartIcon />
+                  ) : link.icon === 'bag' ? (
+                    <BagIcon />
+                  ) : link.icon === 'track' ? (
+                    <TrackIcon />
+                  ) : link.icon === 'reward' ? (
+                    <RewardIcon />
+                  ) : link.icon === 'about' ? (
+                    <AboutIcon />
+                  ) : (
+                    <img src={productIcon} alt="" className="h-5 w-5 object-contain" />
+                  )}
+                  {link.icon === 'bag' && cartCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold text-white">
+                      {cartCount}
+                    </span>
+                  ) : null}
+                  <span className="sr-only">{link.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          )}
 
           {authLoading ? (
             <div className="button-primary whitespace-nowrap">Checking...</div>

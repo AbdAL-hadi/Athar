@@ -1,6 +1,14 @@
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
+import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
+import {
+  awardLoyaltyPointsForOrder,
+  redeemLoyaltyRewardForCheckout,
+  runWithLoyaltyTransaction,
+} from '../services/loyalty/loyaltyPointsService.js';
+import { calculateProductPoints } from '../src/utils/loyaltyPoints.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
 const normalizeAddress = (body = {}) => {
@@ -18,6 +26,28 @@ const normalizeAddress = (body = {}) => {
 const generateOrderNumber = () => {
   return `ATH${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`;
 };
+
+const sanitizeCheckoutUser = (userDocument) => ({
+  id: userDocument._id.toString(),
+  name: userDocument.name,
+  email: userDocument.email,
+  phone: userDocument.phone,
+  profilePicture: userDocument.profilePicture ?? '',
+  isEmailVerified: userDocument.isEmailVerified !== false,
+  emailVerifiedAt: userDocument.emailVerifiedAt,
+  role: userDocument.role,
+  favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
+  address: userDocument.address,
+  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.lifetimeLoyaltyPoints ?? 0),
+    Number(userDocument.atharPoints ?? 0),
+    Number(userDocument.loyaltyPoints ?? 0),
+  ),
+  createdAt: userDocument.createdAt,
+  updatedAt: userDocument.updatedAt,
+});
 
 const ensureOrderNumber = async (order) => {
   if (order.orderNumber) {
@@ -47,9 +77,22 @@ const canAccessOrder = (order, user) => {
   return Boolean(orderUserId) && orderUserId === user._id.toString();
 };
 
+// Refreshes the sales workbook asynchronously so order updates never fail because of Excel I/O.
+const scheduleSalesWorkbookRefresh = () => {
+  void queueSalesExportRefreshWithRetry().catch((error) => {
+    console.error('[Athar exports] Workbook refresh failed after order update:', error.message);
+  });
+};
+
 export const createOrder = async (req, res) => {
   try {
-    const { items = [], shippingFee = 0, paymentMethod = 'Cash on Delivery', phone = '' } = req.body ?? {};
+    const {
+      items = [],
+      shippingFee = 0,
+      paymentMethod = 'Cash on Delivery',
+      phone = '',
+      loyaltyRedemption = null,
+    } = req.body ?? {};
     const address = normalizeAddress(req.body ?? {});
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -88,12 +131,27 @@ export const createOrder = async (req, res) => {
     const productIds = normalizedItems.map((item) => item.productId).filter((value) => mongoose.isValidObjectId(value));
     const products = await Product.find({ _id: { $in: productIds } });
     const productLookup = new Map(products.map((product) => [product._id.toString(), product]));
+    const requestedQuantityByProductId = normalizedItems.reduce((lookup, item) => {
+      const productId = String(item.productId);
+      lookup.set(productId, (lookup.get(productId) || 0) + Number(item.quantity || 0));
+      return lookup;
+    }, new Map());
 
     const orderItems = normalizedItems.map((item) => {
       const product = productLookup.get(String(item.productId));
 
       if (!product) {
-        throw new Error(`Product ${item.productId} could not be found.`);
+        const error = new Error(`Product ${item.productId} could not be found.`);
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const requestedQuantity = requestedQuantityByProductId.get(String(item.productId)) || 0;
+
+      if (Number(product.stock || 0) < requestedQuantity) {
+        const error = new Error(`Not enough stock for ${product.title}.`);
+        error.statusCode = 409;
+        throw error;
       }
 
       return {
@@ -102,27 +160,79 @@ export const createOrder = async (req, res) => {
         image: product.images[0],
         quantity: item.quantity,
         price: product.price,
+        pointsEarned: calculateProductPoints(product, item.quantity),
       };
     });
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const normalizedShippingFee = Number(shippingFee) || 0;
-    const total = subtotal + normalizedShippingFee;
+    const normalizedShippingFee = Math.max(0, Number(shippingFee) || 0);
+    const loyaltyPointsEarned = orderItems.reduce((sum, item) => sum + item.pointsEarned, 0);
+    const persistentUserId =
+      req.user?._id && mongoose.isValidObjectId(req.user._id) ? req.user._id : null;
+    const selectedRewardId =
+      loyaltyRedemption && typeof loyaltyRedemption === 'object' ? loyaltyRedemption.rewardId ?? '' : '';
 
-    const order = await Order.create({
-      user: req.user?._id ?? null,
-      orderNumber: generateOrderNumber(),
-      items: orderItems,
-      subtotal,
-      shippingFee: normalizedShippingFee,
-      total,
-      status: 'Pending',
-      paymentMethod,
-      address,
-      phone,
+    const checkoutDraft = await runWithLoyaltyTransaction(async (session) => {
+      const redemption = await redeemLoyaltyRewardForCheckout({
+        userId: persistentUserId,
+        rewardId: selectedRewardId,
+        subtotal,
+        shippingFee: normalizedShippingFee,
+        session,
+      });
+
+      const orderPayload = {
+        user: persistentUserId,
+        orderNumber: generateOrderNumber(),
+        items: orderItems,
+        subtotal,
+        shippingFee: normalizedShippingFee,
+        discountAmount: redemption.discountAmount,
+        total: redemption.finalTotal,
+        loyaltyReward: redemption.reward
+          ? {
+              id: redemption.reward.id,
+              title: redemption.reward.title,
+              pointsRedeemed: redemption.pointsRedeemed,
+            }
+          : undefined,
+        loyaltyPointsEarned,
+        earnedPoints: loyaltyPointsEarned,
+        pointsAdded: false,
+        status: 'Pending',
+        paymentMethod,
+        address,
+        phone,
+      };
+
+      const [createdOrder] = await Order.create([orderPayload], session ? { session } : undefined);
+
+      return {
+        orderId: createdOrder._id,
+        total: redemption.finalTotal,
+        reward: redemption.reward,
+        discountAmount: redemption.discountAmount,
+        pointsRedeemed: redemption.pointsRedeemed,
+        updatedUser: redemption.updatedUser,
+        remainingBalance: redemption.remainingBalance,
+      };
     });
 
-    const populatedOrder = await Order.findById(order._id).populate('items.product').populate('user', 'name email role');
+    const populatedOrder = await transitionOrderStatusWithInventory({
+      orderId: checkoutDraft.orderId,
+      nextStatus: 'Confirmed',
+    });
+
+    const loyaltyAward = await awardLoyaltyPointsForOrder(populatedOrder._id);
+    const updatedUser = loyaltyAward.user ?? checkoutDraft.updatedUser;
+
+    if (loyaltyAward.appliedAt) {
+      populatedOrder.loyaltyPointsAppliedAt = loyaltyAward.appliedAt;
+      populatedOrder.pointsAdded = true;
+    }
+
+    scheduleSalesWorkbookRefresh();
+
     let whatsappNotification = {
       delivered: false,
       channel: 'skipped',
@@ -132,8 +242,8 @@ export const createOrder = async (req, res) => {
       whatsappNotification = await sendOrderWhatsAppMessage({
         phone,
         customerName: address.fullName,
-        orderNumber: order.orderNumber,
-        total,
+        orderNumber: populatedOrder.orderNumber,
+        total: checkoutDraft.total,
       });
     } catch (notificationError) {
       console.error('[Athar WhatsApp] Failed to send order message:', notificationError.message);
@@ -143,12 +253,26 @@ export const createOrder = async (req, res) => {
       success: true,
       message: 'Order created successfully.',
       data: populatedOrder,
+      loyalty: {
+        pointsEarned: loyaltyPointsEarned,
+        balance: loyaltyAward.balance,
+        applied: loyaltyAward.applied,
+        redeemedReward: checkoutDraft.reward
+          ? {
+              id: checkoutDraft.reward.id,
+              title: checkoutDraft.reward.title,
+              pointsRedeemed: checkoutDraft.pointsRedeemed,
+              discountAmount: checkoutDraft.discountAmount,
+            }
+          : null,
+      },
+      user: updatedUser ? sanitizeCheckoutUser(updatedUser) : null,
       notifications: {
         whatsapp: whatsappNotification,
       },
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || 'Failed to create order.',
     });
@@ -335,7 +459,21 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const updatePayload = { status };
+    if (req.user?.role === 'delivery' && !['Shipped', 'Delivered', 'Cancelled'].includes(status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Delivery accounts can update only shipment-related statuses.',
+      });
+    }
+
+    if (req.user?.role === 'employee' && !['Confirmed', 'Cancelled'].includes(status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Employee accounts can update only confirmation-related statuses.',
+      });
+    }
+
+    const updatePayload = {};
 
     if (status === 'Cancelled') {
       updatePayload.deliveryConfirmedByCustomer = false;
@@ -349,15 +487,14 @@ export const updateOrderStatus = async (req, res) => {
       updatePayload.deliveryConfirmationMessage = 'Delivery team marked this order as delivered.';
     }
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      updatePayload,
-      { new: true, runValidators: true },
-    )
-      .populate('user', 'name email role')
-      .populate('items.product');
+    const order = await transitionOrderStatusWithInventory({
+      orderId: req.params.id,
+      nextStatus: status,
+      extraUpdates: updatePayload,
+    });
 
     await ensureOrderNumber(order);
+    scheduleSalesWorkbookRefresh();
 
     return res.status(200).json({
       success: true,
@@ -365,9 +502,9 @@ export const updateOrderStatus = async (req, res) => {
       data: order,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Failed to update order status.',
+      message: error.message || 'Failed to update order status.',
     });
   }
 };

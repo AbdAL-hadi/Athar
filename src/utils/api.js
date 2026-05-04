@@ -132,5 +132,5 @@ export const resolveApiAssetUrl = (value) => {
     return normalizedValue;
   }
 
-  return `${API_BASE_URL}/${normalizedValue}`;
+return '';
 };

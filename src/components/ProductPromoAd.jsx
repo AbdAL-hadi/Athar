@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import halkPromo from '../assets/products/halk.png';
 
-const AD_APPEAR_INTERVAL_MS = 60 * 1000;
+const AD_APPEAR_INTERVAL_MS = 10 * 1000;
 
 const ProductPromoAd = () => {
   const [isVisible, setIsVisible] = useState(false);

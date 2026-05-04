@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 import { formatDate } from '../utils/format';
+import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 
@@ -171,6 +172,13 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
           <div className="space-y-4">
             {orders.map((order) => (
               <div key={order._id} className="overflow-hidden rounded-[24px] bg-white shadow-card">
+                {(() => {
+                  const orderTotal = getOrderTotal(order);
+                  const rewardTitle = getOrderRewardTitle(order);
+                  const discountAmount = getOrderDiscountAmount(order);
+
+                  return (
+                    <>
                 <button
                   onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
                   className="flex w-full items-center justify-between p-6 text-left transition hover:bg-cream"
@@ -178,7 +186,8 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                   <div>
                     <p className="font-semibold text-ink">Order #{order.orderNumber ?? order._id?.slice(-6).toUpperCase()}</p>
                     <p className="text-sm text-muted">Customer: {order.address?.fullName || 'N/A'}</p>
-                    <p className="text-sm text-muted">Total: {order.total || 0}JD</p>
+                    <p className="text-sm text-muted">Total: {orderTotal}JD</p>
+                    {rewardTitle ? <p className="text-sm text-[#54715f]">{rewardTitle} applied</p> : null}
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="rounded-full bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800">
@@ -224,9 +233,15 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                           </div>
                         ))}
                       </div>
+                      {discountAmount > 0 ? (
+                        <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm text-[#54715f]">
+                          <span>{rewardTitle || 'Reward applied'}:</span>
+                          <span>-{discountAmount}JD</span>
+                        </div>
+                      ) : null}
                       <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
                         <span>Total:</span>
-                        <span className="text-blush">{order.total || 0}JD</span>
+                        <span className="text-blush">{orderTotal}JD</span>
                       </div>
                     </div>
 
@@ -240,6 +255,9 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                     </button>
                   </div>
                 ) : null}
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -256,6 +274,13 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
               <div className="space-y-4">
                 {issueOrders.map((order) => (
                   <div key={order._id} className="overflow-hidden rounded-[24px] border-2 border-orange-300 bg-[#fff4e8] shadow-card">
+                    {(() => {
+                      const orderTotal = getOrderTotal(order);
+                      const rewardTitle = getOrderRewardTitle(order);
+                      const discountAmount = getOrderDiscountAmount(order);
+
+                      return (
+                        <>
                     <button
                       onClick={() => setExpandedIssueOrder(expandedIssueOrder === order._id ? null : order._id)}
                       className="flex w-full items-center justify-between p-6 text-left transition hover:bg-[#ffe8d2]"
@@ -310,6 +335,16 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                               </div>
                             ))}
                           </div>
+                          {discountAmount > 0 ? (
+                            <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm text-[#54715f]">
+                              <span>{rewardTitle || 'Reward applied'}:</span>
+                              <span>-{discountAmount}JD</span>
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
+                            <span>Total:</span>
+                            <span className="text-blush">{orderTotal}JD</span>
+                          </div>
                         </div>
 
                         <div className="flex gap-3">
@@ -332,6 +367,9 @@ const DeliveryDashboard = ({ authToken, authUser, onLogout }) => {
                         </div>
                       </div>
                     ) : null}
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
