@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
@@ -31,10 +31,12 @@ const ProductDetailsPage = ({
   authUser,
   authToken,
   onOpenTryOn,
+  onProductLoaded,
 }) => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const fallbackProduct = findProductByReference(products, id);
+  const fallbackProduct = useMemo(() => findProductByReference(products, id), [products, id]);
+  const fallbackLookupId = fallbackProduct?.productId || '';
   const [product, setProduct] = useState(fallbackProduct);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -96,8 +98,6 @@ const ProductDetailsPage = ({
         try {
           response = await apiRequest(`/api/products/${encodeURIComponent(id)}`);
         } catch (primaryError) {
-          const fallbackLookupId = fallbackProduct?.productId;
-
           if (primaryError?.status === 404 && fallbackLookupId && fallbackLookupId !== id) {
             response = await apiRequest(`/api/products/${encodeURIComponent(fallbackLookupId)}`);
           } else {
@@ -110,6 +110,7 @@ const ProductDetailsPage = ({
         if (!isCancelled) {
           setProduct(normalizedProduct);
           setSelectedMedia(getDefaultMedia(normalizedProduct));
+          onProductLoaded?.(normalizedProduct);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -119,12 +120,12 @@ const ProductDetailsPage = ({
             setLoadError(
               error?.status === 404
                 ? ''
-                : error.message || 'Unable to refresh this product from the Athar API right now.',
+                : error.message || 'Unable to refresh this product right now.',
             );
           } else {
             setProduct(null);
             setSelectedMedia(getDefaultMedia(null));
-            setLoadError(error.message || 'Unable to load this product from the Athar API.');
+            setLoadError(error.message || 'Unable to load this product right now.');
           }
         }
       } finally {
@@ -140,35 +141,7 @@ const ProductDetailsPage = ({
       isCancelled = true;
       stopAudioPlayback();
     };
-  }, [fallbackProduct, id]);
-
-  useEffect(() => {
-    if (!product?.id) {
-      return undefined;
-    }
-
-    let isCancelled = false;
-
-    const loadVisualDescription = async () => {
-      try {
-        const response = await apiRequest(`/api/products/${encodeURIComponent(product.id)}/visual-description`);
-
-        if (!isCancelled) {
-          setVisualDescriptionData(response?.data ?? null);
-        }
-      } catch (error) {
-        if (!isCancelled && error?.status !== 404) {
-          setVisualDescriptionError(error.message || 'Description unavailable right now.');
-        }
-      }
-    };
-
-    loadVisualDescription();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [product?.id]);
+  }, [fallbackLookupId, id]);
 
   useEffect(() => {
     if (!product?.id) {
@@ -320,12 +293,22 @@ const ProductDetailsPage = ({
     }
   };
 
+  const relatedProducts = useMemo(
+    () => (product ? products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 3) : []),
+    [products, product],
+  );
+  const galleryItems = useMemo(
+    () => (product ? product.images.map((image, index) => ({ type: 'image', src: image, alt: `${product.name} view ${index + 1}` })) : []),
+    [product],
+  );
+  const patternStoryTarget = product?.patternStory?.slug || product?.patternStoryId || '';
+
   if (isLoading && !product) {
     return (
       <div className="section-shell pt-14">
         <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
           <h1 className="font-display text-5xl text-ink">Loading product</h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">Fetching the latest product details from the Athar API.</p>
+          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">Preparing the latest details for this piece.</p>
         </div>
       </div>
     );
@@ -344,9 +327,6 @@ const ProductDetailsPage = ({
       </div>
     );
   }
-
-  const relatedProducts = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 3);
-  const galleryItems = product.images.map((image, index) => ({ type: 'image', src: image, alt: `${product.name} view ${index + 1}` }));
 
   const handleAdd = () => {
     if (product.stock < 1) return;
@@ -393,14 +373,24 @@ const ProductDetailsPage = ({
               <p className="font-display text-5xl text-ink">{formatCurrency(product.price)}</p>
               {product.compareAt > product.price ? <span className="text-xl text-muted line-through">{formatCurrency(product.compareAt)}</span> : null}
             </div>
-            {product.motifId ? (
-              <Link
-                to={`/motifs/${product.motifId}?product=${encodeURIComponent(product.id)}`}
-                className="inline-flex min-w-[160px] items-center justify-center rounded-[18px] bg-blush px-6 py-3 text-lg font-semibold text-ink transition hover:bg-rose"
-              >
-                {product.motifCode || 'Athar'}
-              </Link>
-            ) : null}
+            <div className="flex flex-wrap gap-3">
+              {patternStoryTarget ? (
+                <Link
+                  to={`/motifs/${patternStoryTarget}?product=${encodeURIComponent(product.id)}`}
+                  className="inline-flex min-w-[170px] items-center justify-center rounded-[18px] bg-blush px-6 py-3 text-lg font-semibold text-ink transition hover:bg-rose"
+                >
+                  View pattern story
+                </Link>
+              ) : null}
+              {!patternStoryTarget && product.motifId ? (
+                <Link
+                  to={`/motifs/${product.motifId}?product=${encodeURIComponent(product.id)}`}
+                  className="inline-flex min-w-[160px] items-center justify-center rounded-[18px] bg-blush px-6 py-3 text-lg font-semibold text-ink transition hover:bg-rose"
+                >
+                  {product.motifCode || 'Athar'}
+                </Link>
+              ) : null}
+            </div>
           </div>
           <div className="mt-8 space-y-4">
             <p className="text-2xl leading-10 text-ink-soft">{product.description}</p>
@@ -573,7 +563,7 @@ const ProductDetailsPage = ({
           <StaggerContainer immediate className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {relatedProducts.map((relatedProduct) => (
               <StaggerItem key={relatedProduct.id}>
-                <ProductCard product={relatedProduct} isFavorite={isProductFavorite(favoriteIds, relatedProduct)} onToggleFavorite={onToggleFavorite} onOpenTryOn={onOpenTryOn} />
+                <ProductCard product={relatedProduct} isFavorite={isProductFavorite(favoriteIds, relatedProduct)} onToggleFavorite={onToggleFavorite} onAddToCart={onAddToCart} />
               </StaggerItem>
             ))}
           </StaggerContainer>

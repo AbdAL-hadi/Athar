@@ -12,6 +12,7 @@ import cartRoutes from './routes/cartRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import patternStoryRoutes from './routes/patternStoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import tryOnRoutes from './routes/tryOnRoutes.js';
 
@@ -37,6 +38,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/pattern-stories', patternStoryRoutes);
 
 const PORT = process.env.PORT || 5000;
 

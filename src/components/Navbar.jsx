@@ -4,6 +4,7 @@ import AdminNavigation from './admin/AdminNavigation';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const links = [
+  { to: '/heritage-map', label: 'Heritage Map', icon: 'map' },
   { to: '/products', label: 'Products', icon: 'product' },
   { to: '/favorites', label: 'Favorite', icon: 'heart' },
   { to: '/cart', label: 'Cart', icon: 'bag' },
@@ -33,6 +34,13 @@ const TrackIcon = () => (
   <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
     <path d="M20 10c0 4.42-8 11-8 11S4 14.42 4 10a8 8 0 1 1 16 0Z" />
     <circle cx="12" cy="10" r="2.5" />
+  </svg>
+);
+
+const MapIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="m3.5 6.5 5-2 7 2 5-2v13l-5 2-7-2-5 2v-13Z" />
+    <path d="M8.5 4.5v13M15.5 6.5v13" />
   </svg>
 );
 
@@ -81,7 +89,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-[1200] border-b border-line bg-white/95 backdrop-blur">
       <div className="section-shell flex flex-col gap-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <Link to={homeTarget} className="flex items-center gap-4">
           <div className="rounded-[20px] bg-blush p-1.5">
@@ -106,6 +114,8 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <BagIcon />
                   ) : link.icon === 'track' ? (
                     <TrackIcon />
+                  ) : link.icon === 'map' ? (
+                    <MapIcon />
                   ) : link.icon === 'about' ? (
                     <AboutIcon />
                   ) : (
@@ -147,7 +157,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-line bg-white shadow-lg z-50">
+                <div className="absolute right-0 z-[1300] mt-2 w-56 rounded-lg border border-line bg-white shadow-lg">
                   {/* Profile Header in Dropdown */}
                   <div className="border-b border-line/30 px-4 py-4 flex items-center gap-3">
                     {authUser.profilePicture ? (

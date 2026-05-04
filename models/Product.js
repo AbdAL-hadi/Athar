@@ -142,6 +142,16 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    viewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    soldCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     visualDescriptions: {
       en: {
         type: visualDescriptionLanguageSchema,
@@ -178,6 +188,22 @@ const productSchema = new mongoose.Schema(
     styleTags: {
       type: [String],
       default: [],
+    },
+    inspiredByCity: {
+      type: String,
+      enum: ['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem'],
+      default: '',
+      trim: true,
+      lowercase: true,
+    },
+    motifTags: {
+      type: [String],
+      default: [],
+    },
+    patternStoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PatternStory',
+      default: null,
     },
     occasionTags: {
       type: [String],

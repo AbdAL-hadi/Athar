@@ -13,7 +13,7 @@ const ProductCard = ({
   ctaLabel = 'Buy',
   showCategory = true,
   showFavoriteButton = true,
-  onOpenTryOn,
+  onAddToCart,
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const hasSale = product.compareAt && product.compareAt > product.price;
@@ -38,6 +38,9 @@ const ProductCard = ({
         whileTap: { scale: 0.97 },
         transition: { duration: 0.2, ease: MOTION_EASE },
       };
+  const handleBuyClick = () => {
+    onAddToCart?.(product, 1);
+  };
 
   return (
     <motion.article
@@ -70,7 +73,7 @@ const ProductCard = ({
       <div className="flex flex-1 flex-col px-2 pb-2">
         <Link to={productHref} className="flex flex-1 flex-col">
           <p className="min-h-[3rem] text-sm text-ink-soft">{productName}</p>
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+          <div className="mt-3 space-y-4">
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <p className="whitespace-nowrap font-display text-3xl font-bold text-ink sm:text-4xl">
@@ -84,25 +87,37 @@ const ProductCard = ({
               </div>
               {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}
             </div>
-
-            <motion.span
-              className="inline-flex min-w-[3.35rem] shrink-0 justify-center rounded-sm bg-blush px-3 py-2 text-sm font-semibold text-ink transition group-hover:bg-rose"
-              {...ctaMotionProps}
-            >
-              {ctaLabel}
-            </motion.span>
           </div>
         </Link>
-        {onOpenTryOn ? (
-          <motion.button
-            type="button"
-            onClick={() => onOpenTryOn(product)}
-            className="mt-4 w-full rounded-[16px] border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-cream"
-            {...ctaMotionProps}
-          >
-            AI Try-On
-          </motion.button>
-        ) : null}
+
+        <div className="mt-5 grid gap-2 sm:grid-cols-[1.15fr_0.85fr]">
+          <motion.div {...ctaMotionProps}>
+            {onAddToCart ? (
+              <button
+                type="button"
+                onClick={handleBuyClick}
+                className="button-primary min-h-12 w-full px-5 py-3 text-base shadow-[0_14px_30px_rgba(183,123,111,0.22)]"
+              >
+                {ctaLabel}
+              </button>
+            ) : (
+              <Link
+                to={productHref}
+                className="button-primary min-h-12 w-full px-5 py-3 text-base shadow-[0_14px_30px_rgba(183,123,111,0.22)]"
+              >
+                {ctaLabel}
+              </Link>
+            )}
+          </motion.div>
+          <motion.div {...ctaMotionProps}>
+            <Link
+              to={productHref}
+              className="button-secondary min-h-12 w-full px-4 py-3 text-sm"
+            >
+              More Details
+            </Link>
+          </motion.div>
+        </div>
       </div>
     </motion.article>
   );

@@ -1,6 +1,11 @@
 export const formatCurrency = (value) => {
-  const numericValue = Number(value ?? 0);
-  return `${numericValue}JD`;
+  const parsedValue = Number(value ?? 0);
+  const numericValue = Number.isFinite(parsedValue) ? parsedValue : 0;
+  const formattedValue = Number.isInteger(numericValue)
+    ? String(numericValue)
+    : numericValue.toFixed(2).replace(/\.?0+$/, '');
+
+  return `${formattedValue} ₪`;
 };
 
 export const formatDate = (value) => {

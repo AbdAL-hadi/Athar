@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { heritageCityOptions } from '../../data/heritageCities';
 import { resolveApiAssetUrl } from '../../utils/api';
 import AdminAiAssistPanel from './AdminAiAssistPanel';
 
@@ -20,14 +21,18 @@ const AdminProductEditor = ({
   imageFiles,
   isAdmin,
   mode,
+  patternImageFile,
+  patternStories = [],
   product,
   onCancel,
   onFieldChange,
   onImagesChange,
+  onPatternImageChange,
   onSave,
 }) => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [filePreviews, setFilePreviews] = useState([]);
+  const [patternImagePreview, setPatternImagePreview] = useState('');
 
   useEffect(() => {
     const previews = imageFiles.map((file) => URL.createObjectURL(file));
@@ -50,15 +55,35 @@ const AdminProductEditor = ({
     if (selectedImage >= galleryImages.length) setSelectedImage(0);
   }, [galleryImages.length, selectedImage]);
 
+  useEffect(() => {
+    if (!patternImageFile) {
+      setPatternImagePreview('');
+      return undefined;
+    }
+
+    const preview = URL.createObjectURL(patternImageFile);
+    setPatternImagePreview(preview);
+
+    return () => URL.revokeObjectURL(preview);
+  }, [patternImageFile]);
+
   const handleUpload = (event) => {
     const nextFiles = Array.from(event.target.files || []);
     onImagesChange((currentFiles) => [...currentFiles, ...nextFiles]);
     event.target.value = '';
   };
 
+  const handlePatternImageUpload = (event) => {
+    const [nextFile] = Array.from(event.target.files || []);
+    onPatternImageChange(nextFile ?? null);
+    event.target.value = '';
+  };
+
   const handleApplySuggestion = (field, value) => {
     onFieldChange(field, value);
   };
+
+  const patternImageUrl = patternImagePreview || resolveApiAssetUrl(form.patternImage || '');
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
@@ -245,6 +270,36 @@ const AdminProductEditor = ({
 
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>
+                    <FieldLabel>Inspired by City</FieldLabel>
+                    <select
+                      value={form.inspiredByCity || ''}
+                      onChange={(event) => onFieldChange('inspiredByCity', event.target.value)}
+                      className={fieldClassName}
+                    >
+                      <option value="">No city selected</option>
+                      {heritageCityOptions.map((city) => (
+                        <option key={city.value} value={city.value}>
+                          {city.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-sm text-ink-soft">Optional. Products assigned here can appear on the Heritage Map.</p>
+                  </div>
+                  <div>
+                    <FieldLabel>Motif Tags</FieldLabel>
+                    <input
+                      type="text"
+                      value={Array.isArray(form.motifTags) ? form.motifTags.join(', ') : form.motifTags || ''}
+                      onChange={(event) => onFieldChange('motifTags', event.target.value)}
+                      className={fieldClassName}
+                      placeholder="dome, olive branch, embroidery"
+                    />
+                    <p className="mt-2 text-sm text-ink-soft">Separate tags with commas.</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
                     <FieldLabel>Stock number</FieldLabel>
                     <input
                       type="number"
@@ -270,6 +325,125 @@ const AdminProductEditor = ({
                       />
                     </label>
                   </div>
+                </div>
+
+                <div className="rounded-[26px] border border-line bg-[#fffaf8] p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.18em] text-muted">Pattern Story (optional)</p>
+                      <h4 className="mt-2 font-display text-3xl text-ink">Attach motif storytelling</h4>
+                      <p className="mt-2 text-sm leading-6 text-ink-soft">
+                        Product code stays separate. Attach a story only when this product needs a public pattern page.
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-3 rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-ink">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.attachPatternStory)}
+                        onChange={(event) => onFieldChange('attachPatternStory', event.target.checked)}
+                        className="h-5 w-5 accent-[#b77b6f]"
+                      />
+                      Attach pattern story
+                    </label>
+                  </div>
+
+                  {form.attachPatternStory ? (
+                    <div className="mt-5 space-y-5">
+                      {patternStories.length > 0 ? (
+                        <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+                          <div>
+                            <FieldLabel>Story option</FieldLabel>
+                            <select
+                              value={form.patternMode || 'new'}
+                              onChange={(event) => onFieldChange('patternMode', event.target.value)}
+                              className={fieldClassName}
+                            >
+                              <option value="new">Create / edit story</option>
+                              <option value="existing">Use existing story</option>
+                            </select>
+                          </div>
+                          <div>
+                            <FieldLabel>Existing Pattern</FieldLabel>
+                            <select
+                              value={form.patternStoryId || ''}
+                              onChange={(event) => onFieldChange('patternStoryId', event.target.value)}
+                              className={fieldClassName}
+                              disabled={form.patternMode !== 'existing'}
+                            >
+                              <option value="">Choose existing pattern</option>
+                              {patternStories.map((story) => (
+                                <option key={story.id || story._id} value={story.id || story._id}>
+                                  {story.title}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {form.patternMode !== 'existing' ? (
+                        <>
+                          <div className="grid gap-5 md:grid-cols-2">
+                            <div>
+                              <FieldLabel>Pattern Title</FieldLabel>
+                              <input
+                                type="text"
+                                value={form.patternTitle || ''}
+                                onChange={(event) => onFieldChange('patternTitle', event.target.value)}
+                                className={fieldClassName}
+                                placeholder="Hebron Vine Piece"
+                              />
+                            </div>
+                            <div>
+                              <FieldLabel>Pattern Motif Tags</FieldLabel>
+                              <input
+                                type="text"
+                                value={form.patternMotifTags || ''}
+                                onChange={(event) => onFieldChange('patternMotifTags', event.target.value)}
+                                className={fieldClassName}
+                                placeholder="grapevine, hebron, embroidery"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <FieldLabel>Pattern Description</FieldLabel>
+                            <textarea
+                              value={form.patternDescription || ''}
+                              onChange={(event) => onFieldChange('patternDescription', event.target.value)}
+                              className={`${fieldClassName} min-h-32 resize-y leading-7`}
+                              rows="4"
+                              placeholder="Tell the heritage story behind this motif."
+                            />
+                          </div>
+
+                          <div className="grid gap-5 md:grid-cols-[180px_1fr] md:items-center">
+                            <div className="overflow-hidden rounded-[22px] bg-cream">
+                              {patternImageUrl ? (
+                                <img src={patternImageUrl} alt={form.patternTitle || 'Pattern preview'} className="aspect-square w-full object-cover" />
+                              ) : (
+                                <div className="flex aspect-square items-center justify-center px-4 text-center text-sm text-ink-soft">
+                                  Pattern image preview
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <FieldLabel>Pattern Image</FieldLabel>
+                              <label className="button-secondary inline-flex cursor-pointer px-5 py-2 text-sm">
+                                {patternImageUrl ? 'Replace pattern image' : 'Upload pattern image'}
+                                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handlePatternImageUpload} />
+                              </label>
+                              <p className="mt-2 text-sm text-ink-soft">Optional, but recommended for the public Pattern Story page.</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="rounded-[20px] bg-white px-4 py-3 text-sm leading-6 text-ink-soft">
+                          This product will link to the selected story. To change the story copy, switch back to create / edit.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </section>

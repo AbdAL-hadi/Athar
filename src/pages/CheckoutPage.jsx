@@ -152,7 +152,7 @@ const CheckoutPage = ({
         <section className="rounded-[36px] bg-white px-8 py-16 text-center shadow-soft">
           <p className="text-sm uppercase tracking-[0.24em] text-muted">Order confirmed</p>
           <h1 className="mt-4 font-display text-6xl text-ink">Your order has been placed.</h1>
-          <p className="mx-auto mt-5 max-w-3xl text-2xl leading-10 text-ink-soft">Your checkout is now connected to the live Athar orders API, and the cart has been cleared after the order was confirmed.</p>
+          <p className="mx-auto mt-5 max-w-3xl text-2xl leading-10 text-ink-soft">Your order is confirmed, and your cart has been cleared so you can keep shopping fresh.</p>
 
           <div className="mx-auto mt-8 max-w-md rounded-[28px] bg-blush px-6 py-5">
             <p className="text-lg text-ink-soft">Order ID</p>
@@ -184,7 +184,7 @@ const CheckoutPage = ({
 
   return (
     <div className="section-shell space-y-8 pb-6 pt-8">
-      <SectionTitle title="Checkout" description="Complete your shipping details and confirm your order through the connected Athar orders API." />
+      <SectionTitle title="Checkout" description="Complete your shipping details and confirm your Athar order." />
 
       {productsLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest product data before checkout...</div> : null}
       {productsError ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{productsError}</div> : null}

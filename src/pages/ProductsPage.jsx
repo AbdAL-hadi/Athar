@@ -8,6 +8,7 @@ import ProductCard from '../components/ProductCard';
 import ProductCardSkeleton from '../components/ProductCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
+import { getHeritageCityById } from '../data/heritageCities';
 import { getCatalogCategories, isProductFavorite } from '../utils/productCatalog';
 
 const PRODUCTS_PER_PAGE = 6;
@@ -16,7 +17,25 @@ const sortOptions = [
   { value: 'price-asc', label: 'Price: low to high' },
   { value: 'price-desc', label: 'Price: high to low' },
   { value: 'name-asc', label: 'Name: A to Z' },
+  { value: 'most-viewed', label: 'Most viewed' },
+  { value: 'best-selling', label: 'Best selling' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
 ];
+
+const getNumberValue = (product, fields) => {
+  for (const field of fields) {
+    const value = Number(product?.[field] ?? 0);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return 0;
+};
+
+const getCreatedTime = (product) => {
+  const timestamp = Date.parse(product?.createdAt ?? product?.created_at ?? '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
 
 const sortProducts = (productList, sortBy) => {
   const nextProducts = [...productList];
@@ -28,6 +47,18 @@ const sortProducts = (productList, sortBy) => {
       return nextProducts.sort((a, b) => b.price - a.price);
     case 'name-asc':
       return nextProducts.sort((a, b) => a.name.localeCompare(b.name));
+    case 'most-viewed':
+      return nextProducts.sort((a, b) => getNumberValue(b, ['viewCount', 'views', 'viewsCount']) - getNumberValue(a, ['viewCount', 'views', 'viewsCount']));
+    case 'best-selling':
+      return nextProducts.sort(
+        (a, b) =>
+          getNumberValue(b, ['soldCount', 'totalSold', 'salesCount', 'orderCount', 'purchases']) -
+          getNumberValue(a, ['soldCount', 'totalSold', 'salesCount', 'orderCount', 'purchases']),
+      );
+    case 'newest':
+      return nextProducts.sort((a, b) => getCreatedTime(b) - getCreatedTime(a));
+    case 'oldest':
+      return nextProducts.sort((a, b) => getCreatedTime(a) - getCreatedTime(b));
     default:
       return nextProducts.sort((a, b) => {
         if (a.featured && !b.featured) return -1;
@@ -37,7 +68,7 @@ const sortProducts = (productList, sortBy) => {
   }
 };
 
-const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = false, errorMessage = '', onRefreshProducts, onOpenTryOn }) => {
+const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, isLoading = false, errorMessage = '', onRefreshProducts }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categories = getCatalogCategories(products);
   const query = searchParams.get('q') ?? '';
@@ -45,6 +76,8 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
   const minPrice = searchParams.get('min') ?? '';
   const maxPrice = searchParams.get('max') ?? '';
   const sortBy = searchParams.get('sort') ?? 'featured';
+  const selectedCityId = searchParams.get('city') ?? '';
+  const selectedCity = getHeritageCityById(selectedCityId);
   const rawPage = Number.parseInt(searchParams.get('page') ?? '1', 10);
 
   const updateParams = (changes) => {
@@ -87,7 +120,8 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
 
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       const matchesPrice = product.price >= minimumPrice && product.price <= maximumPrice;
-      return matchesSearch && matchesCategory && matchesPrice;
+      const matchesCity = !selectedCityId || String(product.inspiredByCity ?? '').toLowerCase() === selectedCityId;
+      return matchesSearch && matchesCategory && matchesPrice && matchesCity;
     }),
     sortBy,
   );
@@ -98,7 +132,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
 
   const clearFilters = () => setSearchParams({});
   const hasActiveFilters =
-    normalizedQuery.length > 0 || selectedCategory !== 'All' || minPrice !== '' || maxPrice !== '' || sortBy !== 'featured';
+    normalizedQuery.length > 0 || selectedCategory !== 'All' || minPrice !== '' || maxPrice !== '' || sortBy !== 'featured' || selectedCityId !== '';
   const shouldShowSkeletons = isLoading && products.length === 0;
 
   return (
@@ -106,7 +140,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
       <ProductPromoAd />
 
       <div className="flex justify-between items-start">
-        <SectionTitle title="All products" description="The gallery syncs with the live Athar products API while preserving the premium catalog layout." />
+        <SectionTitle title="All products" description="Browse Athar's curated collection of heritage-inspired accessories." />
         {onRefreshProducts && (
           <button
             onClick={onRefreshProducts}
@@ -132,8 +166,19 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
         )}
       </div>
 
-      {isLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest collection from the Athar API...</div> : null}
-      {errorMessage ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{errorMessage} Showing the last available catalog while the connection is restored.</div> : null}
+      {isLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest Athar collection...</div> : null}
+      {errorMessage ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{errorMessage} Showing the last available catalog while the collection refreshes.</div> : null}
+      {selectedCity ? (
+        <div className="flex flex-col gap-3 rounded-[24px] border border-line bg-white px-5 py-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Heritage collection</p>
+            <p className="mt-1 text-base font-semibold text-ink">Showing pieces inspired by {selectedCity.name} / {selectedCity.arabicName}</p>
+          </div>
+          <button type="button" onClick={() => updateParams({ city: '' })} className="button-secondary w-fit px-5 py-2 text-sm">
+            Clear city
+          </button>
+        </div>
+      ) : null}
 
       <section className="space-y-6 rounded-[32px] bg-white p-5 shadow-soft sm:p-6">
         <SearchBar value={query} onChange={(event) => updateParams({ q: event.target.value })} placeholder="Search products or materials" showButton={false} />
@@ -166,7 +211,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
           <StaggerContainer immediate className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {paginatedProducts.map((product) => (
               <StaggerItem key={product.id}>
-                <ProductCard product={product} isFavorite={isProductFavorite(favoriteIds, product)} onToggleFavorite={onToggleFavorite} onOpenTryOn={onOpenTryOn} />
+                <ProductCard product={product} isFavorite={isProductFavorite(favoriteIds, product)} onToggleFavorite={onToggleFavorite} onAddToCart={onAddToCart} />
               </StaggerItem>
             ))}
           </StaggerContainer>
@@ -192,7 +237,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, isLoading = fal
         <Reveal>
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
             <h3 className="font-display text-4xl text-ink">The catalog is temporarily empty.</h3>
-            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Once the Athar products API is available again, the collection will appear here automatically.</p>
+            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">New heritage-inspired pieces will appear here as soon as the collection is refreshed.</p>
           </div>
         </Reveal>
       ) : (

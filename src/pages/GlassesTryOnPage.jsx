@@ -330,7 +330,7 @@ const GlassesTryOnPage = () => {
             <div className="rounded-[24px] bg-white px-5 py-4 shadow-card">
               <p className="text-xs uppercase tracking-[0.18em] text-muted">Configured models</p>
               <p className="mt-2 text-sm leading-7 text-ink-soft">
-                Grounding DINO runs through the configured Space, SAM runs through the local FastAPI service, and the remaining stages follow the current backend configuration.
+                Your try-on preview was prepared with the current Athar fitting pipeline.
               </p>
             </div>
           </div>
