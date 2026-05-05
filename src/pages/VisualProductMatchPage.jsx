@@ -12,7 +12,7 @@ const VisualProductMatchPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [matchResult, setMatchResult] = useState(null);
-  const [catalogEmptyMessage, setCatalogEmptyMessage] = useState('');
+  const [unavailableState, setUnavailableState] = useState(null);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const VisualProductMatchPage = () => {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
     setMatchResult(null);
-    setCatalogEmptyMessage('');
+    setUnavailableState(null);
     setErrorMessage('');
     setImageLoadFailed(false);
   };
@@ -49,7 +49,7 @@ const VisualProductMatchPage = () => {
     setIsLoading(true);
     setErrorMessage('');
     setMatchResult(null);
-    setCatalogEmptyMessage('');
+    setUnavailableState(null);
     setImageLoadFailed(false);
 
     try {
@@ -63,7 +63,14 @@ const VisualProductMatchPage = () => {
       const resultData = response?.data ?? null;
 
       if (response?.available === false) {
-        setCatalogEmptyMessage('No products are available in the store catalog right now.');
+        const availabilityReason = String(response?.availabilityReason || '').trim();
+        setUnavailableState({
+          type: availabilityReason === 'no_catalog_products' ? 'catalog_empty' : 'no_close_enough_match',
+          message:
+            availabilityReason === 'no_catalog_products'
+              ? 'No products are available in the store catalog right now.'
+              : "Sorry, we could not find a close enough similar product in Athar's current collection.",
+        });
         return;
       }
 
@@ -90,6 +97,8 @@ const VisualProductMatchPage = () => {
 
   const matchedProduct = matchResult?.product ?? null;
   const productHref = matchedProduct ? `/products/${matchedProduct.slug || matchedProduct.id}` : '/products';
+  const isCatalogEmpty = unavailableState?.type === 'catalog_empty';
+  const isNoCloseEnoughMatch = unavailableState?.type === 'no_close_enough_match';
   const resolvedProductImage = (() => {
     const imageValue = String(matchedProduct?.image ?? '').trim();
 
@@ -244,7 +253,7 @@ const VisualProductMatchPage = () => {
               ) : null}
             </div>
 
-            {!matchResult && !catalogEmptyMessage && !isLoading ? (
+            {!matchResult && !unavailableState && !isLoading ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
                   Upload a product image and Athar will look for the closest piece in the collection.
@@ -263,11 +272,37 @@ const VisualProductMatchPage = () => {
               </div>
             ) : null}
 
-            {catalogEmptyMessage && !isLoading ? (
+            {isCatalogEmpty && !isLoading ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
-                  {catalogEmptyMessage}
+                  {unavailableState?.message}
                 </p>
+              </div>
+            ) : null}
+
+            {isNoCloseEnoughMatch && !isLoading ? (
+              <div className="mt-6 flex flex-1 items-center rounded-[28px] border border-line bg-white px-6 py-8 shadow-card">
+                <div className="max-w-xl">
+                  <span className="heritage-pill">Athar Match</span>
+                  <h3 className="mt-4 font-display text-3xl text-ink">
+                    No close enough match found
+                  </h3>
+                  <p className="mt-4 max-w-lg text-base leading-7 text-ink-soft">
+                    {unavailableState?.message}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/products')}
+                      className="button-primary"
+                    >
+                      Browse Products
+                    </button>
+                    <label htmlFor="visual-product-match-image" className="button-secondary cursor-pointer">
+                      Upload Another Image
+                    </label>
+                  </div>
+                </div>
               </div>
             ) : null}
 

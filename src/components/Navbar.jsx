@@ -68,6 +68,74 @@ const CameraIcon = () => (
   </svg>
 );
 
+const AccountIcon = ({ className = 'h-4 w-4' }) => (
+  <svg aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" viewBox="0 0 24 24">
+    <circle cx="12" cy="8" r="3.25" />
+    <path d="M5.5 18.25a6.5 6.5 0 0 1 13 0" />
+  </svg>
+);
+
+const ChevronDownIcon = ({ open = false }) => (
+  <svg
+    aria-hidden="true"
+    className={`h-4 w-4 text-ink-soft transition-transform ${open ? 'rotate-180' : ''}`}
+    fill="none"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="1.9"
+    viewBox="0 0 24 24"
+  >
+    <path d="m6.75 9.75 5.25 5.25 5.25-5.25" />
+  </svg>
+);
+
+const ProfileIcon = () => (
+  <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <circle cx="12" cy="8" r="3" />
+    <path d="M6.5 18a6 6 0 0 1 11 0" />
+  </svg>
+);
+
+const LoginIcon = () => (
+  <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M14.5 8.5 18 12l-3.5 3.5" />
+    <path d="M7 12h10.5" />
+    <path d="M10 5.5H7.75A2.25 2.25 0 0 0 5.5 7.75v8.5a2.25 2.25 0 0 0 2.25 2.25H10" />
+  </svg>
+);
+
+const RegisterIcon = () => (
+  <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <circle cx="9" cy="8" r="3" />
+    <path d="M3.5 18a6 6 0 0 1 11 0" />
+    <path d="M17 8.5v6" />
+    <path d="M14 11.5h6" />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M14.5 8.5 18 12l-3.5 3.5" />
+    <path d="M8 12h9.5" />
+    <path d="M10 5.5H7.75A2.25 2.25 0 0 0 5.5 7.75v8.5a2.25 2.25 0 0 0 2.25 2.25H10" />
+  </svg>
+);
+
+const MenuAction = ({ icon, label, onClick, tone = 'default', rounded = '' }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex w-full items-center gap-2 px-4 py-3 text-left text-sm transition ${
+      tone === 'danger' ? 'text-rose hover:bg-rose/10' : 'text-ink hover:bg-blush'
+    } ${rounded}`}
+    role="menuitem"
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
 const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -76,7 +144,6 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const productIcon = resolveApiAssetUrl('products/icons8-product-80.png');
   const homeTarget = authUser?.role === 'admin' ? '/admin/dashboard' : '/';
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -93,8 +160,26 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
     };
   }, [dropdownOpen]);
 
+  useEffect(() => {
+    setDropdownOpen(false);
+  }, [authUser?.id]);
+
+  const toggleDropdown = () => {
+    setDropdownOpen((currentValue) => !currentValue);
+  };
+
   const handleProfileClick = () => {
     navigate('/profile');
+    setDropdownOpen(false);
+  };
+
+  const handleLoginClick = () => {
+    navigate('/auth?mode=login');
+    setDropdownOpen(false);
+  };
+
+  const handleRegisterClick = () => {
+    navigate('/auth?mode=register');
     setDropdownOpen(false);
   };
 
@@ -117,11 +202,11 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
           </div>
         </Link>
 
-        <div className="flex flex-wrap items-center gap-6">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           {authUser?.role === 'admin' ? (
             <AdminNavigation />
           ) : (
-            <nav className="flex flex-wrap items-center gap-6">
+            <nav className="flex flex-wrap items-center gap-4 sm:gap-6">
               {links.map((link) => (
                 <NavLink key={link.to} to={link.to} className={iconLinkClass} aria-label={link.label} title={link.label}>
                   {link.icon === 'heart' ? (
@@ -155,10 +240,13 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
           {authLoading ? (
             <div className="button-primary whitespace-nowrap">Checking...</div>
           ) : authUser ? (
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative shrink-0" ref={dropdownRef}>
               <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-3 rounded-full border-2 border-rose px-2 py-2 transition hover:bg-blush"
+                type="button"
+                onClick={toggleDropdown}
+                className="flex items-center gap-3 rounded-full border-2 border-rose bg-white px-2 py-2 transition hover:bg-blush"
+                aria-expanded={dropdownOpen}
+                aria-haspopup="menu"
               >
                 {authUser.profilePicture ? (
                   <img
@@ -171,15 +259,15 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     {authUser.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 )}
-                <span className="max-w-[100px] truncate font-semibold text-ink hidden sm:block">
-                  {authUser.name.split(' ')[0]}
+                <span className="hidden max-w-[100px] truncate font-semibold text-ink sm:block">
+                  {authUser.name?.split(' ')[0] || 'Account'}
                 </span>
+                <ChevronDownIcon open={dropdownOpen} />
               </button>
 
-              {dropdownOpen && (
-                <div className="absolute right-0 z-[1300] mt-2 w-56 rounded-lg border border-line bg-white shadow-lg">
-                  {/* Profile Header in Dropdown */}
-                  <div className="border-b border-line/30 px-4 py-4 flex items-center gap-3">
+              {dropdownOpen ? (
+                <div className="absolute right-0 z-[1300] mt-2 w-56 rounded-lg border border-line bg-white shadow-lg" role="menu">
+                  <div className="flex items-center gap-3 border-b border-line/30 px-4 py-4">
                     {authUser.profilePicture ? (
                       <img
                         src={authUser.profilePicture}
@@ -191,31 +279,50 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                         {authUser.name?.charAt(0).toUpperCase() || 'U'}
                       </div>
                     )}
-                    <div className="flex-1">
-                      <p className="font-semibold text-ink text-sm">{authUser.name}</p>
-                      <p className="text-xs text-ink-soft capitalize">{authUser.role}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{authUser.name}</p>
+                      <p className="text-xs capitalize text-ink-soft">{authUser.role}</p>
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={handleProfileClick}
-                    className="block w-full px-4 py-3 text-left text-sm text-ink hover:bg-blush first:rounded-t-lg transition"
-                  >
-                    📋 Profile
-                  </button>
-                  <button
-                    onClick={handleLogoutClick}
-                    className="block w-full px-4 py-3 text-left text-sm text-ink hover:bg-rose/10 last:rounded-b-lg transition text-rose"
-                  >
-                    🚪 Sign Out
-                  </button>
+
+                  <MenuAction icon={<ProfileIcon />} label="Profile" onClick={handleProfileClick} />
+                  <MenuAction icon={<LogoutIcon />} label="Sign Out" onClick={handleLogoutClick} tone="danger" rounded="rounded-b-lg" />
                 </div>
-              )}
+              ) : null}
             </div>
           ) : (
-            <Link to="/auth" className="button-primary whitespace-nowrap">
-              Create Account / Log In
-            </Link>
+            <div className="relative shrink-0" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={toggleDropdown}
+                className="flex items-center gap-3 rounded-full border-2 border-rose bg-white px-3 py-2 transition hover:bg-blush"
+                aria-expanded={dropdownOpen}
+                aria-haspopup="menu"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blush text-ink">
+                  <AccountIcon />
+                </span>
+                <span className="font-semibold text-ink">Account</span>
+                <ChevronDownIcon open={dropdownOpen} />
+              </button>
+
+              {dropdownOpen ? (
+                <div className="absolute right-0 z-[1300] mt-2 w-64 rounded-lg border border-line bg-white shadow-lg" role="menu">
+                  <div className="flex items-center gap-3 border-b border-line/30 px-4 py-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blush text-ink">
+                      <AccountIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-ink">Welcome to Athar</p>
+                      <p className="text-xs text-ink-soft">Log in or create an account to save favorites and track orders.</p>
+                    </div>
+                  </div>
+
+                  <MenuAction icon={<LoginIcon />} label="Log In" onClick={handleLoginClick} />
+                  <MenuAction icon={<RegisterIcon />} label="Create Account" onClick={handleRegisterClick} rounded="rounded-b-lg" />
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>

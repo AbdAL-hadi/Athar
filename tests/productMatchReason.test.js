@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMatchReason } from '../services/productMatch/productMatchService.js';
+import { buildMatchReason, getMatchQuality } from '../services/productMatch/productMatchService.js';
+
+test('match quality thresholds treat scores below 20 percent as no match', () => {
+  assert.equal(getMatchQuality(0.19), 'none');
+  assert.equal(getMatchQuality(0.2), 'weak');
+  assert.equal(getMatchQuality(0.44), 'weak');
+  assert.equal(getMatchQuality(0.45), 'medium');
+  assert.equal(getMatchQuality(0.69), 'medium');
+  assert.equal(getMatchQuality(0.7), 'strong');
+});
 
 test('strong matches use customer-friendly wording and include matched fields', () => {
   const result = buildMatchReason({

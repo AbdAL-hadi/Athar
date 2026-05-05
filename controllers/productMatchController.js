@@ -12,10 +12,17 @@ export const createProductMatchRecommendation = async (req, res) => {
     const result = await matchProductByImage({ file: req.file });
 
     if (!result?.match || String(result?.matchQuality || '').trim() === 'none') {
+      const availabilityReason = String(result?.availabilityReason || 'no_catalog_products').trim();
+      const message =
+        availabilityReason === 'no_close_enough_match'
+          ? "We could not find a close enough match in Athar's current collection."
+          : 'No products are available in the store catalog right now.';
+
       return res.status(200).json({
         success: true,
         available: false,
-        message: 'There are no products available in the store catalog right now.',
+        availabilityReason,
+        message,
         analyzedImage: result?.analyzedImage ?? null,
       });
     }
