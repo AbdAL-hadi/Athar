@@ -6,6 +6,7 @@ import { resolveApiAssetUrl } from '../utils/api';
 const links = [
   { to: '/heritage-map', label: 'Heritage Map', icon: 'map' },
   { to: '/products', label: 'Products', icon: 'product' },
+  { to: '/visual-match', label: 'Find Similar Product', icon: 'camera' },
   { to: '/rewards', label: 'Rewards', icon: 'reward' },
   { to: '/favorites', label: 'Favorite', icon: 'heart' },
   { to: '/cart', label: 'Cart', icon: 'bag' },
@@ -57,6 +58,13 @@ const AboutIcon = () => (
     <circle cx="12" cy="12" r="9" />
     <path d="M12 10.5v5" />
     <circle cx="12" cy="7.5" r=".75" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const CameraIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <path d="M4.5 8.5h3l1.2-2h6.6l1.2 2h3a1.5 1.5 0 0 1 1.5 1.5v7a2.5 2.5 0 0 1-2.5 2.5h-12A2.5 2.5 0 0 1 4 17V10a1.5 1.5 0 0 1 1.5-1.5Z" />
+    <circle cx="12" cy="13" r="3.25" />
   </svg>
 );
 
@@ -124,6 +132,8 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <TrackIcon />
                   ) : link.icon === 'map' ? (
                     <MapIcon />
+                  ) : link.icon === 'camera' ? (
+                    <CameraIcon />
                   ) : link.icon === 'reward' ? (
                     <RewardIcon />
                   ) : link.icon === 'about' ? (

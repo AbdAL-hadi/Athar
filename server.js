@@ -14,6 +14,7 @@ import commentRoutes from './routes/commentRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import patternStoryRoutes from './routes/patternStoryRoutes.js';
+import productMatchRoutes from './routes/productMatchRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import tryOnRoutes from './routes/tryOnRoutes.js';
 
@@ -38,6 +39,7 @@ app.use('/api/ai-try-on', aiTryOnRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/product-match', productMatchRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/pattern-stories', patternStoryRoutes);

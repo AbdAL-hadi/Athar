@@ -16,6 +16,7 @@ import {
   getProductVisualDescription,
   ProductVisualDescriptionError,
 } from '../services/visualDescriber/productVisualDescriptionService.js';
+import { findVisualProductMatch, VisualProductMatchError } from '../services/visualMatch/visualProductMatchService.js';
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
 const heritageCityIds = new Set(['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem']);
@@ -553,6 +554,30 @@ export const generateVisualAudio = async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message: error.message || 'Failed to generate the spoken description.',
+    });
+  }
+};
+
+export const findSimilarProduct = async (req, res) => {
+  try {
+    const result = await findVisualProductMatch({
+      file: req.file,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        matched: result.matched,
+        similarityScore: result.similarityScore,
+        matchingReason: result.matchingReason,
+        product: result.product ? serializeProduct(result.product) : null,
+      },
+    });
+  } catch (error) {
+    const statusCode = error instanceof VisualProductMatchError ? error.status : 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.publicMessage || error.message || 'Failed to find a similar product.',
     });
   }
 };
