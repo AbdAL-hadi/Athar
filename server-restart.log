@@ -1,2 +1,20 @@
 MongoDB connected: ac-jrkppjm-shard-00-00.tmtbqbp.mongodb.net
 Server running on port 5000
+getMyOrders called - User: {
+  _id: new ObjectId('69df56a29a28b213c15d5c44'),
+  role: 'customer',
+  email: 'yazeed.k2016@gmail.com'
+}
+Query for orders: { user: new ObjectId('69df56a29a28b213c15d5c44') }
+Orders found: 43
+getMyOrders called - User: {
+  _id: new ObjectId('69df56a29a28b213c15d5c44'),
+  role: 'customer',
+  email: 'yazeed.k2016@gmail.com'
+}
+Query for orders: { user: new ObjectId('69df56a29a28b213c15d5c44') }
+Orders found: 43
+No token provided
+No token provided
+No token provided
+No token provided
