@@ -3,12 +3,20 @@ import Product from '../models/Product.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { getInventoryState } from '../services/admin/inventoryState.js';
 import {
+  attachImageAssetsToOwner,
+  buildImageAssetUrlFromReference,
+  createImageAssetFromUpload,
+  deleteImageAssetsByReferences,
+  mapSubmittedImageValuesToReferences,
+} from '../services/assets/imageAssetService.js';
+import {
   generateVisualAudioForProduct,
   generateVisualDescriptionForProduct,
   generateVisualDescriptionsBatch,
   getProductVisualDescription,
   ProductVisualDescriptionError,
 } from '../services/visualDescriber/productVisualDescriptionService.js';
+import { matchProductByImage, ProductMatchError } from '../services/productMatch/productMatchService.js';
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
 const heritageCityIds = new Set(['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem']);
@@ -74,12 +82,26 @@ const normalizeOptionalNumber = (value) => {
   return Number(value);
 };
 
-const uploadedImagePaths = (files = []) =>
-  files.map((file) => `uploads/products/${file.filename}`).filter(Boolean);
+const serializeImageReferences = (references = []) =>
+  Array.isArray(references)
+    ? references.map((reference) => buildImageAssetUrlFromReference(reference)).filter(Boolean)
+    : [];
 
-const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
-  const existingImages = normalizeArrayField(body.existingImages ?? body.images);
-  const images = [...existingImages, ...uploadedImagePaths(files)];
+const buildProductPayload = async (body = {}, files = [], existingProduct = null) => {
+  const currentImages = Array.isArray(existingProduct?.images) ? existingProduct.images : [];
+  const keptImages = mapSubmittedImageValuesToReferences(
+    normalizeArrayField(body.existingImages ?? body.images),
+    currentImages,
+  );
+  const uploadedImages = await Promise.all(
+    files.map((file) =>
+      createImageAssetFromUpload(file, {
+        kind: 'product',
+        ownerModel: 'Product',
+      }),
+    ),
+  );
+  const images = [...keptImages, ...uploadedImages];
   const payload = {};
 
   [
@@ -148,7 +170,10 @@ const buildProductPayload = (body = {}, files = [], existingProduct = null) => {
   if (body.tryOnEligible !== undefined) payload.tryOnEligible = normalizeBoolean(body.tryOnEligible);
   if (body.images !== undefined || body.existingImages !== undefined || files.length > 0) payload.images = images;
 
-  return payload;
+  return {
+    payload,
+    createdImageReferences: uploadedImages,
+  };
 };
 
 const hasInvalidPointsValue = (payload = {}) => {
@@ -171,9 +196,17 @@ const sendProductSaveError = (res, fallbackMessage, error) => {
 
 const serializeProduct = (product) => {
   const plainProduct = typeof product?.toObject === 'function' ? product.toObject() : product;
+  const patternStoryImageReference =
+    plainProduct?.patternStoryId && typeof plainProduct.patternStoryId === 'object'
+      ? plainProduct.patternStoryId.image
+      : null;
 
   return {
     ...plainProduct,
+    images: serializeImageReferences(plainProduct?.images),
+    imageNames: Array.isArray(plainProduct?.images)
+      ? plainProduct.images.map((image) => image?.fileName || '').filter(Boolean)
+      : [],
     inspiredByCity: normalizeHeritageCity(plainProduct?.inspiredByCity),
     motifTags: normalizeArrayField(plainProduct?.motifTags),
     patternStoryId: plainProduct?.patternStoryId?._id?.toString?.() ?? plainProduct?.patternStoryId?.toString?.() ?? '',
@@ -183,7 +216,8 @@ const serializeProduct = (product) => {
             id: plainProduct.patternStoryId._id?.toString?.() ?? plainProduct.patternStoryId.id ?? '',
             title: plainProduct.patternStoryId.title ?? '',
             slug: plainProduct.patternStoryId.slug ?? '',
-            image: plainProduct.patternStoryId.image ?? '',
+            image: buildImageAssetUrlFromReference(patternStoryImageReference),
+            imageName: patternStoryImageReference?.fileName || '',
             description: plainProduct.patternStoryId.description ?? '',
             productCode: plainProduct.patternStoryId.productCode ?? '',
             motifTags: normalizeArrayField(plainProduct.patternStoryId.motifTags),
@@ -264,44 +298,63 @@ export const getProductById = async (req, res) => {
 };
 
 export const createProduct = async (req, res) => {
+  let createdImageReferences = [];
+  const cleanupCreatedImages = async () => {
+    await deleteImageAssetsByReferences(createdImageReferences);
+  };
+
   try {
-    const payload = buildProductPayload(req.body, req.files ?? []);
+    const buildResult = await buildProductPayload(req.body, req.files ?? []);
+    const { payload } = buildResult;
+    createdImageReferences = buildResult.createdImageReferences;
 
     if (!payload.title) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Product name is required.' });
     }
 
     if (!payload.category || !productCategories.includes(payload.category)) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Please choose a valid product category.' });
     }
 
     if (!payload.description) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Product description is required.' });
     }
 
     if (!payload.material) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Product material is required.' });
     }
 
     if (!String(req.body?.price ?? '').trim() || !Number.isFinite(payload.price)) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Price must be a valid number.' });
     }
 
     if (!String(req.body?.stock ?? '').trim() || !Number.isFinite(payload.stock)) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Stock must be a valid number.' });
     }
 
     if (hasInvalidPointsValue(payload)) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Points Value must be a valid number.' });
     }
 
     if (!Array.isArray(payload.images) || payload.images.length === 0) {
+      await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Upload at least one product image.' });
     }
 
     const product = await Product.create({
       ...payload,
       slug: await ensureUniqueSlug(payload.title),
+    });
+    await attachImageAssetsToOwner(createdImageReferences, {
+      ownerModel: 'Product',
+      ownerId: product._id,
     });
 
     void queueSalesExportRefreshWithRetry().catch((error) => {
@@ -314,11 +367,17 @@ export const createProduct = async (req, res) => {
       data: serializeProduct(product),
     });
   } catch (error) {
+    await cleanupCreatedImages();
     return sendProductSaveError(res, 'Failed to create product', error);
   }
 };
 
 export const updateProduct = async (req, res) => {
+  let createdImageReferences = [];
+  const cleanupCreatedImages = async () => {
+    await deleteImageAssetsByReferences(createdImageReferences);
+  };
+
   try {
     const { id } = req.params;
 
@@ -338,12 +397,20 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    const updateData = buildProductPayload(req.body, req.files ?? [], existingProduct);
+    const previousImages = Array.isArray(existingProduct.images) ? existingProduct.images : [];
+    const buildResult = await buildProductPayload(
+      req.body,
+      req.files ?? [],
+      existingProduct,
+    );
+    const { payload: updateData } = buildResult;
+    createdImageReferences = buildResult.createdImageReferences;
 
     // Keep the public URL stable when admins edit the product title.
     delete updateData.slug;
 
     if (updateData.images !== undefined && updateData.images.length === 0) {
+      await cleanupCreatedImages();
       return res.status(400).json({
         success: false,
         message: 'Images must include at least one product image.',
@@ -351,6 +418,7 @@ export const updateProduct = async (req, res) => {
     }
 
     if (hasInvalidPointsValue(updateData)) {
+      await cleanupCreatedImages();
       return res.status(400).json({
         success: false,
         message: 'Points Value must be a valid number.',
@@ -362,6 +430,16 @@ export const updateProduct = async (req, res) => {
       new: true,
       runValidators: true,
     }).lean(); // Using lean() for better performance
+    await attachImageAssetsToOwner(createdImageReferences, {
+      ownerModel: 'Product',
+      ownerId: existingProduct._id,
+    });
+
+    if (updateData.images !== undefined) {
+      const nextAssetIds = new Set((updateData.images || []).map((image) => String(image.assetId)));
+      const removedImages = previousImages.filter((image) => !nextAssetIds.has(String(image?.assetId || '')));
+      await deleteImageAssetsByReferences(removedImages);
+    }
 
     void queueSalesExportRefreshWithRetry().catch((error) => {
       console.error('[Athar exports] Workbook refresh failed after product update:', error.message);
@@ -373,6 +451,7 @@ export const updateProduct = async (req, res) => {
       data: serializeProduct(product),
     });
   } catch (error) {
+    await cleanupCreatedImages();
     return sendProductSaveError(res, 'Failed to update product', error);
   }
 };
@@ -396,6 +475,8 @@ export const deleteProduct = async (req, res) => {
         message: 'Product not found',
       });
     }
+
+    await deleteImageAssetsByReferences(product.images || []);
 
     void queueSalesExportRefreshWithRetry().catch((error) => {
       console.error('[Athar exports] Workbook refresh failed after product delete:', error.message);
@@ -473,6 +554,49 @@ export const generateVisualAudio = async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message: error.message || 'Failed to generate the spoken description.',
+    });
+  }
+};
+
+export const findSimilarProduct = async (req, res) => {
+  try {
+    const result = await matchProductByImage({ file: req.file });
+
+    if (!result?.match || String(result?.matchQuality || '').trim() === 'none') {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        message: 'There are no products available in the store catalog right now.',
+        analyzedImage: result?.analyzedImage ?? null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      available: true,
+      data: {
+        score: Number(result?.score || 0),
+        matchQuality: String(result?.matchQuality || 'weak').trim(),
+        reason: String(result?.reason || 'This product was selected as the closest visual match.').trim(),
+        matchedFields: Array.isArray(result?.matchedFields) ? result.matchedFields : [],
+        analyzedImage: result?.analyzedImage ?? null,
+        product: {
+          ...result.match,
+          images: result?.match?.image ? [result.match.image] : [],
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof ProductMatchError) {
+      return res.status(error.status || 500).json({
+        success: false,
+        message: error.publicMessage || 'We could not analyze the uploaded image right now. Please try another image.',
+      });
+    }
+
+    return res.status(502).json({
+      success: false,
+      message: 'We could not analyze the uploaded image right now. Please try another image.',
     });
   }
 };

@@ -15,9 +15,8 @@ const patternStorySchema = new mongoose.Schema(
       lowercase: true,
     },
     image: {
-      type: String,
-      default: '',
-      trim: true,
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     description: {
       type: String,

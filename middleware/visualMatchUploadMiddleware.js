@@ -1,8 +1,17 @@
 import multer from 'multer';
 
-const maxFileSizeMb = Number(process.env.PRODUCT_IMAGE_MAX_FILE_SIZE_MB || 10);
+const maxFileSizeMb = Number(process.env.VISUAL_MATCH_MAX_FILE_SIZE_MB || 5);
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+export class VisualMatchUploadError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = 'VisualMatchUploadError';
+    this.status = status;
+  }
+}
+
 const hasAllowedImageExtension = (fileName = '') =>
   allowedImageExtensions.has(String(fileName).toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '');
 
@@ -10,11 +19,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: maxFileSizeMb * 1024 * 1024,
-    files: 8,
+    files: 1,
   },
   fileFilter: (_req, file, callback) => {
     if (!allowedMimeTypes.has(file.mimetype) && !hasAllowedImageExtension(file.originalname)) {
-      callback(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname));
+      callback(new VisualMatchUploadError('Only JPG, PNG, or WEBP images are allowed.'));
       return;
     }
 
@@ -22,8 +31,8 @@ const upload = multer({
   },
 });
 
-export const handleProductImageUpload = (req, res, next) => {
-  upload.array('images', 8)(req, res, (error) => {
+export const handleVisualMatchUpload = (req, res, next) => {
+  upload.single('image')(req, res, (error) => {
     if (!error) {
       next();
       return;
@@ -31,17 +40,16 @@ export const handleProductImageUpload = (req, res, next) => {
 
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
-        res.status(400).json({
-          success: false,
-          message: `Each product image must be ${maxFileSizeMb}MB or smaller.`,
-        });
+        next(new VisualMatchUploadError('The image is too large. Please upload a file under 5MB.'));
         return;
       }
 
-      res.status(400).json({
-        success: false,
-        message: 'Only JPG, PNG, or WEBP product images are supported.',
-      });
+      next(new VisualMatchUploadError('Only JPG, PNG, or WEBP images are allowed.'));
+      return;
+    }
+
+    if (error instanceof VisualMatchUploadError) {
+      next(error);
       return;
     }
 

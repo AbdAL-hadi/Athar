@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
 import AccessibilityToolbar from './components/accessibility/AccessibilityToolbar';
@@ -22,6 +22,7 @@ import ProductDetailsPage from './pages/ProductDetailsPage';
 import ProductsPage from './pages/ProductsPage';
 import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
+import VisualProductMatchPage from './pages/VisualProductMatchPage';
 import Toast from './components/Toast';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
@@ -29,6 +30,26 @@ import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, upda
 import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProduct, normalizeProducts } from './utils/productCatalog';
 
 const fallbackProducts = normalizeProducts(mockProducts);
+
+const ProtectedRewardsRoute = ({ authUser, authLoading }) => {
+  if (authLoading) {
+    return (
+      <div className="section-shell py-16">
+        <div className="rounded-[28px] border border-line bg-white px-6 py-8 text-center shadow-card">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">Athar Rewards</p>
+          <h1 className="mt-3 font-display text-4xl text-ink">Checking your account</h1>
+          <p className="mt-3 text-base text-ink-soft">Please wait while we confirm your sign-in status.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <Navigate to="/auth?mode=login" replace />;
+  }
+
+  return <LoyaltyRewardsPage authUser={authUser} />;
+};
 
 const App = () => {
   const navigate = useNavigate();
@@ -332,6 +353,10 @@ const App = () => {
         <Route path="/products/:id" element={<ProductDetailsPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onAddToCart={handleAddToCart} authUser={authUser} authToken={authToken} onOpenTryOn={handleOpenTryOn} onProductLoaded={handleProductLoaded} />} />
         <Route path="/motifs/:motifId" element={<MotifDetailsPage products={products} />} />
         <Route path="/search" element={<SearchPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onOpenTryOn={handleOpenTryOn} />} />
+        <Route
+          path="/visual-match"
+          element={<VisualProductMatchPage />}
+        />
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
         <Route path="/cart" element={<CartPage items={cartItems} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
@@ -339,7 +364,7 @@ const App = () => {
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/heritage-map" element={<HeritageMapPage />} />
-        <Route path="/rewards" element={<LoyaltyRewardsPage authUser={authUser} />} />
+        <Route path="/rewards" element={<ProtectedRewardsRoute authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/comments" element={<AdminCommentModerationPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />

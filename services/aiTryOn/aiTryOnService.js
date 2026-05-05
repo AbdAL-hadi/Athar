@@ -1,10 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
+import {
+  buildImageAssetUrlFromReference,
+  createImageAssetFromBuffer,
+  createImageAssetReference,
+  getImageAssetBufferByReference,
+  isImageAssetReference,
+} from '../assets/imageAssetService.js';
 
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
-const TRY_ON_OUTPUT_DIR = path.join(process.cwd(), 'uploads', 'ai-try-on');
 
 const mimeTypeByExtension = new Map([
   ['.jpg', 'image/jpeg'],
@@ -77,6 +82,19 @@ const loadImageFromUrl = async (imageUrl) => {
 const loadProductImage = async (imagePath) => {
   if (!imagePath) {
     throw new AiTryOnError('Product image could not be found for AI Try-On.', 422);
+  }
+
+  if (isImageAssetReference(imagePath)) {
+    const asset = await getImageAssetBufferByReference(imagePath);
+
+    if (!asset?.buffer) {
+      throw new AiTryOnError('Product image could not be found for AI Try-On.', 422);
+    }
+
+    return {
+      data: asset.buffer.toString('base64'),
+      mimeType: asset.mimeType || 'image/png',
+    };
   }
 
   if (/^(?:https?:)?\/\//i.test(imagePath)) {
@@ -231,17 +249,19 @@ const callGeminiImageGeneration = async ({ prompt, userImage, productImage }) =>
 };
 
 const saveGeneratedPreview = async ({ base64Data, mimeType }) => {
-  await fs.mkdir(TRY_ON_OUTPUT_DIR, { recursive: true });
-
   const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType === 'image/webp' ? 'webp' : 'png';
-  const fileName = `athar-ai-try-on-${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const outputPath = path.join(TRY_ON_OUTPUT_DIR, fileName);
-
-  await fs.writeFile(outputPath, Buffer.from(base64Data, 'base64'));
+  const storedAsset = await createImageAssetFromBuffer({
+    buffer: Buffer.from(base64Data, 'base64'),
+    mimeType,
+    fileName: `athar-ai-try-on.${extension}`,
+    kind: 'ai-try-on-result',
+    ownerModel: 'AiTryOnResult',
+  });
+  const reference = createImageAssetReference(storedAsset);
 
   return {
-    fileName,
-    resultUrl: `/uploads/ai-try-on/${fileName}`,
+    assetId: String(storedAsset._id),
+    resultUrl: buildImageAssetUrlFromReference(reference),
   };
 };
 
