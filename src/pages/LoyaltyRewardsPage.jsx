@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import homepageVideo from '../assets/products/homepage.mp4';
 import { resolveApiAssetUrl } from '../utils/api';
 import { LOYALTY_REWARDS } from '../utils/loyaltyPoints';
 
@@ -353,11 +354,19 @@ const LoyaltyRewardsPage = ({ authUser }) => {
             </div>
 
             <div className="relative min-h-[340px] bg-[#3b261f]">
-              <img
-                src={heroImage}
-                alt="Athar heritage campaign"
+              <video
+                src={homepageVideo}
                 className="absolute inset-0 h-full w-full object-cover opacity-[0.65]"
-              />
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                poster={heroImage}
+                aria-label="Athar rewards promotional video"
+              >
+                Your browser does not support the rewards video.
+              </video>
               <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(59,38,31,0.93),rgba(84,113,95,0.5))]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(223,189,121,0.22),transparent_24%)]" />
                 <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
