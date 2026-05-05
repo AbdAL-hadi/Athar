@@ -8,14 +8,12 @@ import StaggerItem from '../components/animation/StaggerItem';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
-import homepageVideo from '../assets/products/homepage.mp4';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
 import { isProductFavorite } from '../utils/productCatalog';
 import { getCatalogCategories } from '../utils/productCatalog';
 
 const CTA_EASE = [0.22, 1, 0.36, 1];
-const HERO_MEDIA_ROTATION_MS = 8000;
 
 const ArrowIcon = ({ direction = 'right' }) => (
   <svg
@@ -93,7 +91,6 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState('');
-  const [activeHeroMedia, setActiveHeroMedia] = useState('image');
   const categories = getCatalogCategories(products);
   const featuredProducts = products.filter((product) => product.featured).slice(0, 5);
   const currentUserFeedback = authUser
@@ -180,21 +177,6 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     setFeedbackForm(currentUserFeedback?.message ?? '');
   }, [currentUserFeedback]);
 
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      setActiveHeroMedia('image');
-      return undefined;
-    }
-
-    const rotationId = window.setInterval(() => {
-      setActiveHeroMedia((currentMedia) =>
-        currentMedia === 'image' ? 'video' : 'image',
-      );
-    }, HERO_MEDIA_ROTATION_MS);
-
-    return () => window.clearInterval(rotationId);
-  }, [prefersReducedMotion]);
-
   const handleSubmitFeedback = async (event) => {
     event.preventDefault();
     setFeedbackError('');
@@ -263,21 +245,28 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
 
   return (
     <div className="space-y-16 pb-6 pt-0">
-      <section className="relative left-1/2 right-1/2 -mx-[50vw] w-screen overflow-hidden bg-blush/80 py-14 sm:py-16 lg:py-20">
+      <section className="relative left-1/2 right-1/2 -mx-[50vw] min-h-[680px] w-screen overflow-hidden bg-[#251913] py-16 sm:py-20 lg:flex lg:min-h-[calc(100vh-92px)] lg:items-center lg:py-24">
+        <img
+          src={resolveApiAssetUrl('products/Homepagetorath.png')}
+          alt="Athar Palestinian heritage accessories"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(34,22,17,0.78)_0%,rgba(54,36,28,0.55)_42%,rgba(34,22,17,0.16)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,247,241,0.08)_0%,rgba(37,25,19,0.18)_100%)]" />
         <SoftFloatingParticles count={200} opacity={1.35} speed={0.72} minSize={6} maxSize={20} />
         <div className="section-shell relative z-10">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,560px)_minmax(360px,520px)] lg:items-center lg:justify-between">
-            <div className="min-w-0 max-w-[560px] pt-2 lg:-ml-12 lg:-translate-y-2 xl:-ml-20 xl:-translate-y-4">
+          <div className="max-w-[620px]">
+            <div className="min-w-0 pt-2">
               <Reveal delay={0.12} immediate>
-<h1 className="max-w-[540px] overflow-hidden font-display text-[2.55rem] font-semibold leading-[1.18] text-ink sm:text-[3rem] lg:text-[3.25rem] xl:text-[3.45rem]">
+<h1 className="max-w-[560px] overflow-hidden font-display text-[2.75rem] font-semibold leading-[1.16] text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.36)] sm:text-[3.35rem] lg:text-[4rem] xl:text-[4.4rem]">
   <span className="block">
-    A touch of heritage<span className="font-bold tracking-[0.01em] text-ink"></span>
+    A touch of heritage<span className="font-bold tracking-[0.01em] text-white"></span>
   </span>
   <span className="block">made to shine</span>
 </h1>
               </Reveal>
               <Reveal delay={0.22} immediate>
-                <p className="mt-6 max-w-[470px] text-base font-semibold leading-8 text-ink">
+                <p className="mt-6 max-w-[500px] text-base font-semibold leading-8 text-white/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.42)]">
                   At Athar, we create handcrafted accessories that blend timeless heritage with modern elegance through refined copper details and artistic embroidery.
                 </p>
               </Reveal>
@@ -286,7 +275,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                   <motion.div {...ctaMotionProps}>
                     <Link
                       to="/products"
-                      className="inline-flex min-w-[160px] items-center justify-center bg-white px-6 py-3 text-base font-semibold text-ink shadow-[0_18px_40px_rgba(43,26,20,0.14)] transition"
+                      className="inline-flex min-w-[160px] items-center justify-center bg-white px-6 py-3 text-base font-semibold text-ink shadow-[0_18px_40px_rgba(0,0,0,0.28)] transition hover:bg-cream"
                     >
                       View Collection
                     </Link>
@@ -294,7 +283,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                   <motion.div {...ctaMotionProps}>
                     <Link
                       to="/about"
-                      className="inline-flex min-w-[160px] items-center justify-center bg-white px-6 py-3 text-base font-semibold text-ink shadow-[0_18px_40px_rgba(43,26,20,0.14)] transition"
+                      className="inline-flex min-w-[160px] items-center justify-center border border-white/70 bg-white/14 px-6 py-3 text-base font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm transition hover:bg-white/22"
                     >
                       Discover Athar
                     </Link>
@@ -302,47 +291,9 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                 </div>
               </Reveal>
             </div>
-
-            <div className="relative flex justify-center lg:justify-end">
-              <Reveal delay={0.42} immediate className="w-full max-w-[520px]">
-                <motion.div className="overflow-hidden shadow-[0_24px_70px_rgba(43,26,20,0.12)]" {...heroVisualMotionProps}>
-                  <div className="relative overflow-hidden bg-cream">
-                    <img
-                      src={resolveApiAssetUrl('products/atharhome.png')}
-                      alt="Athar hero collage"
-                      className={`w-full max-w-[520px] object-cover transition-opacity duration-1000 ease-out ${
-                        activeHeroMedia === 'image' ? 'opacity-100' : 'opacity-0'
-                      }`}
-                    />
-                    <video
-                      src={homepageVideo}
-                      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-out ${
-                        activeHeroMedia === 'video' ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
-                      poster={resolveApiAssetUrl('products/atharhome.png')}
-                      aria-label="Athar homepage promotional video"
-                    >
-                      Your browser does not support the homepage video.
-                    </video>
-                    <div
-                      className={`pointer-events-none absolute left-4 top-4 rounded-full bg-white/85 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-ink shadow-card transition-opacity duration-700 ${
-                        activeHeroMedia === 'video' ? 'opacity-100' : 'opacity-0'
-                      }`}
-                    >
-                      Athar story
-                    </div>
-                  </div>
-                </motion.div>
-              </Reveal>
-            </div>
           </div>
 
-          <Reveal delay={0.52} immediate className="pointer-events-none absolute bottom-2 right-6 hidden lg:block">
+          <Reveal delay={0.52} immediate className="pointer-events-none absolute bottom-2 right-6 hidden opacity-80 lg:block">
             <div className="grid grid-cols-6 gap-3">
               {Array.from({ length: 24 }).map((_, index) => (
                 <span key={index} className="h-1 w-1 rounded-full bg-[#cbb7b0]" />
