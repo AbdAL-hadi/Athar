@@ -11,6 +11,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [catalogEmptyMessage, setCatalogEmptyMessage] = useState('');
   const [result, setResult] = useState(null);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
     setResult(null);
+    setCatalogEmptyMessage('');
     setErrorMessage('');
   };
 
@@ -45,6 +47,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
     setSubmitting(true);
     setErrorMessage('');
     setResult(null);
+    setCatalogEmptyMessage('');
 
     try {
       const formData = new FormData();
@@ -55,6 +58,16 @@ const VisualMatchPage = ({ onAddToCart }) => {
         body: formData,
       });
       const matchResult = response?.data ?? null;
+
+      if (response?.available === false) {
+        setCatalogEmptyMessage('No products are available in the store catalog right now.');
+        return;
+      }
+
+      if (!matchResult?.product) {
+        setErrorMessage(response?.message || 'We could not compare this image against the catalog right now.');
+        return;
+      }
 
       setResult(
         matchResult?.product
@@ -76,8 +89,16 @@ const VisualMatchPage = ({ onAddToCart }) => {
     }
   };
 
-  const matchedProduct = result?.matched && result?.product ? result.product : null;
+  const matchedProduct = result?.product ?? null;
   const productHref = matchedProduct ? `/products/${matchedProduct.slug || matchedProduct.id}` : '';
+  const matchNote = result
+    ? String(result?.matchQuality || 'weak') === 'strong'
+      ? 'We found a very similar product.'
+      : String(result?.matchQuality || 'weak') === 'medium'
+        ? 'We found a product with some similar visual details.'
+        : "This is the closest available match in Athar's current collection."
+    : '';
+  const scorePercentage = Math.round(Number(result?.score || 0) * 100);
 
   return (
     <div className="section-shell space-y-8 pb-10 pt-8">
@@ -154,7 +175,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
               <h2 className="mt-2 font-display text-3xl text-ink">Athar suggestion</h2>
             </div>
 
-            {!result && !submitting ? (
+            {!result && !catalogEmptyMessage && !submitting ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
                   Upload a reference image, then let Athar compare it with the current catalog.
@@ -173,6 +194,14 @@ const VisualMatchPage = ({ onAddToCart }) => {
               </div>
             ) : null}
 
+            {catalogEmptyMessage && !submitting ? (
+              <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
+                <p className="max-w-sm text-base leading-7 text-ink-soft">
+                  {catalogEmptyMessage}
+                </p>
+              </div>
+            ) : null}
+
             {result && !submitting && matchedProduct ? (
               <div className="mt-6 flex flex-1 flex-col rounded-[28px] bg-white p-4 shadow-card">
                 <img
@@ -182,14 +211,17 @@ const VisualMatchPage = ({ onAddToCart }) => {
                 />
                 <div className="mt-5 flex flex-1 flex-col">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">
-                    Similarity score {Math.round(Number(result.similarityScore || 0))}%
+                    Similarity score {scorePercentage}%
                   </p>
                   <h3 className="mt-2 font-display text-3xl text-ink">{matchedProduct.name}</h3>
                   <p className="mt-2 text-sm uppercase tracking-[0.16em] text-muted">
                     {matchedProduct.category}
                   </p>
+                  <p className="mt-4 rounded-[18px] bg-[#f8eee7] px-4 py-3 text-sm font-medium leading-6 text-[#8f5f45]">
+                    {matchNote}
+                  </p>
                   <p className="mt-4 text-base leading-7 text-ink-soft">
-                    {result.matchingReason || matchedProduct.description}
+                    {result.reason || matchedProduct.description}
                   </p>
                   <div className="mt-5 flex items-center gap-3">
                     <p className="font-display text-3xl text-ink">
@@ -200,33 +232,13 @@ const VisualMatchPage = ({ onAddToCart }) => {
                     <Link to={productHref} className="button-primary">
                       View Product
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => onAddToCart?.(matchedProduct, 1)}
-                      className="button-secondary"
-                    >
-                      Add to Cart
-                    </button>
+                    <label htmlFor="visual-match-image" className="button-secondary cursor-pointer">
+                      Upload Another Image
+                    </label>
                   </div>
-                </div>
-              </div>
-            ) : null}
-
-            {result && !submitting && !matchedProduct ? (
-              <div className="mt-6 flex flex-1 items-center rounded-[28px] border border-line bg-white px-6 py-8 shadow-card">
-                <div className="max-w-xl">
-                  <span className="heritage-pill">Athar Match</span>
-                  <h3 className="mt-4 font-display text-3xl text-ink">
-                    This style is not currently available in Athar.
-                  </h3>
-                  <p className="mt-4 max-w-lg text-base leading-7 text-ink-soft">
-                    Try another image or browse our collection.
+                  <p className="mt-3 text-sm text-ink-soft">
+                    Choose another reference image and click Find Similar Product to search again.
                   </p>
-                  <div className="mt-6">
-                    <Link to="/products" className="button-primary">
-                      Browse Products
-                    </Link>
-                  </div>
                 </div>
               </div>
             ) : null}

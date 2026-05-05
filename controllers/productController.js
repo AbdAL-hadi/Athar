@@ -16,7 +16,7 @@ import {
   getProductVisualDescription,
   ProductVisualDescriptionError,
 } from '../services/visualDescriber/productVisualDescriptionService.js';
-import { findVisualProductMatch, VisualProductMatchError } from '../services/visualMatch/visualProductMatchService.js';
+import { matchProductByImage, ProductMatchError } from '../services/productMatch/productMatchService.js';
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
 const heritageCityIds = new Set(['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem']);
@@ -560,24 +560,43 @@ export const generateVisualAudio = async (req, res) => {
 
 export const findSimilarProduct = async (req, res) => {
   try {
-    const result = await findVisualProductMatch({
-      file: req.file,
-    });
+    const result = await matchProductByImage({ file: req.file });
+
+    if (!result?.match || String(result?.matchQuality || '').trim() === 'none') {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        message: 'There are no products available in the store catalog right now.',
+        analyzedImage: result?.analyzedImage ?? null,
+      });
+    }
 
     return res.status(200).json({
       success: true,
+      available: true,
       data: {
-        matched: result.matched,
-        similarityScore: result.similarityScore,
-        matchingReason: result.matchingReason,
-        product: result.product ? serializeProduct(result.product) : null,
+        score: Number(result?.score || 0),
+        matchQuality: String(result?.matchQuality || 'weak').trim(),
+        reason: String(result?.reason || 'This product was selected as the closest visual match.').trim(),
+        matchedFields: Array.isArray(result?.matchedFields) ? result.matchedFields : [],
+        analyzedImage: result?.analyzedImage ?? null,
+        product: {
+          ...result.match,
+          images: result?.match?.image ? [result.match.image] : [],
+        },
       },
     });
   } catch (error) {
-    const statusCode = error instanceof VisualProductMatchError ? error.status : 500;
-    return res.status(statusCode).json({
+    if (error instanceof ProductMatchError) {
+      return res.status(error.status || 500).json({
+        success: false,
+        message: error.publicMessage || 'We could not analyze the uploaded image right now. Please try another image.',
+      });
+    }
+
+    return res.status(502).json({
       success: false,
-      message: error.publicMessage || error.message || 'Failed to find a similar product.',
+      message: 'We could not analyze the uploaded image right now. Please try another image.',
     });
   }
 };

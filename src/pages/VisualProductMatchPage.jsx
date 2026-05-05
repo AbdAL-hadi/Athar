@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
 
@@ -12,7 +12,7 @@ const VisualProductMatchPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [matchResult, setMatchResult] = useState(null);
-  const [noMatchMessage, setNoMatchMessage] = useState('');
+  const [catalogEmptyMessage, setCatalogEmptyMessage] = useState('');
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const VisualProductMatchPage = () => {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
     setMatchResult(null);
-    setNoMatchMessage('');
+    setCatalogEmptyMessage('');
     setErrorMessage('');
     setImageLoadFailed(false);
   };
@@ -49,7 +49,7 @@ const VisualProductMatchPage = () => {
     setIsLoading(true);
     setErrorMessage('');
     setMatchResult(null);
-    setNoMatchMessage('');
+    setCatalogEmptyMessage('');
     setImageLoadFailed(false);
 
     try {
@@ -60,23 +60,25 @@ const VisualProductMatchPage = () => {
         method: 'POST',
         body: formData,
       });
+      const resultData = response?.data ?? null;
 
-      if (response?.available) {
-        setMatchResult({
-          available: true,
-          score: Number(response?.data?.score || 0),
-          reason: String(response?.data?.reason || '').trim(),
-          analyzedImage: response?.data?.analyzedImage ?? null,
-          product: response?.data?.product ?? null,
-        });
+      if (response?.available === false) {
+        setCatalogEmptyMessage('No products are available in the store catalog right now.');
+        return;
+      }
+
+      if (!resultData?.product) {
+        setErrorMessage(response?.message || 'We could not compare this image against the catalog right now.');
         return;
       }
 
       setMatchResult({
-        available: false,
-        analyzedImage: response?.analyzedImage ?? null,
+        score: Number(resultData?.score || 0),
+        matchQuality: String(resultData?.matchQuality || 'weak').trim(),
+        reason: String(resultData?.reason || '').trim(),
+        analyzedImage: resultData?.analyzedImage ?? null,
+        product: resultData?.product ?? null,
       });
-      setNoMatchMessage(response?.message || 'Sorry, we could not find a similar product currently available in Athar.');
     } catch (error) {
       setErrorMessage(
         error?.message || 'We could not find a match right now. Please try again.',
@@ -86,7 +88,7 @@ const VisualProductMatchPage = () => {
     }
   };
 
-  const matchedProduct = matchResult?.available ? matchResult?.product : null;
+  const matchedProduct = matchResult?.product ?? null;
   const productHref = matchedProduct ? `/products/${matchedProduct.slug || matchedProduct.id}` : '/products';
   const resolvedProductImage = (() => {
     const imageValue = String(matchedProduct?.image ?? '').trim();
@@ -121,6 +123,14 @@ const VisualProductMatchPage = () => {
         .map((value) => String(value ?? '').trim())
         .filter((value) => value && value !== 'unknown')
     : [];
+  const matchNote = matchResult
+    ? String(matchResult?.matchQuality || 'weak') === 'strong'
+      ? 'We found a very similar product.'
+      : String(matchResult?.matchQuality || 'weak') === 'medium'
+        ? 'We found a product with some similar visual details.'
+        : "This is the closest available match in Athar's current collection."
+    : '';
+  const scorePercentage = Math.round(Number(matchResult?.score || 0) * 100);
 
   return (
     <div className="section-shell space-y-8 pb-10 pt-8">
@@ -227,14 +237,14 @@ const VisualProductMatchPage = () => {
                 <h2 className="mt-2 font-display text-3xl text-ink">Match result</h2>
               </div>
 
-              {matchResult?.available ? (
+              {matchResult?.product ? (
                 <div className="rounded-full bg-[#f4e4d4] px-4 py-2 text-sm font-semibold text-[#8f5f45]">
-                  {Math.round((Number(matchResult?.score || 0) || 0) * 100)}% match
+                  {scorePercentage}% similarity
                 </div>
               ) : null}
             </div>
 
-            {!matchResult && !isLoading ? (
+            {!matchResult && !catalogEmptyMessage && !isLoading ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
                   Upload a product image and Athar will look for the closest piece in the collection.
@@ -253,7 +263,15 @@ const VisualProductMatchPage = () => {
               </div>
             ) : null}
 
-            {matchResult?.available && matchedProduct ? (
+            {catalogEmptyMessage && !isLoading ? (
+              <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
+                <p className="max-w-sm text-base leading-7 text-ink-soft">
+                  {catalogEmptyMessage}
+                </p>
+              </div>
+            ) : null}
+
+            {matchedProduct ? (
               <div className="mt-6 flex flex-1 flex-col rounded-[28px] bg-white p-4 shadow-card transition hover:-translate-y-1 hover:shadow-[0_24px_48px_rgba(120,84,60,0.18)]">
                 {resolvedProductImage && !imageLoadFailed ? (
                   <img
@@ -270,11 +288,14 @@ const VisualProductMatchPage = () => {
 
                 <div className="mt-5 flex flex-1 flex-col">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">
-                    Similarity: {Math.round((Number(matchResult?.score || 0) || 0) * 100)}%
+                    Similarity score: {scorePercentage}%
                   </p>
                   <p className="text-sm uppercase tracking-[0.16em] text-muted">{matchedProduct.category}</p>
                   <h3 className="mt-2 font-display text-3xl text-ink">{matchedProduct.title}</h3>
                   <p className="mt-4 font-display text-3xl text-ink">{formatCurrency(matchedProduct.price)}</p>
+                  <p className="mt-4 rounded-[18px] bg-[#f8eee7] px-4 py-3 text-sm font-medium leading-6 text-[#8f5f45]">
+                    {matchNote}
+                  </p>
                   <p className="mt-4 text-base leading-7 text-ink-soft">{matchResult.reason}</p>
 
                   {analysisBadges.length ? (
@@ -304,48 +325,13 @@ const VisualProductMatchPage = () => {
                     >
                       View Product
                     </button>
-                    <Link to="/products" className="button-secondary">
-                      Browse Collection
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {matchResult && !matchResult.available ? (
-              <div className="mt-6 flex flex-1 items-center rounded-[28px] border border-line bg-white px-6 py-8 shadow-card">
-                <div className="max-w-xl">
-                  <span className="heritage-pill">Athar Match</span>
-                  <h3 className="mt-4 font-display text-3xl text-ink">This style is not currently available in Athar.</h3>
-                  <p className="mt-4 max-w-lg text-base leading-7 text-ink-soft">
-                    {noMatchMessage || 'Try another image or browse our current collection.'}
-                  </p>
-
-                  {analysisBadges.length ? (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {analysisBadges.map((badge, index) => (
-                        <span
-                          key={`${badge}-${index}`}
-                          className="rounded-full bg-[#f8eee7] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8f5f45]"
-                        >
-                          {badge}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/products')}
-                      className="button-primary"
-                    >
-                      Browse Products
-                    </button>
                     <label htmlFor="visual-product-match-image" className="button-secondary cursor-pointer">
-                      Try Another Image
+                      Upload Another Image
                     </label>
                   </div>
+                  <p className="mt-3 text-sm text-ink-soft">
+                    Choose another reference image and click Find Similar Product to search again.
+                  </p>
                 </div>
               </div>
             ) : null}

@@ -1,37 +1,4 @@
-import { findVisualProductMatch, VisualProductMatchError } from '../services/visualMatch/visualProductMatchService.js';
-
-const normalizeMatchedProduct = (product) => {
-  const plainProduct = typeof product?.toObject === 'function' ? product.toObject() : product;
-  const productId = plainProduct?._id ? String(plainProduct._id) : '';
-  const imageUrls = Array.isArray(plainProduct?.images)
-    ? plainProduct.images
-        .map((image) => {
-          if (typeof image === 'string') {
-            return image.trim();
-          }
-
-          if (!image?.assetId) {
-            return '';
-          }
-
-          const fileName = encodeURIComponent(String(image?.fileName || 'image').trim() || 'image');
-          return `/api/assets/${String(image.assetId)}/${fileName}`;
-        })
-        .filter(Boolean)
-    : [];
-
-  return {
-    id: productId,
-    slug: String(plainProduct?.slug ?? '').trim(),
-    title: String(plainProduct?.title ?? '').trim(),
-    price: Number(plainProduct?.price ?? 0),
-    image: imageUrls[0] || '',
-    category: String(plainProduct?.category ?? '').trim(),
-    material: String(plainProduct?.material ?? '').trim(),
-    color: String(plainProduct?.color ?? '').trim(),
-    stock: Number(plainProduct?.stock ?? 0),
-  };
-};
+import { matchProductByImage, ProductMatchError } from '../services/productMatch/productMatchService.js';
 
 export const createProductMatchRecommendation = async (req, res) => {
   if (!req.file) {
@@ -42,18 +9,14 @@ export const createProductMatchRecommendation = async (req, res) => {
   }
 
   try {
-    const result = await findVisualProductMatch({
-      file: req.file,
-    });
+    const result = await matchProductByImage({ file: req.file });
 
-    if (!result?.matched) {
+    if (!result?.match || String(result?.matchQuality || '').trim() === 'none') {
       return res.status(200).json({
         success: true,
         available: false,
-        message:
-          result?.matchingReason ||
-          'Sorry, we could not find a similar product currently available in Athar.',
-        analyzedImage: result?.analysis ?? null,
+        message: 'There are no products available in the store catalog right now.',
+        analyzedImage: result?.analyzedImage ?? null,
       });
     }
 
@@ -61,14 +24,16 @@ export const createProductMatchRecommendation = async (req, res) => {
       success: true,
       available: true,
       data: {
-        score: Number(result?.similarityScore || 0) / 100,
-        reason: String(result?.matchingReason || 'This product was selected as the closest visual match.').trim(),
-        analyzedImage: result?.analysis ?? null,
-        product: result?.product ? normalizeMatchedProduct(result.product) : null,
+        score: Number(result?.score || 0),
+        matchQuality: String(result?.matchQuality || 'weak').trim(),
+        reason: String(result?.reason || 'This product was selected as the closest visual match.').trim(),
+        matchedFields: Array.isArray(result?.matchedFields) ? result.matchedFields : [],
+        analyzedImage: result?.analyzedImage ?? null,
+        product: result?.match ?? null,
       },
     });
   } catch (error) {
-    if (error instanceof VisualProductMatchError) {
+    if (error instanceof ProductMatchError) {
       return res.status(error.status || 500).json({
         success: false,
         message: error.publicMessage || 'We could not analyze the uploaded image right now. Please try another image.',

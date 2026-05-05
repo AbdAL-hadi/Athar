@@ -2,11 +2,11 @@ import { GoogleGenAI } from '@google/genai';
 import Product from '../../models/Product.js';
 
 const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
-const MATCH_THRESHOLD = Number(process.env.PRODUCT_MATCH_THRESHOLD || 0.55);
-const MIN_MATCH_PERCENT = Number(process.env.PRODUCT_MATCH_MIN_PERCENT || 65);
 const MAX_CANDIDATES = Number(process.env.PRODUCT_MATCH_MAX_CANDIDATES || 8);
-const MIN_ANALYSIS_CONFIDENCE = 0.35;
+const MEDIUM_MATCH_SCORE = Number(process.env.PRODUCT_MATCH_MEDIUM_SCORE || 0.45);
+const STRONG_MATCH_SCORE = Number(process.env.PRODUCT_MATCH_STRONG_SCORE || 0.7);
 const weakMatchWords = new Set(['item', 'product', 'accessory', 'style', 'design', 'unknown']);
+const meaningfulShortWords = new Set(['bag', 'red', 'tan', 'gem']);
 
 const categoryAliasMap = {
   bags: ['bag', 'handbag', 'purse', 'carryall', 'tote'],
@@ -133,7 +133,40 @@ const isMeaningfulToken = (value = '') => {
     return false;
   }
 
-  return normalizedValue.length >= 4;
+  return normalizedValue.length >= 4 || meaningfulShortWords.has(normalizedValue);
+};
+
+const getCommonPrefixLength = (left = '', right = '') => {
+  const maxLength = Math.min(left.length, right.length);
+  let index = 0;
+
+  while (index < maxLength && left[index] === right[index]) {
+    index += 1;
+  }
+
+  return index;
+};
+
+const keywordsMatch = (leftValue = '', rightValue = '') => {
+  const left = normalizeToken(leftValue);
+  const right = normalizeToken(rightValue);
+
+  if (!isMeaningfulToken(left) || !isMeaningfulToken(right)) {
+    return false;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  if (left.length >= 4 && right.length >= 4 && (left.includes(right) || right.includes(left))) {
+    return true;
+  }
+
+  const commonPrefixLength = getCommonPrefixLength(left, right);
+  const shorterLength = Math.min(left.length, right.length);
+
+  return commonPrefixLength >= 5 && commonPrefixLength / shorterLength >= 0.6;
 };
 
 const normalizeAnalysis = (analysis = {}) => ({
@@ -165,16 +198,6 @@ const resolveAnalysisCategory = (analysis = {}) => {
   return 'unknown';
 };
 
-const clampPercentage = (value) => {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, Math.round(numericValue)));
-};
-
 const clampConfidence = (value) => {
   const numericValue = Number(value);
 
@@ -187,21 +210,14 @@ const clampConfidence = (value) => {
 
 const overlapRatio = (sourceValues = [], targetHaystack = '') => {
   const normalizedValues = [...new Set(sourceValues.map(normalizeToken).filter(isMeaningfulToken))];
+  const targetTokens = targetHaystack.split(' ').filter(Boolean);
 
-  if (!normalizedValues.length || !targetHaystack) {
+  if (!normalizedValues.length || !targetTokens.length) {
     return 0;
   }
 
   const matchedCount = normalizedValues.filter((value) => {
-    const targetTokens = targetHaystack.split(' ').filter(Boolean);
-
-    return targetTokens.some((token) => {
-      if (!isMeaningfulToken(token)) {
-        return false;
-      }
-
-      return token.includes(value) || value.includes(token);
-    });
+    return targetTokens.some((token) => keywordsMatch(value, token));
   }).length;
   return matchedCount / normalizedValues.length;
 };
@@ -213,6 +229,49 @@ const tokenizeText = (value = '') => {
     .filter(isMeaningfulToken);
 };
 
+const expandComparableValues = (values = []) => {
+  return [...new Set(
+    normalizeArray(values)
+      .flatMap((value) => {
+        const normalizedValue = normalizeToken(value);
+
+        return [normalizedValue, ...tokenizeText(value)];
+      })
+      .filter(isMeaningfulToken),
+  )];
+};
+
+const hasFieldOverlap = (sourceValues = [], targetValues = []) => {
+  const normalizedSourceValues = expandComparableValues(sourceValues);
+  const normalizedTargetValues = expandComparableValues(targetValues);
+
+  if (!normalizedSourceValues.length || !normalizedTargetValues.length) {
+    return false;
+  }
+
+  return normalizedSourceValues.some((sourceValue) => {
+    return normalizedTargetValues.some((targetValue) => keywordsMatch(sourceValue, targetValue));
+  });
+};
+
+const formatNaturalList = (values = []) => {
+  const filteredValues = values.map((value) => String(value ?? '').trim()).filter(Boolean);
+
+  if (!filteredValues.length) {
+    return '';
+  }
+
+  if (filteredValues.length === 1) {
+    return filteredValues[0];
+  }
+
+  if (filteredValues.length === 2) {
+    return `${filteredValues[0]} and ${filteredValues[1]}`;
+  }
+
+  return `${filteredValues.slice(0, -1).join(', ')}, and ${filteredValues.at(-1)}`;
+};
+
 const textMatchRatio = (analysis = {}, product = {}, signals = {}) => {
   const searchableTerms = [
     analysis?.productType,
@@ -222,12 +281,15 @@ const textMatchRatio = (analysis = {}, product = {}, signals = {}) => {
     ...normalizeArray(analysis?.occasion),
   ];
   const normalizedTerms = [...new Set(searchableTerms.flatMap(tokenizeText))];
+  const targetTokens = String(signals?.haystack || '')
+    .split(' ')
+    .filter(Boolean);
 
-  if (!normalizedTerms.length || !signals.haystack) {
+  if (!normalizedTerms.length || !targetTokens.length) {
     return 0;
   }
 
-  const matchedTerms = normalizedTerms.filter((term) => signals.haystack.includes(term)).length;
+  const matchedTerms = normalizedTerms.filter((term) => targetTokens.some((token) => keywordsMatch(term, token))).length;
   const ratio = matchedTerms / normalizedTerms.length;
 
   // Keep broad incidental text overlap from dominating the score.
@@ -369,9 +431,6 @@ const scoreCandidateProduct = (analysis, product) => {
   const normalizedAnalysisCategory = resolveAnalysisCategory(analysis);
   const normalizedProductCategory = normalizeToken(signals.category);
   const normalizedProductType = normalizeToken(analysis?.productType);
-  const hasWeakCategorySignal =
-    (!normalizedAnalysisCategory || normalizedAnalysisCategory === 'unknown') &&
-    (!normalizedProductType || normalizedProductType === 'unknown');
 
   const exactCategoryMatch =
     normalizedAnalysisCategory &&
@@ -419,52 +478,126 @@ const scoreCandidateProduct = (analysis, product) => {
       motifScore,
       textScore,
     },
-    hasWeakCategorySignal,
   };
 };
 
-const calculateSimilarityScore = ({ heuristicScore = 0, analysisConfidence = 0 }) => {
-  const normalizedHeuristic = clampConfidence(heuristicScore);
-  const normalizedAnalysisConfidence = clampConfidence(analysisConfidence);
-  return clampPercentage((normalizedHeuristic * 0.8 + normalizedAnalysisConfidence * 0.2) * 100);
+const calculateMatchScore = ({ heuristicScore = 0 }) => {
+  return clampConfidence(heuristicScore);
 };
 
-const buildMatchReason = ({ analysis, product, score }) => {
-  const category = String(product?.category ?? '').trim().toLowerCase();
-  const colors = normalizeArray(analysis?.colors).slice(0, 2);
-  const materials = normalizeArray(analysis?.materials).slice(0, 2);
-  const keywords = normalizeArray(analysis?.keywords).filter(isMeaningfulToken).slice(0, 2);
-  const details = [];
-
-  if (category && category !== 'unknown') {
-    details.push(category);
+const getMatchQuality = (score = 0) => {
+  if (score >= STRONG_MATCH_SCORE) {
+    return 'strong';
   }
 
-  if (colors.length) {
-    details.push(`${colors.join(' and ')} details`);
+  if (score >= MEDIUM_MATCH_SCORE) {
+    return 'medium';
   }
 
-  if (materials.length) {
-    details.push(`${materials[0]} elements`);
-  }
-
-  if (keywords.length) {
-    details.push(keywords.join(' and '));
-  }
-
-  const itemDescription = details.length
-    ? details.slice(0, 3).join(' with ')
-    : 'item';
-
-  return `The uploaded image looks like a ${itemDescription}. This product is the closest match in Athar's collection.`;
+  return 'weak';
 };
+
+const getMatchedFieldSummary = ({ analysis, product }) => {
+  const signals = inferCatalogSignals(product);
+  const normalizedAnalysisCategory = resolveAnalysisCategory(analysis);
+  const keywordAnalysisFields = [
+    analysis?.shape,
+    ...normalizeArray(analysis?.style),
+    ...normalizeArray(analysis?.keywords),
+    ...normalizeArray(analysis?.occasion),
+    ...normalizeArray(analysis?.motifs),
+  ];
+  const keywordCatalogFields = [
+    signals.title,
+    signals.description,
+    signals.shortDescription,
+    ...signals.styleTags,
+    ...signals.semanticTags,
+    ...signals.motifTags,
+    ...signals.occasionTags,
+    ...signals.targetAudience,
+    ...signals.bestFor,
+    signals.tryOnCategory,
+  ];
+  const matchedFields = [];
+  const customerLabels = [];
+
+  if (
+    normalizedAnalysisCategory &&
+    normalizedAnalysisCategory !== 'unknown' &&
+    categoryMatches(normalizedAnalysisCategory, signals.category, analysis?.productType)
+  ) {
+    matchedFields.push('category');
+    customerLabels.push('category');
+  }
+
+  if (hasFieldOverlap(analysis?.colors, [signals.color, ...signals.dominantColors])) {
+    matchedFields.push('colors');
+    customerLabels.push('colors');
+  }
+
+  if (hasFieldOverlap(analysis?.materials, [signals.material, ...signals.materialTags])) {
+    matchedFields.push('materials');
+    customerLabels.push('materials');
+  }
+
+  if (hasFieldOverlap(keywordAnalysisFields, keywordCatalogFields)) {
+    matchedFields.push('keywords');
+    customerLabels.push('style');
+  }
+
+  return {
+    matchedFields,
+    customerLabels,
+  };
+};
+
+export const buildMatchReason = ({ analysis, product, similarityScore }) => {
+  const matchQuality = getMatchQuality(similarityScore);
+  const { matchedFields, customerLabels } = getMatchedFieldSummary({ analysis, product });
+  const matchedFieldText = formatNaturalList(customerLabels);
+
+  if (matchQuality === 'strong') {
+    return {
+      matchedFields,
+      text: matchedFieldText
+        ? `The uploaded image looks very similar to this product based on ${matchedFieldText}.`
+        : 'The uploaded image looks very similar to this product.',
+    };
+  }
+
+  if (matchQuality === 'medium') {
+    return {
+      matchedFields,
+      text: matchedFieldText
+        ? `This product shares some visual details with your uploaded image and is one of the closest matches in Athar's collection, especially in ${matchedFieldText}.`
+        : "This product shares some visual details with your uploaded image and is one of the closest matches in Athar's collection.",
+    };
+  }
+
+  return {
+    matchedFields,
+    text: matchedFieldText
+      ? `This is the closest available product in Athar's current collection, although it may not be an exact match. It is closest in ${matchedFieldText}.`
+      : "This is the closest available product in Athar's current collection, although it may not be an exact match.",
+  };
+};
+
+const buildEmptyCatalogResult = (analysis = null) => ({
+  match: null,
+  score: 0,
+  matchQuality: 'none',
+  reason: '',
+  matchedFields: [],
+  analyzedImage: analysis,
+});
 
 const analyzeUploadedImage = async ({ imageBuffer, mimeType }) => {
   const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
 
   if (!apiKey) {
     throw new ProductMatchError('GEMINI_API_KEY is not configured.', 503, {
-      publicMessage: 'Product matching is temporarily unavailable right now.',
+      publicMessage: 'Product matching is not configured right now.',
     });
   }
 
@@ -514,25 +647,10 @@ export const findSimilarProductFromImage = async ({ imageBuffer, mimeType }) => 
   }
 
   const analysis = await analyzeUploadedImage({ imageBuffer, mimeType });
-
-  if (Number(analysis?.confidence || 0) < MIN_ANALYSIS_CONFIDENCE) {
-    return {
-      match: null,
-      score: 0,
-      reason: '',
-      analyzedImage: analysis,
-    };
-  }
-
   const allProducts = await Product.find({}).lean();
 
   if (!allProducts.length) {
-    return {
-      match: null,
-      score: 0,
-      reason: '',
-      analyzedImage: analysis,
-    };
+    return buildEmptyCatalogResult(analysis);
   }
 
   const inStockProducts = allProducts.filter((product) => Number(product?.stock || 0) > 0);
@@ -543,37 +661,23 @@ export const findSimilarProductFromImage = async ({ imageBuffer, mimeType }) => 
     .sort((left, right) => right.score - left.score)
     .slice(0, Math.max(1, MAX_CANDIDATES));
 
-  const strongestCandidate = rankedCandidates[0];
-  const similarityScore = calculateSimilarityScore({
+  const strongestCandidate = rankedCandidates[0] ?? scoreCandidateProduct(analysis, candidateProducts[0]);
+  const score = calculateMatchScore({
     heuristicScore: strongestCandidate?.score || 0,
-    analysisConfidence: Number(analysis?.confidence || 0),
   });
-  const requiredMatchScore = strongestCandidate?.hasWeakCategorySignal ? Math.max(MATCH_THRESHOLD, 0.58) : MATCH_THRESHOLD;
-  const requiredSimilarityPercent = strongestCandidate?.hasWeakCategorySignal
-    ? Math.max(MIN_MATCH_PERCENT, 75)
-    : MIN_MATCH_PERCENT;
-
-  if (
-    !strongestCandidate ||
-    strongestCandidate.score < requiredMatchScore ||
-    similarityScore < requiredSimilarityPercent
-  ) {
-    return {
-      match: null,
-      score: clampConfidence(strongestCandidate?.score || 0),
-      reason: '',
-      analyzedImage: analysis,
-    };
-  }
+  const matchQuality = getMatchQuality(score);
+  const matchReason = buildMatchReason({
+    analysis,
+    product: strongestCandidate.product,
+    similarityScore: score,
+  });
 
   return {
     match: buildNormalizedProduct(strongestCandidate.product),
-    score: clampConfidence(strongestCandidate.score),
-    reason: buildMatchReason({
-      analysis,
-      product: strongestCandidate.product,
-      score: strongestCandidate.score,
-    }),
+    score,
+    matchQuality,
+    reason: matchReason.text,
+    matchedFields: matchReason.matchedFields,
     analyzedImage: analysis,
   };
 };
