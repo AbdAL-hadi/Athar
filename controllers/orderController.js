@@ -3,6 +3,7 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
+import { buildImageAssetUrlFromReference } from '../services/assets/imageAssetService.js';
 import {
   awardLoyaltyPointsForOrder,
   redeemLoyaltyRewardForCheckout,
@@ -172,7 +173,7 @@ export const createOrder = async (req, res) => {
       return {
         product: product._id,
         title: product.title,
-        image: product.images[0],
+        image: buildImageAssetUrlFromReference(product.images?.[0]),
         quantity: item.quantity,
         price: product.price,
         pointsEarned: calculateProductPoints(product, item.quantity),

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import mongoose from 'mongoose';
 
 import Product from '../models/Product.js';
 import {
@@ -14,7 +15,14 @@ test('Product schema exposes backward-compatible visual description defaults', (
     slug: 'peacock-eye-wallet',
     description: 'A refined leather wallet carrying the Peacock Eye motif.',
     price: 120,
-    images: ['products/peacock-eye-wallet.png'],
+    images: [
+      {
+        assetId: new mongoose.Types.ObjectId(),
+        fileName: 'peacock-eye-wallet.png',
+        mimeType: 'image/png',
+        size: 1234,
+      },
+    ],
     category: 'Wallets',
     material: 'Engraved black leather',
   });

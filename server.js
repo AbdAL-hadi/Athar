@@ -8,6 +8,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import adminAiAssistRoutes from './routes/adminAiAssistRoutes.js';
 import adminCommentRoutes from './routes/adminCommentRoutes.js';
 import aiTryOnRoutes from './routes/aiTryOnRoutes.js';
+import assetRoutes from './routes/assetRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
@@ -27,6 +28,7 @@ app.get('/', (_req, res) => {
   res.send('Athar API is running');
 });
 
+app.use('/api/assets', assetRoutes);
 app.use('/api/admin/ai-assist', adminAiAssistRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

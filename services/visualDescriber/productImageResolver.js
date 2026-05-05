@@ -1,5 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  buildAbsoluteServerUrl,
+  buildImageAssetUrlFromReference,
+  isImageAssetReference,
+} from '../assets/imageAssetService.js';
 
 const normalizeImageValue = (value) => String(value ?? '').trim().replace(/\\/g, '/').replace(/^\.?\//, '');
 
@@ -26,6 +31,17 @@ const buildCandidatePaths = (imageValue = '') => {
 
 export const resolveProductImageSource = (product) => {
   const primaryImage = product?.images?.[0] ?? '';
+
+  if (isImageAssetReference(primaryImage)) {
+    const relativeUrl = buildImageAssetUrlFromReference(primaryImage);
+
+    return {
+      imageValue: relativeUrl,
+      imagePath: '',
+      imageUrl: buildAbsoluteServerUrl(relativeUrl),
+    };
+  }
+
   const normalizedImage = normalizeImageValue(primaryImage);
 
   if (!normalizedImage) {

@@ -1,33 +1,13 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import multer from 'multer';
 
 const maxFileSizeMb = Number(process.env.PRODUCT_IMAGE_MAX_FILE_SIZE_MB || 10);
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-
-const hasAllowedImageExtension = (fileName = '') => allowedImageExtensions.has(path.extname(fileName).toLowerCase());
-
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, callback) => callback(null, uploadDir),
-  filename: (_req, file, callback) => {
-    const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
-    const safeBase = path
-      .basename(file.originalname || 'product', extension)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || 'product';
-
-    callback(null, `${safeBase}-${Date.now()}-${Math.random().toString(16).slice(2)}${extension}`);
-  },
-});
+const hasAllowedImageExtension = (fileName = '') =>
+  allowedImageExtensions.has(String(fileName).toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '');
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: maxFileSizeMb * 1024 * 1024,
     files: 8,

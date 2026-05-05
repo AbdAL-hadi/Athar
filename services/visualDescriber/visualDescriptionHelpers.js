@@ -1,10 +1,13 @@
 import path from 'node:path';
+import { buildImageAssetUrlFromReference } from '../assets/imageAssetService.js';
 
 const supportedLanguages = new Set(['en', 'ar']);
 const supportedDetailLevels = new Set(['short', 'long']);
 const trackedVisualInputFields = ['title', 'description', 'category', 'material', 'images'];
 
 const normalizeString = (value) => String(value ?? '').trim();
+const normalizeImageList = (values = []) =>
+  Array.isArray(values) ? values.map((value) => normalizeString(buildImageAssetUrlFromReference(value))).filter(Boolean) : [];
 
 const normalizeStringArray = (values = [], limit = Infinity) => {
   if (!Array.isArray(values)) {
@@ -46,7 +49,7 @@ export const shouldRefreshVisualDescription = (currentProduct, updateData = {}) 
     }
 
     if (field === 'images') {
-      return JSON.stringify(updateData.images ?? []) !== JSON.stringify(currentProduct?.images ?? []);
+      return JSON.stringify(normalizeImageList(updateData.images ?? [])) !== JSON.stringify(normalizeImageList(currentProduct?.images ?? []));
     }
 
     return normalizeString(updateData[field]) !== normalizeString(currentProduct?.[field]);

@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 import PatternStory from '../models/PatternStory.js';
 import Product from '../models/Product.js';
+import {
+  attachImageAssetsToOwner,
+  buildImageAssetUrlFromReference,
+  createImageAssetFromUpload,
+  deleteImageAssetsByReferences,
+} from '../services/assets/imageAssetService.js';
 
 const createSlug = (value) =>
   String(value ?? '')
@@ -47,6 +53,8 @@ const serializePatternStory = (story) => {
   return {
     ...plainStory,
     id: plainStory._id?.toString?.() ?? plainStory.id ?? '',
+    image: buildImageAssetUrlFromReference(plainStory.image),
+    imageName: plainStory.image?.fileName || '',
     motifTags: normalizeArrayField(plainStory.motifTags),
   };
 };
@@ -79,19 +87,35 @@ const ensureUniqueSlug = async (title, storyIdToIgnore = null) => {
 
 const buildPatternStoryPayload = async (body = {}, file = null, existingStory = null) => {
   const payload = {};
+  let createdImageReference = null;
 
   if (body.title !== undefined) payload.title = String(body.title ?? '').trim();
   if (body.description !== undefined) payload.description = String(body.description ?? '').trim();
   if (body.productCode !== undefined) payload.productCode = String(body.productCode ?? '').trim();
   if (body.motifTags !== undefined) payload.motifTags = normalizeArrayField(body.motifTags);
-  if (body.existingImage !== undefined) payload.image = String(body.existingImage ?? '').trim();
-  if (file?.filename) payload.image = `uploads/patterns/${file.filename}`;
+  if (body.existingImage !== undefined) {
+    payload.image =
+      existingStory?.image && String(body.existingImage ?? '').trim() === buildImageAssetUrlFromReference(existingStory.image)
+        ? existingStory.image
+        : null;
+  }
+
+  if (file?.buffer) {
+    createdImageReference = await createImageAssetFromUpload(file, {
+      kind: 'pattern-story',
+      ownerModel: 'PatternStory',
+    });
+    payload.image = createdImageReference;
+  }
 
   if (payload.title && (!existingStory || payload.title !== existingStory.title)) {
     payload.slug = await ensureUniqueSlug(payload.title, existingStory?._id ?? null);
   }
 
-  return payload;
+  return {
+    payload,
+    createdImageReference,
+  };
 };
 
 export const getPatternStories = async (_req, res) => {
@@ -143,18 +167,31 @@ export const getPatternStoryByReference = async (req, res) => {
 };
 
 export const createPatternStory = async (req, res) => {
+  let createdImageReference = null;
+  const cleanupCreatedImage = async () => {
+    await deleteImageAssetsByReferences(createdImageReference ? [createdImageReference] : []);
+  };
+
   try {
-    const payload = await buildPatternStoryPayload(req.body, req.file);
+    const buildResult = await buildPatternStoryPayload(req.body, req.file);
+    const { payload } = buildResult;
+    createdImageReference = buildResult.createdImageReference;
 
     if (!payload.title) {
+      await cleanupCreatedImage();
       return res.status(400).json({ success: false, message: 'Pattern title is required.' });
     }
 
     if (!payload.description) {
+      await cleanupCreatedImage();
       return res.status(400).json({ success: false, message: 'Pattern description is required.' });
     }
 
     const story = await PatternStory.create(payload);
+    await attachImageAssetsToOwner(createdImageReference ? [createdImageReference] : [], {
+      ownerModel: 'PatternStory',
+      ownerId: story._id,
+    });
 
     return res.status(201).json({
       success: true,
@@ -162,6 +199,7 @@ export const createPatternStory = async (req, res) => {
       data: serializePatternStory(story),
     });
   } catch (error) {
+    await cleanupCreatedImage();
     const status = error?.name === 'ValidationError' ? 400 : 500;
 
     return res.status(status).json({
@@ -172,6 +210,11 @@ export const createPatternStory = async (req, res) => {
 };
 
 export const updatePatternStory = async (req, res) => {
+  let createdImageReference = null;
+  const cleanupCreatedImage = async () => {
+    await deleteImageAssetsByReferences(createdImageReference ? [createdImageReference] : []);
+  };
+
   try {
     const { id } = req.params;
 
@@ -185,13 +228,18 @@ export const updatePatternStory = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Pattern story not found.' });
     }
 
-    const payload = await buildPatternStoryPayload(req.body, req.file, existingStory);
+    const previousImage = existingStory.image ? [existingStory.image] : [];
+    const buildResult = await buildPatternStoryPayload(req.body, req.file, existingStory);
+    const { payload } = buildResult;
+    createdImageReference = buildResult.createdImageReference;
 
     if (payload.title === '') {
+      await cleanupCreatedImage();
       return res.status(400).json({ success: false, message: 'Pattern title is required.' });
     }
 
     if (payload.description === '') {
+      await cleanupCreatedImage();
       return res.status(400).json({ success: false, message: 'Pattern description is required.' });
     }
 
@@ -199,6 +247,16 @@ export const updatePatternStory = async (req, res) => {
       new: true,
       runValidators: true,
     });
+    await attachImageAssetsToOwner(createdImageReference ? [createdImageReference] : [], {
+      ownerModel: 'PatternStory',
+      ownerId: existingStory._id,
+    });
+
+    if (payload.image !== undefined) {
+      const nextAssetId = String(payload.image?.assetId || '');
+      const removedImages = previousImage.filter((image) => String(image?.assetId || '') !== nextAssetId);
+      await deleteImageAssetsByReferences(removedImages);
+    }
 
     return res.status(200).json({
       success: true,
@@ -206,11 +264,41 @@ export const updatePatternStory = async (req, res) => {
       data: serializePatternStory(story),
     });
   } catch (error) {
+    await cleanupCreatedImage();
     const status = error?.name === 'ValidationError' ? 400 : 500;
 
     return res.status(status).json({
       success: false,
       message: 'Pattern story could not be saved right now.',
+    });
+  }
+};
+
+export const deletePatternStory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid pattern story ID.' });
+    }
+
+    const story = await PatternStory.findByIdAndDelete(id);
+
+    if (!story) {
+      return res.status(404).json({ success: false, message: 'Pattern story not found.' });
+    }
+
+    await deleteImageAssetsByReferences(story.image ? [story.image] : []);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Pattern story deleted successfully.',
+      data: { id },
+    });
+  } catch (_error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Pattern story could not be deleted right now.',
     });
   }
 };

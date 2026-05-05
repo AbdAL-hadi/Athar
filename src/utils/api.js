@@ -132,5 +132,16 @@ export const resolveApiAssetUrl = (value) => {
     return normalizedValue;
   }
 
-return '';
+  if (
+    normalizedValue.startsWith('api/') ||
+    normalizedValue.startsWith('/api/') ||
+    normalizedValue.startsWith('uploads/') ||
+    normalizedValue.startsWith('/uploads/') ||
+    normalizedValue.startsWith('generated/') ||
+    normalizedValue.startsWith('/generated/')
+  ) {
+    return buildApiUrl(normalizedValue);
+  }
+
+  return '';
 };

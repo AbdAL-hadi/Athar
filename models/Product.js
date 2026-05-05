@@ -110,7 +110,7 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
     images: {
-      type: [String],
+      type: [mongoose.Schema.Types.Mixed],
       required: true,
       validate: {
         validator: (value) => Array.isArray(value) && value.length > 0,
