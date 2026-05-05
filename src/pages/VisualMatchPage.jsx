@@ -11,7 +11,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [catalogEmptyMessage, setCatalogEmptyMessage] = useState('');
+  const [unavailableState, setUnavailableState] = useState(null);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
     setResult(null);
-    setCatalogEmptyMessage('');
+    setUnavailableState(null);
     setErrorMessage('');
   };
 
@@ -47,7 +47,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
     setSubmitting(true);
     setErrorMessage('');
     setResult(null);
-    setCatalogEmptyMessage('');
+    setUnavailableState(null);
 
     try {
       const formData = new FormData();
@@ -60,7 +60,14 @@ const VisualMatchPage = ({ onAddToCart }) => {
       const matchResult = response?.data ?? null;
 
       if (response?.available === false) {
-        setCatalogEmptyMessage('No products are available in the store catalog right now.');
+        const availabilityReason = String(response?.availabilityReason || '').trim();
+        setUnavailableState({
+          type: availabilityReason === 'no_catalog_products' ? 'catalog_empty' : 'no_close_enough_match',
+          message:
+            availabilityReason === 'no_catalog_products'
+              ? 'No products are available in the store catalog right now.'
+              : "Sorry, we could not find a close enough similar product in Athar's current collection.",
+        });
         return;
       }
 
@@ -91,6 +98,8 @@ const VisualMatchPage = ({ onAddToCart }) => {
 
   const matchedProduct = result?.product ?? null;
   const productHref = matchedProduct ? `/products/${matchedProduct.slug || matchedProduct.id}` : '';
+  const isCatalogEmpty = unavailableState?.type === 'catalog_empty';
+  const isNoCloseEnoughMatch = unavailableState?.type === 'no_close_enough_match';
   const matchNote = result
     ? String(result?.matchQuality || 'weak') === 'strong'
       ? 'We found a very similar product.'
@@ -175,7 +184,7 @@ const VisualMatchPage = ({ onAddToCart }) => {
               <h2 className="mt-2 font-display text-3xl text-ink">Athar suggestion</h2>
             </div>
 
-            {!result && !catalogEmptyMessage && !submitting ? (
+            {!result && !unavailableState && !submitting ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
                   Upload a reference image, then let Athar compare it with the current catalog.
@@ -194,11 +203,33 @@ const VisualMatchPage = ({ onAddToCart }) => {
               </div>
             ) : null}
 
-            {catalogEmptyMessage && !submitting ? (
+            {isCatalogEmpty && !submitting ? (
               <div className="mt-6 flex flex-1 items-center justify-center rounded-[28px] border border-line bg-white/70 px-6 py-10 text-center">
                 <p className="max-w-sm text-base leading-7 text-ink-soft">
-                  {catalogEmptyMessage}
+                  {unavailableState?.message}
                 </p>
+              </div>
+            ) : null}
+
+            {isNoCloseEnoughMatch && !submitting ? (
+              <div className="mt-6 flex flex-1 items-center rounded-[28px] border border-line bg-white px-6 py-8 shadow-card">
+                <div className="max-w-xl">
+                  <span className="heritage-pill">Athar Match</span>
+                  <h3 className="mt-4 font-display text-3xl text-ink">
+                    No close enough match found
+                  </h3>
+                  <p className="mt-4 max-w-lg text-base leading-7 text-ink-soft">
+                    {unavailableState?.message}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link to="/products" className="button-primary">
+                      Browse Products
+                    </Link>
+                    <label htmlFor="visual-match-image" className="button-secondary cursor-pointer">
+                      Upload Another Image
+                    </label>
+                  </div>
+                </div>
               </div>
             ) : null}
 

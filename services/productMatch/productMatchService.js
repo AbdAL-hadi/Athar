@@ -3,6 +3,7 @@ import Product from '../../models/Product.js';
 
 const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 const MAX_CANDIDATES = Number(process.env.PRODUCT_MATCH_MAX_CANDIDATES || 8);
+const MINIMUM_MATCH_SCORE = Number(process.env.PRODUCT_MATCH_MIN_SCORE || 0.2);
 const MEDIUM_MATCH_SCORE = Number(process.env.PRODUCT_MATCH_MEDIUM_SCORE || 0.45);
 const STRONG_MATCH_SCORE = Number(process.env.PRODUCT_MATCH_STRONG_SCORE || 0.7);
 const weakMatchWords = new Set(['item', 'product', 'accessory', 'style', 'design', 'unknown']);
@@ -485,7 +486,7 @@ const calculateMatchScore = ({ heuristicScore = 0 }) => {
   return clampConfidence(heuristicScore);
 };
 
-const getMatchQuality = (score = 0) => {
+export const getMatchQuality = (score = 0) => {
   if (score >= STRONG_MATCH_SCORE) {
     return 'strong';
   }
@@ -494,8 +495,32 @@ const getMatchQuality = (score = 0) => {
     return 'medium';
   }
 
-  return 'weak';
+  if (score >= MINIMUM_MATCH_SCORE) {
+    return 'weak';
+  }
+
+  return 'none';
 };
+
+const buildNoCloseEnoughMatchResult = (analysis = null, score = 0) => ({
+  match: null,
+  score: clampConfidence(score),
+  matchQuality: 'none',
+  reason: '',
+  matchedFields: [],
+  analyzedImage: analysis,
+  availabilityReason: 'no_close_enough_match',
+});
+
+const buildEmptyCatalogResult = (analysis = null) => ({
+  match: null,
+  score: 0,
+  matchQuality: 'none',
+  reason: '',
+  matchedFields: [],
+  analyzedImage: analysis,
+  availabilityReason: 'no_catalog_products',
+});
 
 const getMatchedFieldSummary = ({ analysis, product }) => {
   const signals = inferCatalogSignals(product);
@@ -554,6 +579,14 @@ const getMatchedFieldSummary = ({ analysis, product }) => {
 
 export const buildMatchReason = ({ analysis, product, similarityScore }) => {
   const matchQuality = getMatchQuality(similarityScore);
+
+  if (matchQuality === 'none') {
+    return {
+      matchedFields: [],
+      text: '',
+    };
+  }
+
   const { matchedFields, customerLabels } = getMatchedFieldSummary({ analysis, product });
   const matchedFieldText = formatNaturalList(customerLabels);
 
@@ -582,15 +615,6 @@ export const buildMatchReason = ({ analysis, product, similarityScore }) => {
       : "This is the closest available product in Athar's current collection, although it may not be an exact match.",
   };
 };
-
-const buildEmptyCatalogResult = (analysis = null) => ({
-  match: null,
-  score: 0,
-  matchQuality: 'none',
-  reason: '',
-  matchedFields: [],
-  analyzedImage: analysis,
-});
 
 const analyzeUploadedImage = async ({ imageBuffer, mimeType }) => {
   const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
@@ -666,6 +690,11 @@ export const findSimilarProductFromImage = async ({ imageBuffer, mimeType }) => 
     heuristicScore: strongestCandidate?.score || 0,
   });
   const matchQuality = getMatchQuality(score);
+
+  if (matchQuality === 'none') {
+    return buildNoCloseEnoughMatchResult(analysis, score);
+  }
+
   const matchReason = buildMatchReason({
     analysis,
     product: strongestCandidate.product,
