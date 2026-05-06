@@ -15,6 +15,7 @@ const ProductCard = ({
   showCategory = true,
   showFavoriteButton = true,
   onAddToCart,
+  variant = 'default',
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const hasSale = product.compareAt && product.compareAt > product.price;
@@ -22,6 +23,7 @@ const ProductCard = ({
   const primaryImage = resolveApiAssetUrl(product?.images?.[0]);
   const productName = product?.name || product?.title || 'Athar product';
   const productPoints = calculateProductPoints(product);
+  const isHorizontal = variant === 'horizontal';
   const cardMotionProps = prefersReducedMotion
     ? {}
     : {
@@ -46,17 +48,21 @@ const ProductCard = ({
 
   return (
     <motion.article
-      className="group flex h-full flex-col gap-4 rounded-[28px] border border-transparent bg-white p-3 shadow-card transition-shadow duration-300 hover:border-line hover:shadow-soft"
+      className={
+        isHorizontal
+          ? 'group grid h-full overflow-hidden rounded-[24px] border border-transparent bg-white shadow-card transition-shadow duration-300 hover:border-line hover:shadow-soft sm:grid-cols-[190px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]'
+          : 'group flex h-full flex-col gap-4 rounded-[28px] border border-transparent bg-white p-3 shadow-card transition-shadow duration-300 hover:border-line hover:shadow-soft'
+      }
       {...cardMotionProps}
     >
-      <div className="relative overflow-hidden rounded-[24px] bg-cream">
-        <Link to={productHref} className="block">
+      <div className={isHorizontal ? 'relative min-h-[190px] overflow-hidden bg-cream sm:min-h-full' : 'relative overflow-hidden rounded-[24px] bg-cream'}>
+        <Link to={productHref} className={isHorizontal ? 'block h-full' : 'block'}>
           <motion.img
             src={primaryImage}
             alt={productName}
             loading="lazy"
             decoding="async"
-            className={`aspect-[4/3] h-full w-full object-cover object-center ${
+            className={`${isHorizontal ? 'h-full min-h-[190px] w-full object-cover sm:absolute sm:inset-0 sm:min-h-full' : 'aspect-[4/3] h-full w-full object-cover object-center'} ${
               prefersReducedMotion ? '' : 'transition duration-500 group-hover:scale-[1.04]'
             }`}
             {...imageMotionProps}
@@ -72,13 +78,13 @@ const ProductCard = ({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col px-2 pb-2">
+      <div className={isHorizontal ? 'flex flex-1 flex-col px-5 py-5 sm:px-6' : 'flex flex-1 flex-col px-2 pb-2'}>
         <Link to={productHref} className="flex flex-1 flex-col">
-          <p className="min-h-[3rem] text-sm text-ink-soft">{productName}</p>
-          <div className="mt-3 space-y-4">
+          <p className={isHorizontal ? 'text-base font-semibold leading-6 text-ink' : 'min-h-[3rem] text-sm text-ink-soft'}>{productName}</p>
+          <div className={isHorizontal ? 'mt-4 space-y-3' : 'mt-3 space-y-4'}>
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <p className="whitespace-nowrap font-display text-3xl font-bold text-ink sm:text-4xl">
+                <p className={`${isHorizontal ? 'text-3xl' : 'text-3xl sm:text-4xl'} whitespace-nowrap font-display font-bold text-ink`}>
                   {formatCurrency(product.price)}
                 </p>
                 {hasSale ? (
@@ -92,7 +98,7 @@ const ProductCard = ({
                   <span className="inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
                     Earn {formatAtharPoints(productPoints)}
                   </span>
-                  <p className="text-xs leading-5 text-ink-soft">
+                  <p className={`${isHorizontal ? 'max-w-[24rem]' : ''} text-xs leading-5 text-ink-soft`}>
                     Added to your balance after a successful checkout.
                   </p>
                 </div>
@@ -102,7 +108,7 @@ const ProductCard = ({
           </div>
         </Link>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-[1.15fr_0.85fr]">
+        <div className={isHorizontal ? 'mt-5 grid max-w-[260px] grid-cols-2 gap-2' : 'mt-5 grid gap-2 sm:grid-cols-[1.15fr_0.85fr]'}>
           <motion.div {...ctaMotionProps}>
             {onAddToCart ? (
               <button

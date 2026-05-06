@@ -17,6 +17,7 @@ const sanitizeFeedback = (feedbackDocument, currentUserId = '') => ({
   userId: feedbackDocument.user?.toString?.() ?? '',
   name: feedbackDocument.name,
   message: feedbackDocument.message,
+  rating: Math.min(5, Math.max(1, Number(feedbackDocument.rating) || 5)),
   status: feedbackDocument.status || 'approved',
   createdAt: feedbackDocument.createdAt,
   updatedAt: feedbackDocument.updatedAt,
@@ -87,12 +88,22 @@ export const upsertFeedback = async (req, res) => {
       });
     }
 
+    const normalizedRating = Math.round(Number(req.body?.rating ?? 5));
+
+    if (normalizedRating < 1 || normalizedRating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please choose a rating between 1 and 5 stars.',
+      });
+    }
+
     const feedback = await Feedback.findOneAndUpdate(
       { user: user._id },
       {
         user: user._id,
         name: user.name,
         message: normalizedMessage,
+        rating: normalizedRating,
         status: 'approved',
       },
       {
