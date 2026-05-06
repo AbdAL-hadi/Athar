@@ -65,6 +65,12 @@ const orderSchema = new mongoose.Schema(
       sparse: true,
       index: true,
     },
+    checkoutRequestId: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true,
+    },
     items: {
       type: [orderItemSchema],
       required: true,
@@ -111,6 +117,45 @@ const orderSchema = new mongoose.Schema(
         default: 0,
         min: 0,
       },
+    },
+    rewardsDiscountApplied: {
+      type: Boolean,
+      default: false,
+    },
+    rewardPointsRedeemed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    rewardsDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsEarnedFromOrder: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsBalanceBefore: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    projectedPointsBeforeRedemption: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsBalanceAfter: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    firstOrderBonusPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     loyaltyPointsEarned: {
       type: Number,
@@ -162,6 +207,10 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
     inventoryApplied: {
+      type: Boolean,
+      default: false,
+    },
+    stockDecremented: {
       type: Boolean,
       default: false,
     },

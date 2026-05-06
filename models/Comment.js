@@ -98,6 +98,14 @@ const commentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    rewardPointsGranted: {
+      type: Boolean,
+      default: false,
+    },
+    rewardPointsGrantedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

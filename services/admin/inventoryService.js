@@ -87,8 +87,10 @@ const applyProductStockChange = async ({ product, quantityChanged, orderId, reas
   );
 };
 
-// Decrements stock for every item in a confirmed order and marks the order as inventory-applied.
+// Decrements stock for every item when the delivery workflow starts shipment.
 const commitInventoryForOrder = async (order, session) => {
+  const productEntries = [];
+
   for (let index = 0; index < order.items.length; index += 1) {
     const item = order.items[index];
     const product = await loadMutableProduct(item.product, session);
@@ -97,18 +99,29 @@ const commitInventoryForOrder = async (order, session) => {
       throw createServiceError(`A product on order ${order.orderNumber || order._id} could not be found.`, 404);
     }
 
+    const quantity = Number(item.quantity || 0);
+
+    if (Number(product.stock || 0) < quantity) {
+      throw createServiceError(`Insufficient stock for ${product.title}.`, 409);
+    }
+
+    productEntries.push({ index, item, product, quantity });
+  }
+
+  for (const { index, item, product, quantity } of productEntries) {
     await applyProductStockChange({
       product,
-      quantityChanged: -Number(item.quantity || 0),
+      quantityChanged: -quantity,
       orderId: order._id,
-      reason: 'order-confirmed',
+      reason: 'order-shipped',
       session,
     });
 
-    order.items[index].fulfilledQuantity = Number(item.quantity || 0);
+    order.items[index].fulfilledQuantity = quantity;
   }
 
   order.inventoryApplied = true;
+  order.stockDecremented = true;
   order.inventoryAppliedAt = new Date();
   order.inventoryRestoredAt = null;
 };
@@ -141,6 +154,7 @@ const restoreInventoryForOrder = async (order, reason, session) => {
   }
 
   order.inventoryApplied = false;
+  order.stockDecremented = false;
   order.inventoryRestoredAt = new Date();
 };
 
@@ -153,7 +167,13 @@ export const transitionOrderStatusWithInventory = async ({ orderId, nextStatus, 
       throw createServiceError('Order not found', 404);
     }
 
-    if (nextStatus === 'Confirmed' && !order.inventoryApplied) {
+    if (nextStatus === 'Confirmed') {
+      order.confirmedAt = order.confirmedAt || new Date();
+      order.cancelledAt = null;
+      order.refundedAt = null;
+    }
+
+    if (nextStatus === 'Shipped' && !order.inventoryApplied) {
       await commitInventoryForOrder(order, session);
       order.confirmedAt = order.confirmedAt || new Date();
       order.cancelledAt = null;

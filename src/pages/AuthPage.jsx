@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Toast from '../components/Toast';
+import { PALESTINIAN_CITIES, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 
 const COUNTRY_OPTIONS = [
@@ -113,7 +114,7 @@ const validateRegisterForm = (form, selectedCountry) => {
     errors.confirmPassword = 'Passwords do not match.';
   }
 
-  if (!form.city.trim()) {
+  if (!normalizeCityValue(form.city)) {
     errors.city = 'City is required.';
   }
 
@@ -265,7 +266,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
           phone: buildPhoneNumber(selectedCountry.dialCode, registerForm.phone),
           address: {
             line1: '',
-            city: registerForm.city.trim(),
+            city: normalizeCityValue(registerForm.city),
             postalCode: registerForm.postalCode.trim(),
             country: selectedCountry.name,
           },
@@ -582,13 +583,19 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-ink">City</span>
-                <input
+                <select
                   className={getFieldClassName(Boolean(registerErrors.city))}
-                  placeholder="City"
                   autoComplete="address-level2"
                   value={registerForm.city}
                   onChange={(event) => updateRegisterField('city', event.target.value)}
-                />
+                >
+                  <option value="">Select city</option>
+                  {PALESTINIAN_CITIES.map((city) => (
+                    <option key={city.value} value={city.value}>
+                      {city.label}
+                    </option>
+                  ))}
+                </select>
                 <FieldError message={registerErrors.city} />
               </label>
 

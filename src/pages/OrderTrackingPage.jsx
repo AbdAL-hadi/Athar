@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import PriceText from '../components/PriceText';
 import StatusTracker from '../components/StatusTracker';
 import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
@@ -9,17 +10,18 @@ import { getOrderDiscountAmount, getOrderRewardTitle, getOrderShippingFee, getOr
 import { loadRecentOrders } from '../utils/orders';
 
 const trackerSteps = [
-  { label: 'Ordered', value: 'Pending' },
+  { label: 'Confirmed', value: 'Confirmed' },
   { label: 'Shipped', value: 'Shipped' },
   { label: 'Delivered', value: 'Delivered' },
 ];
 
-const getCustomerFacingStatus = (status) => (status === 'Confirmed' ? 'Shipped' : status);
+const getCustomerFacingStatus = (status) => status;
 
 const getEstimatedDelivery = (status) => {
   if (status === 'Delivered') return 'Delivered';
   if (status === 'Cancelled') return 'Cancelled';
   if (status === 'Shipped') return '2-3 days';
+  if (status === 'Confirmed') return 'Preparing for shipment';
   return 'Awaiting confirmation';
 };
 
@@ -314,7 +316,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                       </div>
                       <div className="flex flex-col gap-3 text-left lg:items-end">
                         <div className="text-left lg:text-right">
-                          <p className="font-display text-3xl text-ink">{formatCurrency(orderTotal)}</p>
+                          <PriceText value={orderTotal} className="text-3xl" />
                           {rewardTitle ? (
                             <p className="mt-1 text-sm text-[#54715f]">{rewardTitle} applied</p>
                           ) : null}
@@ -522,7 +524,9 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                     <img src={resolveApiAssetUrl(item.image || item.product?.images?.[0])} alt={item.title} className="h-20 w-20 rounded-[18px] object-cover" />
                     <p className="text-lg text-ink">{item.title}</p>
                     <p className="text-sm text-ink-soft">x{item.quantity}</p>
-                    <p className="text-right font-semibold text-ink">{formatCurrency(item.price * item.quantity)}</p>
+                    <p className="text-right">
+                      <PriceText value={item.price * item.quantity} className="text-xl" />
+                    </p>
                   </article>
                 ))}
               </div>
@@ -547,7 +551,7 @@ const OrderTrackingPage = ({ authToken, authUser, authLoading }) => {
                 ) : null}
                 <div className="flex items-center justify-between font-semibold text-ink">
                   <span>Total</span>
-                  <span>{formatCurrency(trackedTotal)}</span>
+                  <PriceText value={trackedTotal} className="text-2xl" />
                 </div>
               </div>
             </div>

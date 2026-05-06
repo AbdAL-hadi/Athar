@@ -4,6 +4,7 @@ import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
 import FavoriteButton from '../components/FavoriteButton';
 import ProductCard from '../components/ProductCard';
+import PriceText from '../components/PriceText';
 import QuantitySelector from '../components/QuantitySelector';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
@@ -380,7 +381,7 @@ const ProductDetailsPage = ({
           <h1 className="mt-3 font-display text-5xl font-bold text-ink">{product.name}</h1>
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <p className="font-display text-5xl text-ink">{formatCurrency(product.price)}</p>
+              <PriceText value={product.price} className="text-5xl" />
               {product.compareAt > product.price ? <span className="text-xl text-muted line-through">{formatCurrency(product.compareAt)}</span> : null}
             </div>
             <div className="flex flex-wrap gap-3">
