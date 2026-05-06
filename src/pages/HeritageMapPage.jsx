@@ -4,9 +4,9 @@ import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { Language, MapStyle, MaptilerLayer } from '@maptiler/leaflet-maptilersdk';
 import 'leaflet/dist/leaflet.css';
+import PriceText from '../components/PriceText';
 import { heritageCities } from '../data/heritageCities';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
-import { formatCurrency } from '../utils/format';
 import { normalizeProducts } from '../utils/productCatalog';
 
 const mapCenter = [31.82, 35.12];
@@ -133,7 +133,9 @@ const ProductMiniCard = ({ product, cityName }) => {
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-ink">{product.name}</p>
         <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{product.category || 'Athar piece'}</p>
-        <p className="mt-2 text-sm font-bold text-ink">{formatCurrency(product.price)}</p>
+        <p className="mt-2">
+          <PriceText value={product.price} className="text-xl" />
+        </p>
         <p className="mt-1 text-xs text-ink-soft">From {cityName}</p>
         {motifTags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-1.5">

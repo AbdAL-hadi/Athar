@@ -62,8 +62,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'admin', 'employee'],
+      enum: ['customer', 'admin', 'employee', 'delivery'],
       default: 'customer',
+    },
+    deliveryCity: {
+      type: String,
+      trim: true,
+      default: '',
     },
     favorites: {
       type: [String],
@@ -83,10 +88,23 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    rewardPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     lifetimeLoyaltyPoints: {
       type: Number,
       default: 0,
       min: 0,
+    },
+    accountRewardGranted: {
+      type: Boolean,
+      default: false,
+    },
+    firstOrderRewardGranted: {
+      type: Boolean,
+      default: false,
     },
     address: {
       type: addressSchema,

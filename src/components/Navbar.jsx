@@ -7,7 +7,6 @@ const primaryLinks = [
   { to: '/products', label: 'Shop' },
   { to: '/heritage-map', label: 'Heritage Map' },
   { to: '/visual-match', label: 'Visual Match' },
-  { to: '/rewards', label: 'Rewards' },
   { to: '/order-tracking', label: 'Track Order' },
   { to: '/about', label: 'About Us' },
 ];

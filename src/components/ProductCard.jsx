@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import FavoriteButton from './FavoriteButton';
+import PriceText from './PriceText';
 import { resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
@@ -84,9 +85,7 @@ const ProductCard = ({
           <div className={isHorizontal ? 'mt-4 space-y-3' : 'mt-3 space-y-4'}>
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <p className={`${isHorizontal ? 'text-3xl' : 'text-3xl sm:text-4xl'} whitespace-nowrap font-display font-bold text-ink`}>
-                  {formatCurrency(product.price)}
-                </p>
+                <PriceText value={product.price} className={`${isHorizontal ? 'text-3xl' : 'text-3xl sm:text-4xl'} whitespace-nowrap`} />
                 {hasSale ? (
                   <span className="whitespace-nowrap text-sm text-muted line-through">
                     {formatCurrency(product.compareAt)}

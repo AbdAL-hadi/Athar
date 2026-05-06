@@ -17,6 +17,23 @@ const findProductByReference = async (reference) => {
     : Product.findOne({ slug: normalizedReference.toLowerCase() });
 };
 
+const parseOptionalJsonField = (value) => {
+  if (!value) {
+    return {};
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    const parsedValue = JSON.parse(String(value));
+    return parsedValue && typeof parsedValue === 'object' ? parsedValue : {};
+  } catch (_error) {
+    return {};
+  }
+};
+
 export const createAiTryOnPreview = async (req, res) => {
   try {
     const productId = String(req.body?.productId ?? '').trim();
@@ -52,6 +69,7 @@ export const createAiTryOnPreview = async (req, res) => {
       userImageBuffer: req.file.buffer,
       userImageMimeType: req.file.mimetype,
       style: req.body?.style,
+      photoContext: parseOptionalJsonField(req.body?.photoContext),
     });
 
     return res.status(200).json({
@@ -66,6 +84,8 @@ export const createAiTryOnPreview = async (req, res) => {
         productCategory: product.category,
         model: preview.model,
         accessoryType: preview.accessoryType,
+        productType: preview.productType,
+        visibleArea: preview.visibleArea,
         message: 'AI try-on preview generated successfully.',
       },
     });

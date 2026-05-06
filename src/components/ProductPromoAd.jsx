@@ -30,7 +30,7 @@ const ProductPromoAd = () => {
 
   return (
     <aside
-      className={`pointer-events-none fixed left-4 top-28 z-30 hidden w-[148px] transition-all duration-500 ease-out lg:block xl:left-6 ${
+      className={`pointer-events-none fixed left-4 top-28 z-[1400] hidden w-[148px] transition-all duration-500 ease-out lg:block xl:left-6 ${
         isVisible ? 'translate-x-0 opacity-100' : '-translate-x-8 opacity-0'
       }`}
       aria-hidden={!isVisible}

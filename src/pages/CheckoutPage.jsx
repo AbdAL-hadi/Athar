@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import CheckoutForm from '../components/CheckoutForm';
+import PriceText from '../components/PriceText';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
+import { normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
 import { getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
 import {
-  calculateProductPoints,
   formatAtharPoints,
   getCurrentAtharPointsBalance,
-  getLoyaltyRewardById,
-  getLoyaltyRewardDiscount,
-  LOYALTY_REWARDS,
+  REWARD_DISCOUNT_PERCENT,
+  REWARD_DISCOUNT_POINTS_COST,
 } from '../utils/loyaltyPoints';
 import { getOrderIdentifier, saveRecentOrder } from '../utils/orders';
 import { findProductByReference } from '../utils/productCatalog';
@@ -51,7 +51,12 @@ const CheckoutPage = ({
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', variant: 'success' });
-  const [selectedRewardId, setSelectedRewardId] = useState('');
+  const [useRewardDiscount, setUseRewardDiscount] = useState(false);
+  const checkoutRequestIdRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
 
   useEffect(() => {
     if (authUser) {
@@ -60,7 +65,7 @@ const CheckoutPage = ({
         fullName: current.fullName || authUser.name || '',
         phone: current.phone || authUser.phone || '',
         line1: current.line1 || authUser.address?.line1 || '',
-        city: current.city || authUser.address?.city || '',
+        city: current.city || normalizeCityValue(authUser.address?.city || ''),
         postalCode: current.postalCode || authUser.address?.postalCode || '',
         country: current.country || authUser.address?.country || 'Palestine',
       }));
@@ -101,34 +106,23 @@ const CheckoutPage = ({
   }, [authToken, isSuccessRoute, loyaltyAward?.pointsEarned, orderNumberFromUrl]);
 
   const subtotal = useMemo(() => getCartSubtotal(items), [items]);
-  const cartPoints = useMemo(
-    () =>
-      items.reduce((sum, item) => {
-        const pointsProduct = findProductByReference(products, item.productId || item.id) ?? item;
-        return sum + calculateProductPoints(pointsProduct, item.quantity);
-      }, 0),
-    [items, products],
-  );
   const currentBalance = useMemo(() => getCurrentAtharPointsBalance(authUser), [authUser]);
-  const availableRewards = useMemo(
-    () => LOYALTY_REWARDS.filter((reward) => currentBalance >= reward.cost),
-    [currentBalance],
-  );
-  const selectedReward = useMemo(() => getLoyaltyRewardById(selectedRewardId), [selectedRewardId]);
-  const pricingWithReward = useMemo(
-    () => getLoyaltyRewardDiscount(selectedReward, { subtotal, shippingFee: items.length > 0 ? SHIPPING_FEE : 0 }),
-    [items.length, selectedReward, subtotal],
-  );
-  const discountAmount = pricingWithReward.discountAmount;
-  const shippingTotal = pricingWithReward.appliedShippingFee;
-  const finalTotal = pricingWithReward.finalTotal;
-  const projectedBalanceAfterReward = Math.max(0, currentBalance - (selectedReward?.cost ?? 0) + cartPoints);
+  const shippingTotal = items.length > 0 ? SHIPPING_FEE : 0;
+  const estimatedCheckoutPoints = Math.floor(subtotal + shippingTotal);
+  const projectedBalanceBeforeRedemption = currentBalance + estimatedCheckoutPoints;
+  const rewardDiscountAvailable = Boolean(authUser) && projectedBalanceBeforeRedemption >= REWARD_DISCOUNT_POINTS_COST;
+  const rewardPointsNeeded = Math.max(0, REWARD_DISCOUNT_POINTS_COST - projectedBalanceBeforeRedemption);
+  const shouldApplyRewardDiscount = useRewardDiscount && rewardDiscountAvailable;
+  const discountAmount = shouldApplyRewardDiscount ? subtotal * (REWARD_DISCOUNT_PERCENT / 100) : 0;
+  const finalTotal = Math.max(0, subtotal + shippingTotal - discountAmount);
+  const cartPoints = estimatedCheckoutPoints;
+  const projectedBalanceAfterReward = Math.max(0, projectedBalanceBeforeRedemption - (shouldApplyRewardDiscount ? REWARD_DISCOUNT_POINTS_COST : 0));
 
   useEffect(() => {
-    if (selectedRewardId && !availableRewards.some((reward) => reward.id === selectedRewardId)) {
-      setSelectedRewardId('');
+    if (useRewardDiscount && !rewardDiscountAvailable) {
+      setUseRewardDiscount(false);
     }
-  }, [availableRewards, selectedRewardId]);
+  }, [rewardDiscountAvailable, useRewardDiscount]);
 
   const checkoutPointsSummary = useMemo(() => {
     if (items.length === 0) {
@@ -138,12 +132,13 @@ const CheckoutPage = ({
     return {
       title: `Complete this order and earn ${formatAtharPoints(cartPoints)}.`,
       description: authUser
-        ? 'These points will be added to your Athar Points balance after the purchase is completed successfully.'
+        ? 'These points count toward this checkout reward unlock after the purchase is completed successfully.'
         : 'Log in before placing this order to save these points to your Athar Points balance.',
       metrics: authUser
         ? [
             { label: 'Current balance', value: formatAtharPoints(currentBalance) },
             { label: 'This checkout', value: formatAtharPoints(cartPoints) },
+            { label: 'Before redemption', value: formatAtharPoints(projectedBalanceBeforeRedemption) },
             { label: 'After purchase', value: formatAtharPoints(projectedBalanceAfterReward) },
           ]
         : [
@@ -151,7 +146,7 @@ const CheckoutPage = ({
             { label: 'Account status', value: 'Log in to save' },
           ],
     };
-  }, [authUser, cartPoints, currentBalance, items.length, projectedBalanceAfterReward]);
+  }, [authUser, cartPoints, currentBalance, items.length, projectedBalanceAfterReward, projectedBalanceBeforeRedemption]);
   const successPointsEarned = Number(loyaltyAward?.pointsEarned ?? successOrder?.earnedPoints ?? successOrder?.loyaltyPointsEarned ?? 0);
   const successRedeemedReward = loyaltyAward?.redeemedReward ?? successOrder?.loyaltyReward ?? null;
   const successPointsRedeemed = Number(successRedeemedReward?.pointsRedeemed ?? 0);
@@ -165,9 +160,13 @@ const CheckoutPage = ({
     successBalance !== null && successBalance !== undefined
       ? Math.max(0, successBalance - successPointsEarned + successPointsRedeemed)
       : null;
-  const balanceAfterRedemption =
+  const successProjectedBeforeRedemption =
     previousBalance !== null && previousBalance !== undefined
-      ? Math.max(0, previousBalance - successPointsRedeemed)
+      ? previousBalance + successPointsEarned
+      : null;
+  const balanceAfterRedemption =
+    successProjectedBeforeRedemption !== null && successProjectedBeforeRedemption !== undefined && successPointsRedeemed > 0
+      ? Math.max(0, successProjectedBeforeRedemption - successPointsRedeemed)
       : null;
 
   const validate = () => {
@@ -176,7 +175,7 @@ const CheckoutPage = ({
     if (!formData.fullName.trim()) nextErrors.fullName = 'Full name is required.';
     if (!formData.phone.trim()) nextErrors.phone = 'Phone number is required.';
     if (!formData.line1.trim()) nextErrors.line1 = 'Address line is required.';
-    if (!formData.city.trim()) nextErrors.city = 'City is required.';
+    if (!normalizeCityValue(formData.city)) nextErrors.city = 'City is required.';
     if (!formData.postalCode.trim()) nextErrors.postalCode = 'Postal code is required.';
     if (!formData.country.trim()) nextErrors.country = 'Country is required.';
     if (formData.paymentMethod !== 'Cash on Delivery') nextErrors.paymentMethod = 'Only Cash on Delivery is available.';
@@ -223,11 +222,12 @@ const CheckoutPage = ({
         shippingFee: items.length > 0 ? SHIPPING_FEE : 0,
         paymentMethod: formData.paymentMethod,
         phone: formData.phone,
-        loyaltyRedemption: selectedReward ? { rewardId: selectedReward.id } : null,
+        useRewardDiscount: shouldApplyRewardDiscount,
+        checkoutRequestId: checkoutRequestIdRef.current,
         address: {
           fullName: formData.fullName,
           line1: formData.line1,
-          city: formData.city,
+          city: normalizeCityValue(formData.city),
           postalCode: formData.postalCode,
           country: formData.country,
         },
@@ -377,8 +377,7 @@ const CheckoutPage = ({
           ) : (
             <div className="mt-6 space-y-4">
               {items.map((item) => {
-                const pointsProduct = findProductByReference(products, item.productId || item.id) ?? item;
-                const itemPoints = calculateProductPoints(pointsProduct, item.quantity);
+                const itemPoints = Math.floor(Number(item.price || 0) * Number(item.quantity || 0));
 
                 return (
                   <div key={item.id} className="flex items-center justify-between gap-3 rounded-[22px] bg-cream px-4 py-3">
@@ -389,7 +388,7 @@ const CheckoutPage = ({
                         +{formatAtharPoints(itemPoints)}
                       </p>
                     </div>
-                    <p className="font-semibold text-ink">{formatCurrency(item.price * item.quantity)}</p>
+                    <PriceText value={item.price * item.quantity} className="text-xl" />
                   </div>
                 );
               })}
@@ -402,15 +401,15 @@ const CheckoutPage = ({
                   <span>Shipping</span>
                   <span>{formatCurrency(shippingTotal)}</span>
                 </div>
-                {selectedReward ? (
+                {shouldApplyRewardDiscount ? (
                   <div className="flex items-center justify-between text-[#54715f]">
-                    <span>Reward applied</span>
+                    <span>Rewards discount ({REWARD_DISCOUNT_PERCENT}%)</span>
                     <span>-{formatCurrency(discountAmount)}</span>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between font-semibold text-ink">
                   <span>Total</span>
-                  <span>{formatCurrency(finalTotal)}</span>
+                  <PriceText value={finalTotal} className="text-2xl" />
                 </div>
                 {authUser ? (
                   <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
@@ -418,60 +417,53 @@ const CheckoutPage = ({
                       <div>
                         <p className="font-semibold text-ink">Use your Athar Points</p>
                         <p className="mt-1 text-sm leading-6 text-ink-soft">
-                          Available balance: {formatAtharPoints(currentBalance)}
+                          Current balance: {formatAtharPoints(currentBalance)}
+                        </p>
+                        <p className="text-sm leading-6 text-ink-soft">
+                          This checkout: +{formatAtharPoints(estimatedCheckoutPoints)}
+                        </p>
+                        <p className="text-sm leading-6 text-ink-soft">
+                          Projected before redemption: {formatAtharPoints(projectedBalanceBeforeRedemption)}
                         </p>
                       </div>
-                      {selectedReward ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRewardId('')}
-                          className="text-sm font-semibold text-[#8f5f45] transition hover:text-ink"
-                        >
-                          Remove
-                        </button>
-                      ) : null}
                     </div>
-                    {availableRewards.length > 0 ? (
-                      <div className="mt-3 space-y-3">
-                        {availableRewards.map((reward) => {
-                          const rewardPricing = getLoyaltyRewardDiscount(reward, {
-                            subtotal,
-                            shippingFee: items.length > 0 ? SHIPPING_FEE : 0,
-                          });
-                          const isSelected = reward.id === selectedRewardId;
-
-                          return (
-                            <button
-                              key={reward.id}
-                              type="button"
-                              onClick={() => setSelectedRewardId(isSelected ? '' : reward.id)}
-                              className={`w-full rounded-[18px] border px-4 py-3 text-left transition ${
-                                isSelected
-                                  ? 'border-[#b88746] bg-[#fff7f0] shadow-[0_10px_25px_rgba(80,45,28,0.08)]'
-                                  : 'border-line bg-white hover:border-[#d9c2b0]'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="font-semibold text-ink">{reward.title}</p>
-                                  <p className="mt-1 text-sm leading-6 text-ink-soft">{reward.description}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                                    {formatAtharPoints(reward.cost)}
-                                  </p>
-                                  <p className="mt-2 text-sm font-semibold text-[#54715f]">
-                                    Save {formatCurrency(rewardPricing.discountAmount)}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {rewardDiscountAvailable ? (
+                      <>
+                        <p className="mt-3 rounded-[18px] bg-[#f1faf0] px-4 py-3 text-sm font-semibold leading-6 text-[#2f6a35]">
+                          {currentBalance >= REWARD_DISCOUNT_POINTS_COST
+                            ? `You can use ${formatAtharPoints(REWARD_DISCOUNT_POINTS_COST)} for ${REWARD_DISCOUNT_PERCENT}% off.`
+                            : `Your current order unlocks ${REWARD_DISCOUNT_PERCENT}% off.`}
+                        </p>
+                        <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[18px] border border-[#d9c2b0] bg-white px-4 py-3 transition hover:border-[#b88746]">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={useRewardDiscount}
+                            onChange={(event) => setUseRewardDiscount(event.target.checked)}
+                          />
+                          <span>
+                            <span className="block font-semibold text-ink">Use {REWARD_DISCOUNT_POINTS_COST} Athar Points for {REWARD_DISCOUNT_PERCENT}% off this order</span>
+                            <span className="mt-1 block text-sm leading-6 text-ink-soft">
+                              Save {formatCurrency(subtotal * (REWARD_DISCOUNT_PERCENT / 100))}. Backend validates your projected points and calculates the final discount.
+                            </span>
+                          </span>
+                        </label>
+                        {shouldApplyRewardDiscount ? (
+                          <div className="mt-3 grid gap-2 text-sm leading-6 text-ink-soft">
+                            <div className="flex justify-between gap-3">
+                              <span>Points redeemed</span>
+                              <span>-{formatAtharPoints(REWARD_DISCOUNT_POINTS_COST)}</span>
+                            </div>
+                            <div className="flex justify-between gap-3 font-semibold text-ink">
+                              <span>After this order</span>
+                              <span>{formatAtharPoints(projectedBalanceAfterReward)}</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
                     ) : (
                       <p className="mt-3 text-sm leading-6 text-ink-soft">
-                        Keep collecting points to unlock checkout rewards.
+                        You need {formatAtharPoints(rewardPointsNeeded)} more to unlock {REWARD_DISCOUNT_PERCENT}% off.
                       </p>
                     )}
                   </div>
@@ -479,12 +471,12 @@ const CheckoutPage = ({
                   <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
                     <p className="font-semibold text-ink">Use your Athar Points</p>
                     <p className="mt-1 text-sm leading-6 text-ink-soft">
-                      Log in to apply your saved discounts and shipping rewards at checkout.
+                      Log in to earn and redeem Athar points.
                     </p>
                   </div>
                 )}
                 <div className="rounded-[22px] border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-3">
-                  <div className="flex items-center justify-between gap-3 font-semibold text-ink">
+                    <div className="flex items-center justify-between gap-3 font-semibold text-ink">
                     <span>Athar Points earned</span>
                     <span>+{formatAtharPoints(cartPoints)}</span>
                   </div>
@@ -495,7 +487,11 @@ const CheckoutPage = ({
                         <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
                       </div>
                       <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After purchase</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Projected before redemption</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalanceBeforeRedemption)}</p>
+                      </div>
+                      <div className="rounded-[18px] bg-white/75 px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After this order</p>
                         <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalanceAfterReward)}</p>
                       </div>
                     </div>

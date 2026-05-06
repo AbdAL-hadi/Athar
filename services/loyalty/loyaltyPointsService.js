@@ -1,7 +1,14 @@
 import mongoose from 'mongoose';
 import Order from '../../models/Order.js';
 import User from '../../models/User.js';
-import { getLoyaltyRewardById, getLoyaltyRewardDiscount, normalizeAtharPoints } from '../../src/utils/loyaltyPoints.js';
+import {
+  FIRST_ORDER_POINTS,
+  getLoyaltyRewardById,
+  getLoyaltyRewardDiscount,
+  LOYALTY_REWARD_IDS,
+  normalizeAtharPoints,
+  PRODUCT_REVIEW_POINTS,
+} from '../../src/utils/loyaltyPoints.js';
 
 const POINTS_AWARD_STATUSES = ['Confirmed', 'Shipped', 'Delivered'];
 
@@ -42,7 +49,18 @@ const getUserById = (userId, session) => {
 };
 
 const getCurrentBalance = (user = null) =>
-  Math.max(Number(user?.atharPoints ?? 0), Number(user?.loyaltyPoints ?? 0));
+  Math.max(
+    Number(user?.rewardPoints ?? 0),
+    Number(user?.atharPoints ?? 0),
+    Number(user?.loyaltyPoints ?? 0),
+  );
+
+const syncUserPointBalances = (user, nextBalance) => {
+  const normalizedBalance = normalizeAtharPoints(nextBalance);
+  user.rewardPoints = normalizedBalance;
+  user.atharPoints = normalizedBalance;
+  user.loyaltyPoints = normalizedBalance;
+};
 
 const getOrderEarnedPoints = (order = null) => {
   const earnedPoints = Number(order?.earnedPoints ?? 0);
@@ -88,25 +106,48 @@ export const awardLoyaltyPointsForOrder = async (orderId) => {
       return emptyAwardResult(await getOrderById(orderId, session));
     }
 
-    const pointsEarned = getOrderEarnedPoints(claimedOrder);
+    let pointsEarned = getOrderEarnedPoints(claimedOrder);
     const updatedUser = await getUserById(claimedOrder.user, session);
 
     if (!updatedUser) {
       throw new Error('Unable to add Athar Points because the customer account was not found.');
     }
 
-    const currentBalance = Math.max(
-      Number(updatedUser.atharPoints ?? 0),
-      Number(updatedUser.loyaltyPoints ?? 0),
-    );
+    const currentBalance = getCurrentBalance(updatedUser);
     const lifetimeBaseline = Math.max(
       Number(updatedUser.lifetimeLoyaltyPoints ?? 0),
+      Number(updatedUser.rewardPoints ?? 0),
       Number(updatedUser.atharPoints ?? 0),
       Number(updatedUser.loyaltyPoints ?? 0),
     );
 
-    updatedUser.atharPoints = currentBalance + pointsEarned;
-    updatedUser.loyaltyPoints = currentBalance + pointsEarned;
+    if (Number(claimedOrder.rewardPointsRedeemed || 0) > 0 && Number.isFinite(Number(claimedOrder.pointsBalanceAfter))) {
+      syncUserPointBalances(updatedUser, claimedOrder.pointsBalanceAfter);
+      updatedUser.lifetimeLoyaltyPoints = lifetimeBaseline + pointsEarned;
+
+      if (!updatedUser.firstOrderRewardGranted) {
+        updatedUser.firstOrderRewardGranted = true;
+      }
+
+      await updatedUser.save({ session });
+
+      return {
+        applied: true,
+        appliedAt,
+        pointsEarned,
+        balance: getCurrentBalance(updatedUser),
+        user: updatedUser,
+      };
+    }
+
+    if (!updatedUser.firstOrderRewardGranted) {
+      pointsEarned += FIRST_ORDER_POINTS;
+      claimedOrder.firstOrderBonusPoints = FIRST_ORDER_POINTS;
+      updatedUser.firstOrderRewardGranted = true;
+      await claimedOrder.save({ session });
+    }
+
+    syncUserPointBalances(updatedUser, currentBalance + pointsEarned);
     updatedUser.lifetimeLoyaltyPoints = lifetimeBaseline + pointsEarned;
 
     await updatedUser.save({ session });
@@ -115,7 +156,7 @@ export const awardLoyaltyPointsForOrder = async (orderId) => {
       applied: true,
       appliedAt,
       pointsEarned,
-      balance: Math.max(Number(updatedUser.atharPoints ?? 0), Number(updatedUser.loyaltyPoints ?? 0)),
+      balance: getCurrentBalance(updatedUser),
       user: updatedUser,
     };
   });
@@ -126,16 +167,28 @@ export const redeemLoyaltyRewardForCheckout = async ({
   rewardId,
   subtotal = 0,
   shippingFee = 0,
+  estimatedPointsFromOrder = null,
   session = null,
 }) => {
+  const normalizedSubtotal = Math.max(0, Number(subtotal) || 0);
+  const normalizedShippingFee = Math.max(0, Number(shippingFee) || 0);
+  const estimatedCheckoutPoints =
+    estimatedPointsFromOrder === null || estimatedPointsFromOrder === undefined
+      ? Math.floor(normalizedSubtotal + normalizedShippingFee)
+      : Math.max(0, Math.floor(Number(estimatedPointsFromOrder) || 0));
+
   if (!rewardId) {
     return {
       reward: null,
       discountAmount: 0,
-      appliedShippingFee: Math.max(0, Number(shippingFee) || 0),
-      finalTotal: Math.max(0, (Number(subtotal) || 0) + (Number(shippingFee) || 0)),
+      appliedShippingFee: normalizedShippingFee,
+      finalTotal: Math.max(0, normalizedSubtotal + normalizedShippingFee),
       updatedUser: null,
+      currentBalance: null,
       remainingBalance: null,
+      projectedBalanceBeforeRedemption: null,
+      pointsBalanceAfterRedemption: null,
+      estimatedPointsFromOrder: estimatedCheckoutPoints,
       pointsRedeemed: 0,
     };
   }
@@ -163,18 +216,18 @@ export const redeemLoyaltyRewardForCheckout = async ({
   }
 
   const currentBalance = getCurrentBalance(updatedUser);
+  const projectedBalanceBeforeRedemption = currentBalance + estimatedCheckoutPoints;
 
-  if (currentBalance < reward.cost) {
-    const error = new Error('You do not have enough Athar Points for this reward.');
-    error.statusCode = 409;
+  if (projectedBalanceBeforeRedemption < reward.cost) {
+    const error = new Error('Not enough Athar Points to redeem this reward.');
+    error.statusCode = 400;
     throw error;
   }
 
-  const pricing = getLoyaltyRewardDiscount(reward, { subtotal, shippingFee });
-
-  updatedUser.atharPoints = normalizeAtharPoints(currentBalance - reward.cost);
-  updatedUser.loyaltyPoints = normalizeAtharPoints(currentBalance - reward.cost);
-  await updatedUser.save({ session });
+  const pricing = getLoyaltyRewardDiscount(reward, {
+    subtotal: normalizedSubtotal,
+    shippingFee: normalizedShippingFee,
+  });
 
   return {
     reward,
@@ -182,7 +235,51 @@ export const redeemLoyaltyRewardForCheckout = async ({
     appliedShippingFee: pricing.appliedShippingFee,
     finalTotal: pricing.finalTotal,
     updatedUser,
-    remainingBalance: getCurrentBalance(updatedUser),
+    currentBalance,
+    remainingBalance: projectedBalanceBeforeRedemption - reward.cost,
+    projectedBalanceBeforeRedemption,
+    pointsBalanceAfterRedemption: projectedBalanceBeforeRedemption - reward.cost,
+    estimatedPointsFromOrder: estimatedCheckoutPoints,
     pointsRedeemed: reward.cost,
   };
+};
+
+export const getCheckoutRewardId = (useRewardDiscount = false) =>
+  useRewardDiscount ? LOYALTY_REWARD_IDS.CHECKOUT_30_PERCENT : '';
+
+export const deductRewardPointsForCheckout = async ({ user, pointsRedeemed, session = null }) => {
+  if (!user || Number(pointsRedeemed || 0) <= 0) {
+    return user;
+  }
+
+  const currentBalance = getCurrentBalance(user);
+  const nextBalance = normalizeAtharPoints(currentBalance - Number(pointsRedeemed || 0));
+  syncUserPointBalances(user, nextBalance);
+  await user.save({ session });
+  return user;
+};
+
+export const awardProductReviewPoints = async ({ userId, session = null }) => {
+  if (!userId || !mongoose.isValidObjectId(userId)) {
+    return null;
+  }
+
+  const user = await getUserById(userId, session);
+
+  if (!user) {
+    return null;
+  }
+
+  const currentBalance = getCurrentBalance(user);
+  const lifetimeBaseline = Math.max(
+    Number(user.lifetimeLoyaltyPoints ?? 0),
+    Number(user.rewardPoints ?? 0),
+    Number(user.atharPoints ?? 0),
+    Number(user.loyaltyPoints ?? 0),
+  );
+
+  syncUserPointBalances(user, currentBalance + PRODUCT_REVIEW_POINTS);
+  user.lifetimeLoyaltyPoints = lifetimeBaseline + PRODUCT_REVIEW_POINTS;
+  await user.save({ session });
+  return user;
 };

@@ -6,6 +6,7 @@ import StaggerItem from '../components/animation/StaggerItem';
 import SearchBar from '../components/SearchBar';
 import Filter from '../components/Filter';
 import SectionTitle from '../components/SectionTitle';
+import PriceText from '../components/PriceText';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
 import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
@@ -794,7 +795,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                                   {product.description}
                                 </p>
                                 <div className="flex justify-between items-center mb-4">
-                                  <span className="text-blush font-bold text-lg">{formatCurrency(product.price)}</span>
+                                  <PriceText value={product.price} className="text-2xl text-blush" symbolClassName="text-blush" />
                                   <span className="text-sm text-muted uppercase tracking-[0.18em]">{product.category}</span>
                                 </div>
                                 <div className="grid gap-2 sm:grid-cols-2">

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Comment from '../models/Comment.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
+import { awardProductReviewPoints } from '../services/loyalty/loyaltyPointsService.js';
 import { moderateComment } from '../services/moderation/commentModerationService.js';
 import { sendCommentRejectedEmail } from '../utils/notifications.js';
 
@@ -74,6 +75,29 @@ const notifyRejectedComment = async (comment) => {
   }
 };
 
+const grantProductReviewReward = async (comment) => {
+  if (!comment || comment.status !== 'approved' || comment.rewardPointsGranted) {
+    return null;
+  }
+
+  const existingRewardedComment = await Comment.findOne({
+    _id: { $ne: comment._id },
+    user: comment.user,
+    product: comment.product,
+    rewardPointsGranted: true,
+  }).select('_id');
+
+  if (existingRewardedComment) {
+    return null;
+  }
+
+  const updatedUser = await awardProductReviewPoints({ userId: comment.user });
+  comment.rewardPointsGranted = true;
+  comment.rewardPointsGrantedAt = new Date();
+  await comment.save();
+  return updatedUser;
+};
+
 export const createProductComment = async (req, res) => {
   try {
     const user = await getPersistentAuthenticatedUser(req.user);
@@ -141,6 +165,12 @@ export const createProductComment = async (req, res) => {
 
     if (comment.status === 'rejected') {
       void notifyRejectedComment(comment);
+    }
+
+    if (comment.status === 'approved') {
+      void grantProductReviewReward(comment).catch((error) => {
+        console.error('[Athar comments] Review reward failed:', error.message);
+      });
     }
 
     const message =
@@ -268,6 +298,10 @@ export const updateAdminCommentStatus = async (req, res) => {
     }
 
     await comment.save();
+
+    if (nextStatus === 'approved') {
+      await grantProductReviewReward(comment);
+    }
 
     if (nextStatus === 'rejected' && !wasRejected) {
       void notifyRejectedComment(comment);

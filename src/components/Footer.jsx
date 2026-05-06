@@ -1,3 +1,15 @@
+import { Link } from 'react-router-dom';
+
+const quickLinks = [
+  { to: '/favorites', label: 'Favorite' },
+  { to: '/cart', label: 'Cart' },
+  { to: '/products', label: 'Shop' },
+  { to: '/heritage-map', label: 'Heritage Map' },
+  { to: '/visual-match', label: 'Visual Match' },
+  { to: '/order-tracking', label: 'Track Order' },
+  { to: '/about', label: 'About Us' },
+];
+
 const Footer = () => {
   return (
     <footer className="border-t border-line bg-white">
@@ -11,10 +23,15 @@ const Footer = () => {
         <div>
           <h3 className="font-semibold text-ink">Quick links</h3>
           <div className="mt-3 space-y-2 text-sm text-ink-soft">
-            <p>Products</p>
-            <p>Favorite</p>
-            <p>Cart</p>
-            <p>Track Order</p>
+            {quickLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="block w-fit transition hover:text-ink"
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
         <div>

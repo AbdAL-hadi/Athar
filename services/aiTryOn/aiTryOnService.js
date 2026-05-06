@@ -8,6 +8,7 @@ import {
   getImageAssetBufferByReference,
   isImageAssetReference,
 } from '../assets/imageAssetService.js';
+import { buildTryOnPrompt } from './tryOnPromptBuilder.js';
 
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
 
@@ -17,21 +18,6 @@ const mimeTypeByExtension = new Map([
   ['.png', 'image/png'],
   ['.webp', 'image/webp'],
 ]);
-
-const accessoryInstructions = {
-  glasses:
-    "Place the glasses naturally on the user's face, aligned with the eyes and nose bridge.",
-  ring:
-    'Place the ring naturally on a visible finger. If no hand is visible, create a realistic preview while preserving the user identity as much as possible.',
-  bracelet:
-    'Place the bracelet naturally on the wrist. If the wrist is not clearly visible, create the most realistic preview possible.',
-  watch:
-    'Place the watch naturally on the wrist.',
-  necklace:
-    'Place the necklace naturally around the neck.',
-  bag:
-    "Place the bag naturally on the user's shoulder, arm, or hand in a realistic fashion pose.",
-};
 
 export class AiTryOnError extends Error {
   constructor(message, status = 500, details = {}) {
@@ -114,46 +100,6 @@ const loadProductImage = async (imagePath) => {
   }
 
   throw new AiTryOnError('Product image could not be found for AI Try-On.', 422);
-};
-
-const inferAccessoryType = (product) => {
-  const haystack = `${product?.category ?? ''} ${product?.title ?? ''} ${product?.name ?? ''}`.toLowerCase();
-
-  if (/glass|sunglass|eyewear|نظ/.test(haystack)) return 'glasses';
-  if (/ring|خاتم/.test(haystack)) return 'ring';
-  if (/bracelet|bracelets|bangle|سوار/.test(haystack)) return 'bracelet';
-  if (/watch|watches|ساعة/.test(haystack)) return 'watch';
-  if (/necklace|pendant|قلادة|عقد/.test(haystack)) return 'necklace';
-  if (/bag|bags|handbag|carryall|حقيبة/.test(haystack)) return 'bag';
-
-  return 'accessory';
-};
-
-const buildTryOnPrompt = ({ product, accessoryType, style = 'realistic' }) => {
-  const placementInstruction =
-    accessoryInstructions[accessoryType] ||
-    'Place the accessory naturally on the user in the most realistic appropriate position.';
-  const tags = [
-    ...(product.styleTags ?? []),
-    ...(product.occasionTags ?? []),
-    ...(product.dominantColors ?? []),
-    ...(product.visualTraits ?? []),
-    ...(product.semanticTags ?? []),
-  ].filter(Boolean);
-
-  return [
-    "You are creating an AI try-on preview for an e-commerce accessories website called Athar. Use the first image as the user's photo and the second image as the product reference. Generate one realistic, polished preview image where the product is naturally placed on the user. Preserve the user's identity, face, body, outfit, pose, and background as much as possible. Preserve the product's shape, color, material, and details as much as possible. Do not change the product into a different item. Make the result look realistic, elegant, and suitable for an e-commerce demo.",
-    placementInstruction,
-    `Product name: ${product.title || product.name}.`,
-    `Product category: ${product.category}.`,
-    product.material ? `Known material from catalog: ${product.material}.` : '',
-    product.description ? `Catalog description: ${product.description}.` : '',
-    tags.length ? `Catalog tags: ${tags.join(', ')}.` : '',
-    `Framing style: ${style === 'studio-fashion' ? 'studio fashion editorial' : 'realistic preview'}.`,
-    'Return only the generated image. Do not return text.',
-  ]
-    .filter(Boolean)
-    .join('\n');
 };
 
 const extractInlineImage = (payload) => {
@@ -270,12 +216,16 @@ export const generateAiTryOnPreview = async ({
   userImageBuffer,
   userImageMimeType,
   style = 'realistic',
+  photoContext = {},
 }) => {
   const productImage = await loadProductImage(product.images?.[0]);
-  const accessoryType = inferAccessoryType(product);
-  const prompt = buildTryOnPrompt({ product, accessoryType, style });
+  const promptDetails = buildTryOnPrompt({
+    product,
+    selectedStyle: style,
+    photoContext,
+  });
   const generatedImage = await callGeminiImageGeneration({
-    prompt,
+    prompt: promptDetails.prompt,
     userImage: {
       data: userImageBuffer.toString('base64'),
       mimeType: userImageMimeType,
@@ -292,7 +242,10 @@ export const generateAiTryOnPreview = async ({
     resultUrl: savedPreview.resultUrl,
     mimeType: generatedImage.mimeType,
     model: GEMINI_IMAGE_MODEL,
-    accessoryType,
-    prompt,
+    accessoryType: promptDetails.productType,
+    productType: promptDetails.productType,
+    style: promptDetails.style,
+    visibleArea: promptDetails.visibleArea,
+    prompt: promptDetails.prompt,
   };
 };
