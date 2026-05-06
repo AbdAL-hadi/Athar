@@ -173,6 +173,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const dropdownRef = useRef(null);
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const homeTarget = authUser?.role === 'admin' ? '/admin/dashboard' : '/';
@@ -203,6 +204,31 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   useEffect(() => {
     closeAllMenus();
   }, [authUser?.id, location.pathname]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+
+      setIsScrolled((currentValue) => {
+        if (!currentValue && scrollY > 150) {
+          return true;
+        }
+
+        if (currentValue && scrollY < 24) {
+          return false;
+        }
+
+        return currentValue;
+      });
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const toggleDropdown = () => {
     setMobileMenuOpen(false);
@@ -236,11 +262,15 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   };
 
   return (
-    <header className="sticky top-0 z-[1200] border-b border-line bg-white/95 backdrop-blur">
-      <div className="h-1 w-full bg-[#52603e]" />
+    <header className="sticky top-0 z-[1200] border-b border-line bg-white/95 backdrop-blur transition-shadow duration-300">
+      <div className={`w-full bg-[#52603e] transition-all duration-300 ${isScrolled ? 'h-0' : 'h-1'}`} />
 
       <div className="hidden lg:block">
-        <div className="section-shell grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 py-6">
+        <div
+          className={`section-shell relative z-[3] grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 transition-all duration-300 ease-out ${
+            isScrolled ? 'max-h-0 py-0 opacity-0' : 'max-h-44 py-6 opacity-100'
+          } ${dropdownOpen && !isScrolled ? 'overflow-visible' : 'overflow-hidden'}`}
+        >
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#5f6547]">Palestinian Craft House</p>
             <p className="mt-1 max-w-xs text-sm text-ink-soft">Heritage-inspired pieces, thoughtful gifting, and signature copper details.</p>
@@ -347,20 +377,20 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
           </div>
         </div>
 
-        <div className="border-t border-line/70">
+        <div className={`relative z-[1] transition-colors duration-300 ${isScrolled ? 'border-t border-transparent shadow-[0_12px_30px_rgba(66,47,35,0.08)]' : 'border-t border-line/70'}`}>
           <div className="section-shell">
             {isAdmin ? (
-              <div className="flex justify-center py-4">
+              <div className={`flex justify-center transition-all duration-300 ${isScrolled ? 'py-3' : 'py-4'}`}>
                 <AdminNavigation className="justify-center" />
               </div>
             ) : (
-              <nav className="flex items-center justify-center gap-7 py-4 xl:gap-9" aria-label="Primary navigation">
+              <nav className={`flex items-center justify-center gap-7 transition-all duration-300 xl:gap-9 ${isScrolled ? 'py-3' : 'py-4'}`} aria-label="Primary navigation">
                 {primaryLinks.map((link) => (
                   <NavLink key={link.to} to={link.to} className={primaryNavLinkClass}>
                     {({ isActive }) => (
                       <>
                         <span>{link.label}</span>
-                        {isActive ? <span className="absolute -bottom-4 left-1/2 h-[2px] w-8 -translate-x-1/2 rounded-full bg-[#52603e]" /> : null}
+                        {isActive ? <span className={`absolute left-1/2 h-[2px] w-8 -translate-x-1/2 rounded-full bg-[#52603e] ${isScrolled ? '-bottom-3' : '-bottom-4'}`} /> : null}
                       </>
                     )}
                   </NavLink>

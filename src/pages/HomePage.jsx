@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import SoftFloatingParticles from '../components/SoftFloatingParticles';
 import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
@@ -30,48 +29,85 @@ const ArrowIcon = ({ direction = 'right' }) => (
   </svg>
 );
 
-const ScrollIcon = () => (
-  <svg
-    aria-hidden="true"
-    className="h-4 w-4"
-    fill="none"
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth="1.8"
-    viewBox="0 0 24 24"
-  >
-    <path d="m12 5 0 14" />
-    <path d="m6 13 6 6 6-6" />
-  </svg>
-);
+const StarRating = ({ value = 5, onChange, disabled = false, sizeClass = 'text-lg' }) => {
+  const normalizedValue = Math.min(5, Math.max(1, Math.round(Number(value) || 5)));
+
+  return (
+    <div className={`inline-flex items-center gap-1 ${sizeClass}`} aria-label={`${normalizedValue} out of 5 stars`}>
+      {Array.from({ length: 5 }, (_, index) => {
+        const starValue = index + 1;
+        const isActive = starValue <= normalizedValue;
+
+        if (onChange) {
+          return (
+            <button
+              key={starValue}
+              type="button"
+              onClick={() => onChange(starValue)}
+              disabled={disabled}
+              className={`leading-none transition ${isActive ? 'text-[#b88746]' : 'text-[#d7c8bd]'} ${disabled ? 'cursor-not-allowed opacity-70' : 'hover:scale-110 hover:text-[#b88746]'}`}
+              aria-label={`Rate ${starValue} star${starValue === 1 ? '' : 's'}`}
+            >
+              ★
+            </button>
+          );
+        }
+
+        return (
+          <span key={starValue} className={isActive ? 'text-[#b88746]' : 'text-[#d7c8bd]'}>
+            ★
+          </span>
+        );
+      })}
+    </div>
+  );
+};
 
 const FeedbackCard = ({ item }) => {
   const initial = item?.name?.charAt(0)?.toUpperCase() || 'A';
+  const rating = Math.min(5, Math.max(1, Math.round(Number(item?.rating) || 5)));
   const createdAtLabel = item?.createdAt
     ? new Date(item.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric',
         month: 'short',
         day: 'numeric',
+        year: 'numeric',
       })
     : '';
 
   return (
-    <article className="rounded-[24px] border border-line/70 bg-white px-5 py-5 shadow-card">
-      <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blush text-xl font-bold text-ink">
-          {initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-display text-2xl text-ink">{item.name}</h3>
-            {createdAtLabel ? (
-              <span className="text-xs uppercase tracking-[0.18em] text-muted">
-                {createdAtLabel}
-              </span>
-            ) : null}
+    <article className="flex min-h-[350px] flex-col rounded-[6px] bg-white p-6 shadow-[0_20px_48px_rgba(66,47,35,0.08)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f7ede6] text-base font-bold text-ink">
+              {initial}
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-ink">{item.name}</h3>
+              {createdAtLabel ? (
+                <p className="mt-0.5 text-xs uppercase tracking-[0.16em] text-muted">{createdAtLabel}</p>
+              ) : null}
+            </div>
           </div>
-          <p className="mt-2 text-base leading-7 text-ink-soft">{item.message}</p>
+          <div className="mt-4">
+            <StarRating value={rating} sizeClass="text-base" />
+          </div>
+        </div>
+
+        <span className="rounded-full bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#8f5f45]">
+          {rating}/5
+        </span>
+      </div>
+
+      <div className="mt-5 flex flex-1 flex-col">
+        <p className="text-lg font-semibold text-ink">Athar experience</p>
+        <p className="mt-4 flex-1 text-base leading-8 text-ink-soft">{item.message}</p>
+
+        <div className="mt-8 border-t border-line pt-4">
+          <p className="text-sm font-semibold text-ink">Athar Storefront</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">
+            Site review
+          </p>
         </div>
       </div>
     </article>
@@ -86,6 +122,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
   const [searchQuery, setSearchQuery] = useState('');
   const [feedbackItems, setFeedbackItems] = useState([]);
   const [feedbackForm, setFeedbackForm] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [feedbackLoadError, setFeedbackLoadError] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -127,17 +164,6 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     });
   };
 
-  const scrollFeedbackDown = () => {
-    if (!feedbackListRef.current) {
-      return;
-    }
-
-    feedbackListRef.current.scrollBy({
-      top: 280,
-      behavior: 'smooth',
-    });
-  };
-
   useEffect(() => {
     let isCancelled = false;
 
@@ -175,6 +201,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
 
   useEffect(() => {
     setFeedbackForm(currentUserFeedback?.message ?? '');
+    setFeedbackRating(currentUserFeedback?.rating ?? 5);
   }, [currentUserFeedback]);
 
   const handleSubmitFeedback = async (event) => {
@@ -203,13 +230,15 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
       return;
     }
 
+    const normalizedRating = Math.min(5, Math.max(1, Math.round(Number(feedbackRating) || 5)));
+
     setFeedbackSubmitting(true);
 
     try {
       const response = await apiRequest('/api/feedback', {
         method: 'POST',
         token: activeToken,
-        body: { message: normalizedMessage },
+        body: { message: normalizedMessage, rating: normalizedRating },
       });
       const savedFeedback = response?.data ?? null;
 
@@ -247,13 +276,12 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     <div className="space-y-16 pb-6 pt-0">
       <section className="relative left-1/2 right-1/2 -mx-[50vw] min-h-[680px] w-screen overflow-hidden bg-[#251913] py-16 sm:py-20 lg:flex lg:min-h-[calc(100vh-92px)] lg:items-center lg:py-24">
         <img
-          src={resolveApiAssetUrl('products/Homepagetorath.png')}
+          src={resolveApiAssetUrl('products/homeshorouq.jpeg')}
           alt="Athar Palestinian heritage accessories"
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(34,22,17,0.78)_0%,rgba(54,36,28,0.55)_42%,rgba(34,22,17,0.16)_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,247,241,0.08)_0%,rgba(37,25,19,0.18)_100%)]" />
-        <SoftFloatingParticles count={200} opacity={1.35} speed={0.72} minSize={6} maxSize={20} />
         <div className="section-shell relative z-10">
           <div className="max-w-[620px]">
             <div className="min-w-0 pt-2">
@@ -333,19 +361,20 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
             </div>
           </div>
 
-          <StaggerContainer immediate className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 xl:grid-cols-4 2xl:grid-cols-5">
+          <StaggerContainer immediate className="grid gap-6 lg:grid-cols-2 xl:gap-8">
             {featuredProducts.map((product, index) => (
               <StaggerItem key={product.id}>
-                <div className="group">
-                  <div className="relative h-full rounded-3xl bg-white shadow-lg transition hover:shadow-2xl">
+                <div className="group h-full">
+                  <div className="relative h-full transition hover:shadow-2xl">
                     <ProductCard
                       product={product}
                       isFavorite={isProductFavorite(favoriteIds, product)}
                       onToggleFavorite={onToggleFavorite}
                       onAddToCart={onAddToCart}
+                      variant="horizontal"
                     />
                     {index < 2 ? (
-                      <div className="absolute top-4 right-4 inline-block rounded-full bg-gradient-to-r from-rose to-pink-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg">
+                      <div className="absolute right-4 top-4 inline-block rounded-full bg-gradient-to-r from-rose to-pink-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg">
                         Popular
                       </div>
                     ) : null}
@@ -460,131 +489,161 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
         </div>
       </section>
 
-      <section className="section-shell">
-        <Reveal>
-          <SectionTitle
-            title="Reviews"
-            description="Customers can share their Athar experience here. Only logged-in customers can add a review."
-            action={
-              <motion.div {...ctaMotionProps}>
-                <button
-                  type="button"
-                  onClick={scrollFeedbackDown}
-                  className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-rose hover:bg-blush"
-                >
-                  <ScrollIcon />
-                  Scroll reviews
-                </button>
-              </motion.div>
-            }
-          />
-        </Reveal>
-
-        <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="relative left-1/2 right-1/2 -mx-[50vw] w-screen bg-[#f5f3f1] py-20">
+        <div className="section-shell">
           <Reveal>
-            <div className="rounded-[28px] bg-white p-6 shadow-card">
-              <h3 className="font-display text-3xl text-ink">
-                {authUser
-                  ? currentUserFeedback
-                    ? 'Update your review'
-                    : 'Share your review'
-                  : 'Please log in to write a review.'}
-              </h3>
-              <p className="mt-2 text-base leading-7 text-ink-soft">
-                {authUser
-                  ? 'Write a short review about your Athar experience. You can come back later and update it.'
-                  : 'Public visitors can read reviews, but only logged-in customers can add one.'}
-              </p>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#8f5f45]">Reviews</p>
+                <h2 className="mt-3 text-5xl font-bold leading-tight text-ink sm:text-6xl">
+                  Happy Customers
+                </h2>
+                <p className="mt-4 max-w-2xl text-base leading-8 text-ink-soft">
+                  Rate your Athar experience and share a note. New reviews appear here for everyone after saving.
+                </p>
+              </div>
 
-              {!authUser ? (
-                <div className="mt-6 rounded-[24px] border border-line bg-[#fffaf8] px-5 py-5">
-                  <p className="text-base font-semibold text-ink">Please log in to write a review.</p>
-                  <p className="mt-2 text-sm leading-6 text-ink-soft">
-                    You can still read customer reviews here. Sign in when you want to share your own Athar experience.
-                  </p>
-                  <motion.div {...ctaMotionProps}>
-                    <Link to="/auth" className="button-primary mt-5 inline-flex">
-                      Log in to review
-                    </Link>
-                  </motion.div>
-                </div>
-              ) : (
-                <form className="mt-6 space-y-4" onSubmit={handleSubmitFeedback}>
-                  <textarea
-                    value={feedbackForm}
-                    onChange={(event) => setFeedbackForm(event.target.value)}
-                    placeholder="Write your review here..."
-                    rows={6}
-                    className="w-full rounded-[24px] border border-line bg-cream px-5 py-4 text-base leading-7 text-ink outline-none transition focus:border-rose"
-                    disabled={feedbackSubmitting}
-                  />
-
-                  {feedbackError ? (
-                    <div className="rounded-2xl border border-rose/20 bg-rose/5 px-4 py-3 text-sm font-medium text-rose">
-                      {feedbackError}
-                    </div>
-                  ) : null}
-
-                  {feedbackSuccess ? (
-                    <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
-                      {feedbackSuccess}
-                    </div>
-                  ) : null}
-
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted">
-                      {feedbackSuccess || 'Your review will appear for other visitors after a successful save.'}
-                    </p>
-                    <motion.div {...ctaMotionProps}>
-                      <button
-                        type="submit"
-                        disabled={feedbackSubmitting}
-                        className="button-primary"
-                      >
-                        {feedbackSubmitting
-                          ? 'Saving...'
-                          : currentUserFeedback
-                            ? 'Update review'
-                            : 'Add review'}
-                      </button>
-                    </motion.div>
-                  </div>
-                </form>
-              )}
+              <div className="flex flex-wrap gap-3">
+                <motion.div {...ctaMotionProps}>
+                  <button
+                    type="button"
+                    onClick={() => feedbackListRef.current?.scrollBy({ left: -420, behavior: 'smooth' })}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-[#d8c7ba] hover:bg-[#fbf4ef]"
+                    aria-label="Previous reviews"
+                  >
+                    <ArrowIcon direction="left" />
+                  </button>
+                </motion.div>
+                <motion.div {...ctaMotionProps}>
+                  <button
+                    type="button"
+                    onClick={() => feedbackListRef.current?.scrollBy({ left: 420, behavior: 'smooth' })}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-[#d8c7ba] hover:bg-[#fbf4ef]"
+                    aria-label="Next reviews"
+                  >
+                    <ArrowIcon />
+                  </button>
+                </motion.div>
+              </div>
             </div>
           </Reveal>
 
-          <StaggerContainer
-            ref={feedbackListRef}
-            className="max-h-[540px] space-y-4 overflow-y-auto rounded-[28px] bg-white p-5 shadow-card"
-            amount={0.1}
-          >
-            {feedbackLoading ? (
-              <div className="rounded-[24px] border border-line/70 bg-cream px-5 py-8 text-center text-base text-ink-soft">
-                Loading reviews...
-              </div>
-            ) : null}
+          <div className="mt-10 grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
+            <Reveal>
+              <div className="rounded-[6px] bg-white p-6 shadow-[0_20px_48px_rgba(66,47,35,0.08)]">
+                <h3 className="text-2xl font-bold text-ink">
+                  {authUser
+                    ? currentUserFeedback
+                      ? 'Update your review'
+                      : 'Share your review'
+                    : 'Log in to review'}
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-ink-soft">
+                  {authUser
+                    ? 'Choose your rating and write a short comment about your experience with Athar.'
+                    : 'Visitors can read reviews. Customers can log in to add a public rating and comment.'}
+                </p>
 
-            {!feedbackLoading && feedbackLoadError ? (
-              <div className="rounded-[24px] border border-rose/20 bg-rose/5 px-5 py-8 text-center text-base font-medium text-rose">
-                {feedbackLoadError}
-              </div>
-            ) : null}
+                {!authUser ? (
+                  <div className="mt-6 rounded-[6px] border border-line bg-[#fffaf8] px-5 py-5">
+                    <p className="text-base font-semibold text-ink">Please log in to write a review.</p>
+                    <p className="mt-2 text-sm leading-6 text-ink-soft">
+                      Your rating and comment will show in this section for everyone.
+                    </p>
+                    <motion.div {...ctaMotionProps}>
+                      <Link to="/auth" className="button-primary mt-5 inline-flex">
+                        Log in to review
+                      </Link>
+                    </motion.div>
+                  </div>
+                ) : (
+                  <form className="mt-6 space-y-4" onSubmit={handleSubmitFeedback}>
+                    <div>
+                      <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] text-muted">Your rating</p>
+                      <StarRating
+                        value={feedbackRating}
+                        onChange={setFeedbackRating}
+                        disabled={feedbackSubmitting}
+                        sizeClass="text-3xl"
+                      />
+                    </div>
 
-            {!feedbackLoading && !feedbackLoadError && feedbackItems.length === 0 ? (
-              <div className="rounded-[24px] border border-line/70 bg-cream px-5 py-8 text-center text-base text-ink-soft">
-                No reviews yet.
-              </div>
-            ) : null}
+                    <textarea
+                      value={feedbackForm}
+                      onChange={(event) => setFeedbackForm(event.target.value)}
+                      placeholder="Write your review here..."
+                      rows={6}
+                      className="w-full rounded-[6px] border border-line bg-[#f8f4f0] px-5 py-4 text-base leading-7 text-ink outline-none transition focus:border-[#b88746] focus:bg-white"
+                      disabled={feedbackSubmitting}
+                    />
 
-            {!feedbackLoading && !feedbackLoadError
-              ? feedbackItems.map((item) => (
-                  <StaggerItem key={item.id}>
-                    <FeedbackCard item={item} />
-                  </StaggerItem>
-                ))
-              : null}
-          </StaggerContainer>
+                    {feedbackError ? (
+                      <div className="rounded-[6px] border border-rose/20 bg-rose/5 px-4 py-3 text-sm font-medium text-rose">
+                        {feedbackError}
+                      </div>
+                    ) : null}
+
+                    {feedbackSuccess ? (
+                      <div className="rounded-[6px] border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+                        {feedbackSuccess}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="max-w-[220px] text-xs leading-5 text-muted">
+                        {feedbackSuccess || 'Saved reviews appear publicly in Happy Customers.'}
+                      </p>
+                      <motion.div {...ctaMotionProps}>
+                        <button
+                          type="submit"
+                          disabled={feedbackSubmitting}
+                          className="button-primary"
+                        >
+                          {feedbackSubmitting
+                            ? 'Saving...'
+                            : currentUserFeedback
+                              ? 'Update review'
+                              : 'Add review'}
+                        </button>
+                      </motion.div>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </Reveal>
+
+            <StaggerContainer
+              ref={feedbackListRef}
+              className="flex gap-6 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              amount={0.1}
+            >
+              {feedbackLoading ? (
+                <div className="min-w-[360px] rounded-[6px] border border-line/70 bg-white px-5 py-8 text-center text-base text-ink-soft">
+                  Loading reviews...
+                </div>
+              ) : null}
+
+              {!feedbackLoading && feedbackLoadError ? (
+                <div className="min-w-[360px] rounded-[6px] border border-rose/20 bg-white px-5 py-8 text-center text-base font-medium text-rose">
+                  {feedbackLoadError}
+                </div>
+              ) : null}
+
+              {!feedbackLoading && !feedbackLoadError && feedbackItems.length === 0 ? (
+                <div className="min-w-[360px] rounded-[6px] border border-line/70 bg-white px-5 py-8 text-center text-base text-ink-soft">
+                  No reviews yet.
+                </div>
+              ) : null}
+
+              {!feedbackLoading && !feedbackLoadError
+                ? feedbackItems.map((item) => (
+                    <StaggerItem key={item.id} className="w-[360px] min-w-[360px] lg:w-[420px] lg:min-w-[420px]">
+                      <FeedbackCard item={item} />
+                    </StaggerItem>
+                  ))
+                : null}
+            </StaggerContainer>
+          </div>
         </div>
       </section>
 
