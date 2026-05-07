@@ -43,7 +43,14 @@ const extractText = (response) => {
 };
 
 const cleanReply = (value) => {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const text = String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   return text.slice(0, 1200);
 };
 
@@ -55,6 +62,98 @@ const tokenizeMessage = (value) =>
     .map((item) => item.trim())
     .filter((item) => item.length >= 2)
     .slice(0, 12);
+
+const detectDeterministicReply = ({ message, page }) => {
+  const raw = String(message ?? '').trim();
+  const lower = raw.toLowerCase();
+  const isArabic = /[\u0600-\u06FF]/.test(raw);
+  const currentPage = String(page || '/').trim() || '/';
+
+  const isLoginIntent =
+    /(\blog[\s-]?in\b|sign[\s-]?in|register|account)/i.test(lower) ||
+    /(تسجيل دخول|سجل دخول|دخول|حساب|تسجيل)/.test(raw);
+  if (isLoginIntent) {
+    if (isArabic) {
+      return [
+        'أكيد، تقدر تعمل تسجيل دخول بهالخطوات:',
+        '',
+        '1. افتح [صفحة تسجيل الدخول](/login).',
+        '2. اكتب الإيميل وكلمة المرور.',
+        '3. اضغط على زر تسجيل الدخول.',
+        '4. بعد الدخول، تقدر تكمل التسوق أو تروح على حسابك.',
+        '',
+        'إذا ما عندك حساب، استخدم صفحة التسجيل من نفس صفحة الدخول.',
+      ].join('\n');
+    }
+    return [
+      'Sure, you can log in by following these steps:',
+      '',
+      '1. Open the [Login page](/login).',
+      '2. Enter your email and password.',
+      '3. Click the login button.',
+      '4. After logging in, you can continue shopping or go to your profile.',
+      '',
+      'If you do not have an account yet, you can register from the same page.',
+    ].join('\n');
+  }
+
+  const asksHowToUsePage =
+    /(كيف.*استخدم.*الصفحة|كيف.*استخدم.*هاي الصفحة|what can i do here|how do i use this page)/i.test(raw);
+  const asksCartPage = /(صفحة السلة|السلة|cart)/i.test(raw);
+  if ((asksHowToUsePage && currentPage === '/cart') || asksCartPage) {
+    return [
+      'هاي صفحة السلة.',
+      '',
+      'بتقدر تعمل فيها:',
+      '- تراجع المنتجات اللي اخترتها.',
+      '- تعدل الكميات.',
+      '- تحذف منتجات من السلة.',
+      '- تنتقل لإتمام الطلب.',
+      '',
+      'الخطوة التالية:',
+      'راجع المنتجات، وبعدها افتح [صفحة الدفع](/checkout).',
+    ].join('\n');
+  }
+
+  const asksProductsLocation = /(وين.*المنتجات|ألاقي المنتجات|where.*products|find products)/i.test(raw);
+  if (asksProductsLocation) {
+    return isArabic
+      ? 'بتقدر تلاقي كل المنتجات من [صفحة المنتجات](/products).'
+      : 'You can find all items on the [Products page](/products).';
+  }
+
+  const asksOrderTracking = /(تتبع.*طلب|تتبع طلبي|track.*order|order tracking)/i.test(raw);
+  if (asksOrderTracking) {
+    return isArabic
+      ? [
+          'أكيد، لتتبع طلبك:',
+          '',
+          '1. افتح [صفحة تتبع الطلب](/order-tracking).',
+          '2. أدخل أو استخدم معلومات الطلب.',
+          '3. راجع آخر حالة للطلب.',
+        ].join('\n')
+      : [
+          'Sure, to track your order:',
+          '',
+          '1. Open the [Order tracking page](/order-tracking).',
+          '2. Enter or use your order information.',
+          '3. Check the latest order status.',
+        ].join('\n');
+  }
+
+  const asksSearchHow = /(how do i search for products|how.*search.*products)/i.test(lower);
+  if (asksSearchHow) {
+    return [
+      'Sure, you can search for products in these steps:',
+      '',
+      '1. Open the [Search page](/search).',
+      '2. Type the product name, style, material, or category.',
+      '3. Open a product from the results.',
+    ].join('\n');
+  }
+
+  return '';
+};
 
 export const normalizeProductForChatbot = (product = {}) => {
   const id = String(product?._id || product?.id || '').trim();
@@ -307,6 +406,7 @@ export const buildCustomerPrompt = ({ message, page, productContext, matchedProd
     'Do not discuss how the chatbot was built.',
     'Redirect technical or admin questions politely.',
     'Keep answers short unless the customer asks for detail.',
+    'Do not over-explain unless the customer asks for details.',
     'Safety and boundaries:',
     'The chatbot is allowed to guide customers.',
     'The chatbot is allowed to explain pages.',
@@ -331,11 +431,108 @@ export const buildCustomerPrompt = ({ message, page, productContext, matchedProd
     'If the user asks for something outside ability, explain politely and offer the closest safe next step.',
     'Answer style rules:',
     'The chatbot answer should be customer-friendly.',
+    'Format every answer in clean Markdown that is easy to read in chat UI.',
+    'Always format instructional answers using bullets or numbered steps.',
     'Use short paragraphs.',
     'Use bullet points only when useful.',
+    'Avoid long messy paragraphs.',
+    'Keep answers short and clear.',
+    'Use simple language.',
     'For page explanations, mention what the page is for, what the customer can do there, and the next recommended step.',
+    'When explaining a page, use this structure:',
+    '- What this page is for',
+    '- What the customer can do here',
+    '- Next recommended step',
+    'If the customer asks how to use a page, answer with:',
+    '- Page purpose',
+    '- Main actions',
+    '- Next step',
+    'If the customer asks in Arabic "كيف أستخدم هاي الصفحة؟", use this structure:',
+    'هاي الصفحة مخصصة لـ ...',
+    'بتقدر تعمل فيها:',
+    '- ...',
+    '- ...',
+    '- ...',
+    'الخطوة التالية المقترحة:',
+    'افتح [اسم الصفحة](/path) أو تابع من الصفحة الحالية.',
+    'If current page is /products and the customer asks how to use this page, prefer this style:',
+    'هاي صفحة المنتجات.',
+    'بتقدر تعمل فيها:',
+    '- تتصفح كل المنتجات المتوفرة.',
+    '- تفتح أي منتج وتشوف تفاصيله.',
+    '- تبحث عن منتج حسب الفئة أو الستايل.',
+    '- تضيف المنتج للسلة بعد فتح صفحة التفاصيل.',
+    'الخطوة التالية:',
+    'اختار منتج يعجبك وافتح تفاصيله، أو استخدم [صفحة البحث](/search).',
+    'If current page is /cart and the customer asks how to use this page, prefer this style:',
+    'هاي صفحة السلة.',
+    'بتقدر تعمل فيها:',
+    '- تراجع المنتجات اللي اخترتها.',
+    '- تعدل الكميات.',
+    '- تحذف منتجات من السلة.',
+    '- تنتقل لإتمام الطلب.',
+    'الخطوة التالية:',
+    'راجع المنتجات، وبعدها افتح [صفحة الدفع](/checkout).',
     'For product recommendations, include product name, price if available, and link if available.',
     'For shopping steps, use numbered steps.',
+    'For "how to" questions, always respond with numbered steps, not one long paragraph.',
+    'Do not return a single long paragraph for instructional answers.',
+    'When mentioning a page, make the page text clickable with markdown link format and an internal path.',
+    'Use these supported internal paths only: /auth, /login, /products, /search, /cart, /checkout, /order-tracking, /favorites, /visual-match, /heritage-map, /profile.',
+    'Preferred markdown examples: [Login page](/login), [Products page](/products), [Search page](/search), [Cart page](/cart), [Checkout page](/checkout), [Order tracking page](/order-tracking), [Favorites page](/favorites), [Visual Match page](/visual-match), [Heritage Map page](/heritage-map), [Profile page](/profile).',
+    'Use internal React app paths only. Never use full external URLs for store navigation.',
+    'Do not expose backend URLs.',
+    'Do not use localhost URLs.',
+    'Do not use API base URLs for navigation.',
+    'Do not use full absolute URLs unless absolutely necessary.',
+    'Use markdown links only for known internal store paths.',
+    'Do not create fake links.',
+    'Do not include links for pages that do not exist.',
+    'Keep links natural inside the answer.',
+    'Do not overload every response with too many links.',
+    'Include only the most useful one or two links.',
+    'Do not use markdown code blocks.',
+    'If the customer asks how to log in, register, or access account features, include a clickable link to [Login page](/login) or [Account page](/auth).',
+    'If the customer asks how to browse products, include [Products page](/products).',
+    'If the customer asks how to search, include [Search page](/search).',
+    'If the customer asks how to review selected items, include [Cart page](/cart).',
+    'If the customer asks how to complete an order, include [Checkout page](/checkout).',
+    'If the customer asks how to track an order, include [Order tracking page](/order-tracking).',
+    'If the customer asks about saved items, include [Favorites page](/favorites).',
+    'If the customer asks about visual product matching, include [Visual Match page](/visual-match).',
+    'If the customer asks about heritage content, include [Heritage Map page](/heritage-map).',
+    'When explaining how to log in, use this structure:',
+    '1. Go to the [Login page](/login).',
+    '2. Enter your email and password.',
+    '3. Submit the form.',
+    '4. After login, continue shopping or go to your profile.',
+    'If the customer asks login in Arabic (examples: "بدي أعمل تسجيل دخول"), prefer this style:',
+    'أكيد، تقدر تعمل تسجيل دخول بهالخطوات:',
+    '1. افتح [صفحة تسجيل الدخول](/login).',
+    '2. اكتب الإيميل وكلمة المرور.',
+    '3. اضغط على زر تسجيل الدخول.',
+    '4. بعد الدخول، تقدر تكمل التسوق أو تروح على حسابك.',
+    'إذا ما عندك حساب، استخدم صفحة التسجيل من نفس صفحة الدخول.',
+    'If the customer asks login in English (examples: "How do I log in?"), prefer this style:',
+    'Sure, you can log in by following these steps:',
+    '1. Open the [Login page](/login).',
+    '2. Enter your email and password.',
+    '3. Click the login button.',
+    '4. After logging in, you can continue shopping or go to your profile.',
+    'If you do not have an account yet, you can register from the same page.',
+    'When explaining how to buy, use this structure:',
+    '1. Browse [products](/products).',
+    '2. Open a product.',
+    '3. Add it to [cart](/cart).',
+    '4. Go to [cart](/cart).',
+    '5. Continue to [checkout](/checkout).',
+    'When explaining order tracking, use this structure:',
+    '1. Go to [order tracking](/order-tracking).',
+    '2. Enter or use your order information.',
+    '3. Check the latest order status.',
+    'If the customer writes Arabic, respond in Arabic with organized formatting.',
+    'If the customer writes English, respond in English with organized formatting.',
+    'Keep this same clean style for all step-by-step answers.',
     'For unclear questions, ask one simple follow-up question.',
     'Do not ask multiple questions at once unless necessary.',
     'If the customer seems lost, guide them step by step.',
@@ -390,6 +587,18 @@ export const buildCustomerPrompt = ({ message, page, productContext, matchedProd
 };
 
 export const generateCustomerChatbotReply = async ({ message, page, productContext }) => {
+  const deterministicReply = detectDeterministicReply({ message, page });
+  if (deterministicReply) {
+    return {
+      reply: deterministicReply,
+      answer: deterministicReply,
+      page: String(page || '/').trim() || '/',
+      products: [],
+      matchedProducts: [],
+      links: [],
+    };
+  }
+
   const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
 
   if (!apiKey) {
@@ -420,14 +629,17 @@ export const generateCustomerChatbotReply = async ({ message, page, productConte
     });
 
     const generatedText = cleanReply(extractText(response));
-    const answer =
+    const reply =
       generatedText ||
       'I can help explain this page and guide your shopping steps. Please ask your question again.';
 
     return {
-      answer,
+      reply,
+      answer: reply,
       page: String(page || '/').trim() || '/',
+      products: matchedProducts,
       matchedProducts,
+      links: [],
     };
   } catch (error) {
     const providerMessage = String(error?.message || 'Gemini generation failed.');
@@ -496,10 +708,15 @@ export const generateCustomerChatbotReply = async ({ message, page, productConte
       console.error('[CustomerChatbotService] Gemini provider error:', providerMessage);
     }
 
+    const reply = isArabic ? fallbackArabic : fallbackEnglish;
+
     return {
-      answer: isArabic ? fallbackArabic : fallbackEnglish,
+      reply,
+      answer: reply,
       page: currentPage,
+      products: matchedProducts,
       matchedProducts,
+      links: [],
       fallback: true,
     };
   }

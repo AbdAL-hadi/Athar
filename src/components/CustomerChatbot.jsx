@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api';
 
 const initialAssistantMessage =
@@ -10,8 +10,181 @@ const assistantFallbackReply =
 const assistantErrorReply =
   '\u0645\u0624\u0642\u062a\u064b\u0627 \u0641\u064a \u0645\u0634\u0643\u0644\u0629 \u0628\u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u062c\u0631\u0651\u0628 \u0645\u0631\u0629 \u062b\u0627\u0646\u064a\u0629 \u0628\u0639\u062f \u0644\u062d\u0638\u0627\u062a.';
 
+const LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+const SAFE_CHATBOT_PATHS = new Set([
+  '/',
+  '/auth',
+  '/login',
+  '/products',
+  '/search',
+  '/cart',
+  '/checkout',
+  '/order-tracking',
+  '/favorites',
+  '/visual-match',
+  '/heritage-map',
+  '/profile',
+]);
+
+const isAllowedChatbotPath = (path = '') => SAFE_CHATBOT_PATHS.has(String(path || '').trim());
+
+const normalizeSafeInternalPath = (href = '') => {
+  const trimmed = String(href || '').trim();
+  if (!trimmed.startsWith('/')) return '';
+
+  // Strip query/hash and only allow exact known store paths.
+  const cleanPath = trimmed.split(/[?#]/)[0];
+  if (!isAllowedChatbotPath(cleanPath)) return '';
+
+  if (cleanPath === '/login') {
+    return '/auth?mode=login';
+  }
+
+  return cleanPath;
+};
+
+const renderInline = (text = '', keyPrefix = 'inline', navigate) => {
+  const value = String(text ?? '');
+  if (!value) return null;
+
+  LINK_PATTERN.lastIndex = 0;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let index = 0;
+
+  while ((match = LINK_PATTERN.exec(value)) !== null) {
+    const [raw, label, href] = match;
+    const start = match.index;
+
+    if (start > lastIndex) {
+      parts.push(<span key={`${keyPrefix}-text-${index}`}>{value.slice(lastIndex, start)}</span>);
+      index += 1;
+    }
+
+    const normalizedHref = String(href || '').trim();
+    const normalizedLabel = String(label || '').trim() || normalizedHref;
+
+    const safeTarget = normalizeSafeInternalPath(normalizedHref);
+    if (safeTarget) {
+      parts.push(
+        <button
+          key={`${keyPrefix}-link-${index}`}
+          type="button"
+          className="inline-flex items-center rounded-sm px-0.5 py-0.5 font-medium text-blue-700 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+          onClick={() => navigate(safeTarget)}
+        >
+          {normalizedLabel}
+        </button>,
+      );
+    } else {
+      parts.push(<span key={`${keyPrefix}-plain-${index}`}>{raw}</span>);
+    }
+
+    index += 1;
+    lastIndex = start + raw.length;
+  }
+
+  if (lastIndex < value.length) {
+    parts.push(<span key={`${keyPrefix}-tail-${index}`}>{value.slice(lastIndex)}</span>);
+  }
+
+  return parts.length ? parts : value;
+};
+
+const renderAssistantMessage = (text = '', messageId = 'assistant', navigate) => {
+  const lines = String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n');
+
+  const nodes = [];
+  let bulletItems = [];
+  let numberedItems = [];
+  let paragraphLines = [];
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    const paragraph = paragraphLines.join('\n').trim();
+    if (paragraph) {
+      nodes.push(
+        <p key={`${messageId}-p-${nodes.length}`} className="whitespace-pre-line leading-6">
+          {renderInline(paragraph, `${messageId}-p-${nodes.length}`, navigate)}
+        </p>,
+      );
+    }
+    paragraphLines = [];
+  };
+
+  const flushBullets = () => {
+    if (!bulletItems.length) return;
+    nodes.push(
+      <ul key={`${messageId}-ul-${nodes.length}`} className="list-disc space-y-1 pl-5">
+        {bulletItems.map((item, idx) => (
+          <li key={`${messageId}-ul-item-${idx}`}>{renderInline(item, `${messageId}-ul-item-${idx}`, navigate)}</li>
+        ))}
+      </ul>,
+    );
+    bulletItems = [];
+  };
+
+  const flushNumbered = () => {
+    if (!numberedItems.length) return;
+    nodes.push(
+      <ol key={`${messageId}-ol-${nodes.length}`} className="list-decimal space-y-1 pl-5">
+        {numberedItems.map((item, idx) => (
+          <li key={`${messageId}-ol-item-${idx}`}>{renderInline(item, `${messageId}-ol-item-${idx}`, navigate)}</li>
+        ))}
+      </ol>,
+    );
+    numberedItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || '').trim();
+
+    if (!line) {
+      flushParagraph();
+      flushBullets();
+      flushNumbered();
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      flushParagraph();
+      flushNumbered();
+      bulletItems.push(bulletMatch[1].trim());
+      continue;
+    }
+
+    const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (numberedMatch) {
+      flushParagraph();
+      flushBullets();
+      numberedItems.push(numberedMatch[1].trim());
+      continue;
+    }
+
+    flushBullets();
+    flushNumbered();
+    paragraphLines.push(line);
+  }
+
+  flushParagraph();
+  flushBullets();
+  flushNumbered();
+
+  return (
+    <div className="space-y-2">
+      {nodes.length ? nodes : <p className="leading-6">{renderInline(text, messageId, navigate)}</p>}
+    </div>
+  );
+};
+
 const CustomerChatbot = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
@@ -48,7 +221,7 @@ const CustomerChatbot = () => {
       });
 
       const assistantText =
-        String(response?.data?.answer || response?.answer || response?.message || '').trim() ||
+        String(response?.data?.reply || response?.data?.answer || response?.answer || response?.message || '').trim() ||
         assistantFallbackReply;
 
       setMessages((current) => [
@@ -100,7 +273,11 @@ const CustomerChatbot = () => {
                     : 'mr-8 border border-line bg-white text-ink shadow-sm'
                 }`}
               >
-                <p>{message.text}</p>
+                {message.role === 'assistant' ? (
+                  renderAssistantMessage(message.text, message.id, navigate)
+                ) : (
+                  <p className="leading-6">{message.text}</p>
+                )}
               </article>
             ))}
             {loading ? <p className="text-xs text-muted">Athar Assistant is typing...</p> : null}
