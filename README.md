@@ -42,6 +42,30 @@ If you want to override ports, API URLs, email settings, or AI settings, use `.e
 docker compose --env-file .env.docker --profile ai up --build
 ```
 
+## Customer chatbot environment
+
+The customer chatbot route (`POST /api/chatbot/message`) reads Gemini credentials from backend environment variables only.
+
+Required:
+
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+Optional model override:
+
+```bash
+GEMINI_CHATBOT_MODEL=gemini-2.5-flash
+```
+
+Fallback model behavior:
+
+- if `GEMINI_CHATBOT_MODEL` is set, it is used
+- otherwise `GEMINI_TEXT_MODEL` is used
+- if neither is set, default is `gemini-2.5-flash`
+
+Do not add any `VITE_GEMINI_API_KEY` frontend variable. Keep Gemini API keys on the backend only.
+
 ## Important note for the AI try-on flow
 
 The local Docker stack now covers:
