@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import profileMotif from '../assets/products/Nprfile.png';
+import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
-import { formatAtharPoints } from '../utils/loyaltyPoints';
+import {
+  ACCOUNT_CREATION_POINTS,
+  FIRST_ORDER_POINTS,
+  PRODUCT_REVIEW_POINTS,
+  REWARD_DISCOUNT_PERCENT,
+  REWARD_DISCOUNT_POINTS_COST,
+  formatAtharPoints,
+} from '../utils/loyaltyPoints';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -14,7 +22,7 @@ const buildContactForm = (user = {}) => ({
 
 const buildAddressForm = (user = {}) => ({
   line1: user?.address?.line1 ?? '',
-  city: user?.address?.city ?? '',
+  city: normalizeCityValue(user?.address?.city ?? ''),
   postalCode: user?.address?.postalCode ?? '',
   country: user?.address?.country ?? 'Palestine',
 });
@@ -72,6 +80,85 @@ const formatRole = (role) => {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(' ');
+};
+
+const rewardEarnOptions = [
+  {
+    title: 'Create an account',
+    value: `+${ACCOUNT_CREATION_POINTS} points`,
+    description: 'Join Athar Rewards and start collecting points.',
+    icon: 'account',
+  },
+  {
+    title: 'Place your first order',
+    value: `+${FIRST_ORDER_POINTS} points`,
+    description: 'Earn a welcome bonus after your first Athar order is placed.',
+    icon: 'order',
+  },
+  {
+    title: 'Earn on every shekel',
+    value: '1 point / 1 ₪',
+    description: 'Collect 1 point for every shekel spent on Athar pieces.',
+    icon: 'spend',
+  },
+  {
+    title: 'Write a product review',
+    value: `+${PRODUCT_REVIEW_POINTS} points`,
+    description: 'Share your experience after receiving your order.',
+    icon: 'review',
+  },
+];
+
+const RewardEarnIcon = ({ type }) => {
+  const commonProps = {
+    'aria-hidden': 'true',
+    className: 'h-5 w-5',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    strokeWidth: '1.8',
+    viewBox: '0 0 24 24',
+  };
+
+  if (type === 'account') {
+    return (
+      <svg {...commonProps}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+        <path d="M18.5 6.5v4" />
+        <path d="M20.5 8.5h-4" />
+      </svg>
+    );
+  }
+
+  if (type === 'order') {
+    return (
+      <svg {...commonProps}>
+        <path d="M6.5 8.5h11l-.86 9.02a2 2 0 0 1-1.99 1.81h-5.3a2 2 0 0 1-1.99-1.81L6.5 8.5Z" />
+        <path d="M9 8.5V7a3 3 0 0 1 6 0v1.5" />
+        <path d="m9.5 13 1.8 1.8 3.5-3.6" />
+      </svg>
+    );
+  }
+
+  if (type === 'spend') {
+    return (
+      <svg {...commonProps}>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M8.5 12h7" />
+        <path d="M9.5 8.5h5" />
+        <path d="M9.5 15.5h5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path d="M6.25 5.25h11.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-6.5L7 19.25v-3h-.75a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z" />
+      <path d="m9 10.8 1.7 1.7L15 8.4" />
+    </svg>
+  );
 };
 
 const getUserFullName = (user = {}) => {
@@ -339,7 +426,7 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
     if (section === 'address') {
       const normalizedAddress = {
         line1: addressForm.line1.trim(),
-        city: addressForm.city.trim(),
+        city: normalizeCityValue(addressForm.city),
         postalCode: addressForm.postalCode.trim(),
         country: addressForm.country.trim(),
       };
@@ -394,13 +481,15 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
     ? `Email verified for ${getDisplayValue(localAuthUser?.email)}.`
     : `Verify ${getDisplayValue(localAuthUser?.email)} to secure your account updates.`;
   const loyaltyBalance = Math.max(
+    Number(localAuthUser?.rewardPoints ?? 0) || 0,
     Number(localAuthUser?.atharPoints ?? 0) || 0,
     Number(localAuthUser?.loyaltyPoints ?? 0) || 0,
   );
+  const rewardPointsNeeded = Math.max(0, REWARD_DISCOUNT_POINTS_COST - loyaltyBalance);
 
   return (
     <div className="min-h-screen bg-cream">
-      <div className="section-shell max-w-5xl py-8 sm:py-12">
+      <div className="section-shell max-w-6xl py-8 sm:py-12">
         <article className="overflow-hidden rounded-[32px] border border-line bg-white shadow-card">
           <div
             className="h-16 border-b border-line/70 bg-white bg-cover bg-center sm:h-20"
@@ -554,14 +643,20 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
                     <label className="rounded-[22px] border border-line/80 bg-cream/55 px-5 py-4">
                       <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">City:</span>
                       {isEditingAddress ? (
-                        <input
-                          type="text"
+                        <select
                           value={addressForm.city}
                           onChange={(event) => handleAddressInputChange('city', event.target.value)}
                           className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-base font-semibold text-ink outline-none transition focus:border-rose"
-                        />
+                        >
+                          <option value="">Select city</option>
+                          {PALESTINIAN_CITIES.map((city) => (
+                            <option key={city.value} value={city.value}>
+                              {city.label}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <DetailValue muted={!localAuthUser?.address?.city}>{getDisplayValue(localAuthUser?.address?.city)}</DetailValue>
+                        <DetailValue muted={!localAuthUser?.address?.city}>{getDisplayValue(getCityLabel(localAuthUser?.address?.city))}</DetailValue>
                       )}
                     </label>
 
@@ -649,6 +744,59 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
             </div>
           </div>
         </article>
+
+        <section className="mt-8 rounded-[32px] border border-line bg-white px-5 py-7 shadow-card sm:px-8 lg:px-10">
+          <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr] lg:items-end">
+            <div>
+              <div className="h-1.5 w-24 rounded-full bg-[linear-gradient(90deg,#b88746,#e7cfc2,#54715f)]" />
+              <p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-[#8f5f45]">Athar Rewards</p>
+              <h2 className="mt-3 font-display text-4xl font-bold text-ink sm:text-5xl">Rewards</h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-ink-soft">
+                Earn Athar points through your purchases, reviews, and first milestones. When you reach {REWARD_DISCOUNT_POINTS_COST} points, you can use them for {REWARD_DISCOUNT_PERCENT}% off at checkout.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-[#e7cfc2] bg-cream/70 px-5 py-5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Your points</p>
+              <p className="mt-2 font-display text-5xl font-bold text-ink">{formatAtharPoints(loyaltyBalance)}</p>
+              <p className="mt-2 text-sm leading-6 text-ink-soft">
+                {rewardPointsNeeded > 0
+                  ? `You need ${rewardPointsNeeded} more points to unlock ${REWARD_DISCOUNT_PERCENT}% off.`
+                  : `${REWARD_DISCOUNT_POINTS_COST} points can unlock ${REWARD_DISCOUNT_PERCENT}% off at checkout.`}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#8f5f45]">Ways to Earn</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {rewardEarnOptions.map((option) => (
+                <article key={option.title} className="rounded-[26px] border border-line bg-[#fffaf7] p-5 shadow-[0_14px_34px_rgba(66,47,35,0.08)]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blush text-[#8f5f45] shadow-[inset_0_0_0_1px_rgba(143,95,69,0.12)]">
+                    <RewardEarnIcon type={option.icon} />
+                  </div>
+                  <h3 className="mt-5 font-display text-2xl font-bold text-ink">{option.title}</h3>
+                  <p className="mt-3 inline-flex rounded-full border border-[#dfbd79]/60 bg-white px-3 py-1 text-sm font-bold text-[#8f5f45]">
+                    {option.value}
+                  </p>
+                  <p className="mt-4 text-sm leading-7 text-ink-soft">{option.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-4 rounded-[28px] border border-[#e7cfc2] bg-[#fffaf7] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-display text-3xl font-bold text-ink">Redeem at checkout</h3>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-ink-soft">
+                Once you collect {REWARD_DISCOUNT_POINTS_COST} points, you can choose to use them for {REWARD_DISCOUNT_PERCENT}% off your next order.
+              </p>
+            </div>
+            <Link to="/checkout" className="button-primary shrink-0 justify-center">
+              Go to checkout
+            </Link>
+          </div>
+        </section>
       </div>
     </div>
   );

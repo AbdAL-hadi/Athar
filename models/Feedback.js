@@ -21,6 +21,13 @@ const feedbackSchema = new mongoose.Schema(
       minlength: 10,
       maxlength: 500,
     },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5,
+      default: 5,
+    },
     status: {
       type: String,
       enum: ['approved', 'pending', 'rejected'],

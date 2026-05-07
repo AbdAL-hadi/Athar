@@ -4,10 +4,10 @@ import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
 import FavoriteButton from '../components/FavoriteButton';
+import PriceText from '../components/PriceText';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
 import { resolveApiAssetUrl } from '../utils/api';
-import { formatCurrency } from '../utils/format';
 import { isProductFavorite } from '../utils/productCatalog';
 
 const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
@@ -60,7 +60,11 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
                   <img src={resolveApiAssetUrl(product?.images?.[0])} alt={product.name} className="h-12 w-12 rounded-full object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-3xl text-ink">{product.name}</p>
-                    <p className="text-sm text-ink-soft">{product.category} · {formatCurrency(product.price)}</p>
+                    <p className="flex items-center gap-2 text-sm text-ink-soft">
+                      <span>{product.category}</span>
+                      <span aria-hidden="true">·</span>
+                      <PriceText value={product.price} className="text-xl" />
+                    </p>
                   </div>
                   <span className="hidden rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream sm:inline-flex">More Details</span>
                 </Link>

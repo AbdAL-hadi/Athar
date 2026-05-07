@@ -35,7 +35,7 @@ const stockLogSchema = new mongoose.Schema(
     },
     reason: {
       type: String,
-      enum: ['order-confirmed', 'order-cancelled', 'order-refunded', 'manual-restock'],
+      enum: ['order-confirmed', 'order-shipped', 'order-cancelled', 'order-refunded', 'manual-restock'],
       required: true,
     },
   },

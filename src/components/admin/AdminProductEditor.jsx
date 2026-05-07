@@ -246,7 +246,7 @@ const AdminProductEditor = ({
                     placeholder="Auto from price"
                   />
                   <p className="mt-2 text-sm leading-6 text-ink-soft">
-                    Leave empty to calculate points automatically from price: 1 dollar = 1 point.
+                    Leave empty to calculate points automatically from price: 1 shekel = 1 point.
                   </p>
                 </div>
 

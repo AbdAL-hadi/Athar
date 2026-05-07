@@ -1,36 +1,22 @@
 export const POINTS_PER_CURRENCY_UNIT = 1;
+export const ACCOUNT_CREATION_POINTS = 25;
+export const FIRST_ORDER_POINTS = 75;
+export const PRODUCT_REVIEW_POINTS = 40;
+export const REWARD_DISCOUNT_POINTS_COST = 1000;
+export const REWARD_DISCOUNT_PERCENT = 30;
 export const LOYALTY_REWARD_IDS = {
-  DISCOUNT_5: 'discount-5',
-  DISCOUNT_12: 'discount-12',
-  FREE_SHIPPING: 'free-shipping',
+  CHECKOUT_30_PERCENT: 'checkout-30-percent',
 };
 
 export const LOYALTY_REWARDS = [
   {
-    id: LOYALTY_REWARD_IDS.DISCOUNT_5,
-    title: '$5 discount',
-    cost: 100,
-    description: 'Exchange 100 points for $5 off your next Athar order.',
+    id: LOYALTY_REWARD_IDS.CHECKOUT_30_PERCENT,
+    title: '30% off this order',
+    cost: REWARD_DISCOUNT_POINTS_COST,
+    description: 'Use 1000 points for 30% off your order subtotal at checkout.',
     accent: 'bg-[#8f5f45]',
-    type: 'discount',
-    discountAmount: 5,
-  },
-  {
-    id: LOYALTY_REWARD_IDS.DISCOUNT_12,
-    title: '$12 discount',
-    cost: 200,
-    description: 'Use 200 points for a richer $12 discount at checkout.',
-    accent: 'bg-[#54715f]',
-    type: 'discount',
-    discountAmount: 12,
-  },
-  {
-    id: LOYALTY_REWARD_IDS.FREE_SHIPPING,
-    title: 'Free shipping',
-    cost: 300,
-    description: 'Redeem 300 points to unlock complimentary delivery.',
-    accent: 'bg-[#a8704c]',
-    type: 'shipping',
+    type: 'percentage-subtotal',
+    discountPercent: REWARD_DISCOUNT_PERCENT,
     discountAmount: 0,
   },
 ];
@@ -99,6 +85,7 @@ export const formatAtharPoints = (points) => {
 
 export const getCurrentAtharPointsBalance = (user = null) =>
   Math.max(
+    normalizeAtharPoints(user?.rewardPoints ?? 0),
     normalizeAtharPoints(user?.atharPoints ?? 0),
     normalizeAtharPoints(user?.loyaltyPoints ?? 0),
   );
@@ -119,11 +106,14 @@ export const getLoyaltyRewardDiscount = (reward, { subtotal = 0, shippingFee = 0
   const normalizedShippingFee = Math.max(0, Number(shippingFee) || 0);
   const baseTotal = normalizedSubtotal + normalizedShippingFee;
 
-  if (reward.type === 'shipping') {
+  if (reward.type === 'percentage-subtotal') {
+    const discountPercent = Math.max(0, Math.min(100, Number(reward.discountPercent) || 0));
+    const discountAmount = Math.min(normalizedSubtotal, normalizedSubtotal * (discountPercent / 100));
+
     return {
-      discountAmount: normalizedShippingFee,
-      appliedShippingFee: 0,
-      finalTotal: normalizedSubtotal,
+      discountAmount,
+      appliedShippingFee: normalizedShippingFee,
+      finalTotal: Math.max(0, baseTotal - discountAmount),
     };
   }
 

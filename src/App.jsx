@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
 import AccessibilityToolbar from './components/accessibility/AccessibilityToolbar';
@@ -11,11 +11,11 @@ import AuthPage from './pages/AuthPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import DeliveryDashboard from './pages/DeliveryDashboard';
+import DeliveryProfilePage from './pages/DeliveryProfilePage';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import FavoritesPage from './pages/FavoritesPage';
 import HeritageMapPage from './pages/HeritageMapPage';
 import HomePage from './pages/HomePage';
-import LoyaltyRewardsPage from './pages/LoyaltyRewardsPage';
 import MotifDetailsPage from './pages/MotifDetailsPage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
 import ProductDetailsPage from './pages/ProductDetailsPage';
@@ -30,26 +30,6 @@ import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, upda
 import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProduct, normalizeProducts } from './utils/productCatalog';
 
 const fallbackProducts = normalizeProducts(mockProducts);
-
-const ProtectedRewardsRoute = ({ authUser, authLoading }) => {
-  if (authLoading) {
-    return (
-      <div className="section-shell py-16">
-        <div className="rounded-[28px] border border-line bg-white px-6 py-8 text-center shadow-card">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">Athar Rewards</p>
-          <h1 className="mt-3 font-display text-4xl text-ink">Checking your account</h1>
-          <p className="mt-3 text-base text-ink-soft">Please wait while we confirm your sign-in status.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!authUser) {
-    return <Navigate to="/auth?mode=login" replace />;
-  }
-
-  return <LoyaltyRewardsPage authUser={authUser} />;
-};
 
 const App = () => {
   const navigate = useNavigate();
@@ -364,7 +344,6 @@ const App = () => {
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/heritage-map" element={<HeritageMapPage />} />
-        <Route path="/rewards" element={<ProtectedRewardsRoute authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/comments" element={<AdminCommentModerationPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />
@@ -373,6 +352,7 @@ const App = () => {
       </Route>
       <Route path="/employee-dashboard" element={<EmployeeDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} onProductSaved={handleProductSaved} />} />
       <Route path="/delivery-dashboard" element={<DeliveryDashboard authToken={authToken} authUser={authUser} authLoading={authLoading} onLogout={handleLogout} />} />
+      <Route path="/delivery/profile" element={<DeliveryProfilePage authToken={authToken} authUser={authUser} authLoading={authLoading} onUpdateProfile={handleUpdateProfile} />} />
     </Routes>
     <AITryOnModal product={tryOnProduct} open={Boolean(tryOnProduct)} onClose={handleCloseTryOn} />
     <AccessibilityToolbar />

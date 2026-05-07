@@ -1,0 +1,61 @@
+
+> athar-storefront@1.0.0 dev
+> vite --host 127.0.0.1
+
+Port 5173 is in use, trying another one...
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m294[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5174[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m9:01:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:13:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navbar.jsx, /src/index.css[22m
+[2m9:13:25 PM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/pages/VisualMatchPage.jsx[22m
+[2m9:13:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/VisualProductMatchPage.jsx, /src/index.css[22m
+[2m9:17:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ProductCard.jsx, /src/index.css[22m
+[2m9:17:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:17:41 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ProductCard.jsx, /src/index.css[22m
+[2m9:45:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navbar.jsx, /src/index.css[22m
+[2m9:50:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:50:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:50:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:51:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:52:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m9:58:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m9:58:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m9:58:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m9:59:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:01:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navbar.jsx, /src/index.css[22m
+[2m10:02:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m10:02:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m10:02:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/pages/FavoritesPage.jsx, /src/pages/HeritageMapPage.jsx, /src/pages/CartPage.jsx, /src/pages/SearchPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/MotifDetailsPage.jsx, /src/pages/HomePage.jsx, /src/pages/ProductsPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/components/AITryOnModal.jsx, /src/pages/AdminCommentModerationPage.jsx, /src/pages/AboutPage.jsx, /src/pages/VisualProductMatchPage.jsx, /src/pages/AdminDashboardPage.jsx, /src/pages/DeliveryDashboard.jsx, /src/pages/ProfilePage.jsx, /src/pages/OrderTrackingPage.jsx, /src/pages/AuthPage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/pages/EmployeeDashboard.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx, /src/components/Navbar.jsx, /src/components/admin/AdminProductEditor.jsx, /src/components/admin/AdminAiAssistPanel.jsx[22m
+[2m10:03:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:05:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:05:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:06:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:10:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/index.css[22m
+[2m10:20:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AboutPage.jsx, /src/index.css[22m
+[2m10:29:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navbar.jsx, /src/index.css[22m
+[2m5:23:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AuthPage.jsx, /src/index.css[22m
+[2m5:23:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilePage.jsx, /src/index.css[22m
+[2m5:23:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/CheckoutForm.jsx, /src/index.css[22m
+[2m5:23:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/index.css[22m
+[2m5:24:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m5:26:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/DeliveryDashboard.jsx, /src/index.css[22m
+[2m5:27:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/StatusTracker.jsx, /src/index.css[22m
+[2m5:27:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OrderTrackingPage.jsx, /src/index.css[22m
+[2m5:41:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/StatusTracker.jsx, /src/index.css[22m
+[2m5:41:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OrderTrackingPage.jsx, /src/index.css[22m
+[2m5:58:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoyaltyRewardsPage.jsx, /src/index.css[22m
+[2m5:59:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/App.jsx, /src/pages/CartPage.jsx, /src/pages/CheckoutPage.jsx, /src/pages/ProductDetailsPage.jsx, /src/pages/ProfilePage.jsx, /src/pages/LoyaltyRewardsPage.jsx, /src/components/CartItem.jsx, /src/components/ProductCard.jsx[22m
+[2m6:04:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/index.css[22m
+[2m6:05:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/index.css[22m
+[2m6:06:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/admin/AdminProductEditor.jsx, /src/index.css[22m
+[2m6:06:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilePage.jsx, /src/index.css[22m
+[2m6:14:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilePage.jsx, /src/index.css[22m
+[2m6:14:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilePage.jsx, /src/index.css[22m
+[2m6:15:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m6:15:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navbar.jsx, /src/index.css[22m
+[2m6:15:35 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m6:15:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoyaltyRewardsPage.jsx, /src/index.css[22m
+[2m6:38:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AITryOnModal.jsx, /src/index.css[22m

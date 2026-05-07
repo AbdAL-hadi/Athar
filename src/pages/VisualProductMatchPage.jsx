@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PriceText from '../components/PriceText';
 import { API_BASE_URL, apiRequest, resolveApiAssetUrl } from '../utils/api';
-import { formatCurrency } from '../utils/format';
 
 const acceptedImageTypes = 'image/png,image/jpeg,image/webp';
 
@@ -327,7 +327,9 @@ const VisualProductMatchPage = () => {
                   </p>
                   <p className="text-sm uppercase tracking-[0.16em] text-muted">{matchedProduct.category}</p>
                   <h3 className="mt-2 font-display text-3xl text-ink">{matchedProduct.title}</h3>
-                  <p className="mt-4 font-display text-3xl text-ink">{formatCurrency(matchedProduct.price)}</p>
+                  <p className="mt-4">
+                    <PriceText value={matchedProduct.price} className="text-3xl" />
+                  </p>
                   <p className="mt-4 rounded-[18px] bg-[#f8eee7] px-4 py-3 text-sm font-medium leading-6 text-[#8f5f45]">
                     {matchNote}
                   </p>

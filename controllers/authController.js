@@ -3,6 +3,8 @@ import Product from '../models/Product.js';
 import User from '../models/User.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { products as localCatalogProducts } from '../src/data/products.js';
+import { isKnownCityValue, normalizeCityValue } from '../constants/palestinianCities.js';
+import { ACCOUNT_CREATION_POINTS, normalizeAtharPoints } from '../src/utils/loyaltyPoints.js';
 import { createAuthToken, hashPassword, verifyPassword } from '../utils/auth.js';
 import { sendVerificationEmail } from '../utils/notifications.js';
 import {
@@ -20,11 +22,14 @@ const sanitizeUser = (userDocument) => ({
   isEmailVerified: userDocument.isEmailVerified !== false,
   emailVerifiedAt: userDocument.emailVerifiedAt,
   role: userDocument.role,
+  deliveryCity: userDocument.deliveryCity ?? '',
   favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
-  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
-  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  rewardPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  atharPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
   lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.rewardPoints ?? 0),
     Number(userDocument.lifetimeLoyaltyPoints ?? 0),
     Number(userDocument.atharPoints ?? 0),
     Number(userDocument.loyaltyPoints ?? 0),
@@ -42,6 +47,20 @@ const MAX_PROFILE_PICTURE_BYTES = 5 * 1024 * 1024;
 const normalizeReference = (value) => String(value ?? '').trim().toLowerCase();
 const getSafeFavoriteIds = (userDocument) =>
   Array.isArray(userDocument?.favorites) ? userDocument.favorites : [];
+
+const getCurrentRewardBalance = (userDocument) =>
+  Math.max(
+    Number(userDocument?.rewardPoints ?? 0),
+    Number(userDocument?.atharPoints ?? 0),
+    Number(userDocument?.loyaltyPoints ?? 0),
+  );
+
+const syncRewardBalances = (userDocument, nextBalance) => {
+  const normalizedBalance = normalizeAtharPoints(nextBalance);
+  userDocument.rewardPoints = normalizedBalance;
+  userDocument.atharPoints = normalizedBalance;
+  userDocument.loyaltyPoints = normalizedBalance;
+};
 
 const ADMIN_CREDENTIALS = {
   email: 'admin@athar.com',
@@ -218,11 +237,104 @@ const getPersistentAdminUser = async (authenticatedUser) => {
   return adminUser;
 };
 
+const getPersistentDeliveryUser = async (authenticatedUser) => {
+  if (authenticatedUser?._id !== 'delivery-001' || authenticatedUser?.role !== 'delivery') {
+    return null;
+  }
+
+  const email = DELIVERY_CREDENTIALS.email;
+  let deliveryUser = await User.findOne({ email }).select('-password');
+
+  if (!deliveryUser) {
+    try {
+      deliveryUser = await User.create({
+        name: authenticatedUser.name || 'Delivery',
+        email,
+        password: await hashPassword(DELIVERY_CREDENTIALS.password),
+        phone: authenticatedUser.phone || '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: authenticatedUser.emailVerifiedAt || new Date(),
+        role: 'delivery',
+        deliveryCity: authenticatedUser.deliveryCity || '',
+        profilePicture: authenticatedUser.profilePicture || '',
+        address: authenticatedUser.address || {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        favorites: [],
+      });
+
+      return User.findById(deliveryUser._id).select('-password');
+    } catch (error) {
+      if (error?.code !== 11000) {
+        throw error;
+      }
+
+      deliveryUser = await User.findOne({ email }).select('-password');
+    }
+  }
+
+  if (deliveryUser && deliveryUser.role !== 'delivery') {
+    deliveryUser.role = 'delivery';
+    await deliveryUser.save();
+  }
+
+  return deliveryUser;
+};
+
+const getOrCreateDeliveryCredentialUser = async () => {
+  let deliveryUser = await User.findOne({ email: DELIVERY_CREDENTIALS.email }).select('-password');
+
+  if (!deliveryUser) {
+    try {
+      deliveryUser = await User.create({
+        name: 'Delivery',
+        email: DELIVERY_CREDENTIALS.email,
+        password: await hashPassword(DELIVERY_CREDENTIALS.password),
+        phone: '+970000000000',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'delivery',
+        deliveryCity: '',
+        profilePicture: '',
+        address: {
+          line1: '',
+          city: '',
+          postalCode: '',
+          country: 'Palestine',
+        },
+        favorites: [],
+      });
+    } catch (error) {
+      if (error?.code !== 11000) {
+        throw error;
+      }
+
+      deliveryUser = await User.findOne({ email: DELIVERY_CREDENTIALS.email }).select('-password');
+    }
+  }
+
+  if (deliveryUser.role !== 'delivery') {
+    deliveryUser.role = 'delivery';
+    await deliveryUser.save();
+  }
+
+  return deliveryUser;
+};
+
 const getPersistentAuthenticatedUser = async (authenticatedUser) => {
   const persistentAdmin = await getPersistentAdminUser(authenticatedUser);
 
   if (persistentAdmin) {
     return persistentAdmin;
+  }
+
+  const persistentDelivery = await getPersistentDeliveryUser(authenticatedUser);
+
+  if (persistentDelivery) {
+    return persistentDelivery;
   }
 
   if (!canPersistAuthenticatedUser(authenticatedUser)) {
@@ -295,7 +407,7 @@ export const registerUser = async (req, res) => {
     const normalizedPhone = String(phone ?? '').trim();
     const normalizedAddress = {
       line1: String(address?.line1 ?? '').trim(),
-      city: String(address?.city ?? '').trim(),
+      city: normalizeCityValue(address?.city ?? ''),
       postalCode: String(address?.postalCode ?? '').trim(),
       country: String(address?.country ?? '').trim(),
     };
@@ -329,6 +441,13 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'City, country, and postal code are required.',
+      });
+    }
+
+    if (!isKnownCityValue(normalizedAddress.city)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please choose a valid Palestinian city.',
       });
     }
 
@@ -466,24 +585,7 @@ export const loginUser = async (req, res) => {
 
     // Check for delivery login
     if (normalizedEmail === DELIVERY_CREDENTIALS.email && password === DELIVERY_CREDENTIALS.password) {
-      const deliveryUser = {
-        _id: 'delivery-001',
-        name: 'Delivery',
-        email: DELIVERY_CREDENTIALS.email,
-        phone: '+970000000000',
-        isEmailVerified: true,
-        emailVerifiedAt: new Date(),
-        role: 'delivery',
-        profilePicture: '',
-        address: {
-          line1: '',
-          city: '',
-          postalCode: '',
-          country: 'Palestine',
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const deliveryUser = await getOrCreateDeliveryCredentialUser();
 
       const token = createAuthToken(deliveryUser);
 
@@ -644,6 +746,15 @@ export const verifyEmailCode = async (req, res) => {
           setDefaultsOnInsert: true,
         },
       );
+
+      if (!user.accountRewardGranted && user.role === 'customer') {
+        const currentBalance = getCurrentRewardBalance(user);
+        const lifetimeBaseline = Math.max(Number(user.lifetimeLoyaltyPoints ?? 0), currentBalance);
+        syncRewardBalances(user, currentBalance + ACCOUNT_CREATION_POINTS);
+        user.lifetimeLoyaltyPoints = lifetimeBaseline + ACCOUNT_CREATION_POINTS;
+        user.accountRewardGranted = true;
+        await user.save();
+      }
 
       await pendingRegistration.deleteOne();
       scheduleCustomerWorkbookRefresh();
@@ -912,7 +1023,7 @@ export const updateCurrentUser = async (req, res) => {
     if (submittedPayload.address !== undefined) {
       const mergedAddress = {
         line1: String(submittedPayload.address?.line1 ?? user.address?.line1 ?? '').trim(),
-        city: String(submittedPayload.address?.city ?? user.address?.city ?? '').trim(),
+        city: normalizeCityValue(submittedPayload.address?.city ?? user.address?.city ?? ''),
         postalCode: String(submittedPayload.address?.postalCode ?? user.address?.postalCode ?? '').trim(),
         country: String(submittedPayload.address?.country ?? user.address?.country ?? '').trim(),
       };
@@ -921,6 +1032,13 @@ export const updateCurrentUser = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: 'City, postal code, and country are required in address information.',
+        });
+      }
+
+      if (!isKnownCityValue(mergedAddress.city)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please choose a valid Palestinian city.',
         });
       }
 

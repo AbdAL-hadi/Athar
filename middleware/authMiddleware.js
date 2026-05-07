@@ -81,23 +81,25 @@ export const attachUserIfPresent = async (req, _res, next) => {
     // Handle mock delivery user
     if (payload.userId === 'delivery-001' && payload.role === 'delivery') {
       console.log('Setting delivery user');
+      const persistentDeliveryUser = await User.findOne({ email: 'delivery@athar.com' }).select('-password');
       req.user = {
         _id: 'delivery-001',
-        name: 'Delivery',
+        name: persistentDeliveryUser?.name || 'Delivery',
         email: 'delivery@athar.com',
-        phone: '+970000000000',
+        phone: persistentDeliveryUser?.phone || '+970000000000',
         isEmailVerified: true,
-        emailVerifiedAt: new Date(),
+        emailVerifiedAt: persistentDeliveryUser?.emailVerifiedAt || new Date(),
         role: 'delivery',
-        profilePicture: '',
-        address: {
+        deliveryCity: persistentDeliveryUser?.deliveryCity || '',
+        profilePicture: persistentDeliveryUser?.profilePicture || '',
+        address: persistentDeliveryUser?.address || {
           line1: '',
           city: '',
           postalCode: '',
           country: 'Palestine',
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: persistentDeliveryUser?.createdAt || new Date(),
+        updatedAt: persistentDeliveryUser?.updatedAt || new Date(),
       };
       next();
       return;

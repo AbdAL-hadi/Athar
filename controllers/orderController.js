@@ -4,12 +4,14 @@ import Product from '../models/Product.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
 import { buildImageAssetUrlFromReference } from '../services/assets/imageAssetService.js';
+import { normalizeCityValue } from '../constants/palestinianCities.js';
 import {
   awardLoyaltyPointsForOrder,
+  getCheckoutRewardId,
   redeemLoyaltyRewardForCheckout,
   runWithLoyaltyTransaction,
 } from '../services/loyalty/loyaltyPointsService.js';
-import { calculateProductPoints } from '../src/utils/loyaltyPoints.js';
+import { REWARD_DISCOUNT_PERCENT } from '../src/utils/loyaltyPoints.js';
 import { sendOrderWhatsAppMessage } from '../utils/notifications.js';
 
 const normalizeAddress = (body = {}) => {
@@ -18,7 +20,7 @@ const normalizeAddress = (body = {}) => {
   return {
     fullName: nestedAddress?.fullName ?? body.fullName ?? '',
     line1: nestedAddress?.line1 ?? body.address ?? '',
-    city: nestedAddress?.city ?? body.city ?? '',
+    city: normalizeCityValue(nestedAddress?.city ?? body.city ?? ''),
     postalCode: nestedAddress?.postalCode ?? body.postalCode ?? '',
     country: nestedAddress?.country ?? body.country ?? 'Palestine',
   };
@@ -39,9 +41,11 @@ const sanitizeCheckoutUser = (userDocument) => ({
   role: userDocument.role,
   favoriteIds: Array.isArray(userDocument.favorites) ? userDocument.favorites : [],
   address: userDocument.address,
-  atharPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
-  loyaltyPoints: Math.max(Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  rewardPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  atharPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
+  loyaltyPoints: Math.max(Number(userDocument.rewardPoints ?? 0), Number(userDocument.atharPoints ?? 0), Number(userDocument.loyaltyPoints ?? 0)),
   lifetimeLoyaltyPoints: Math.max(
+    Number(userDocument.rewardPoints ?? 0),
     Number(userDocument.lifetimeLoyaltyPoints ?? 0),
     Number(userDocument.atharPoints ?? 0),
     Number(userDocument.loyaltyPoints ?? 0),
@@ -108,6 +112,8 @@ export const createOrder = async (req, res) => {
       paymentMethod = 'Cash on Delivery',
       phone = '',
       loyaltyRedemption = null,
+      useRewardDiscount = false,
+      checkoutRequestId = '',
     } = req.body ?? {};
     const address = normalizeAddress(req.body ?? {});
 
@@ -176,17 +182,47 @@ export const createOrder = async (req, res) => {
         image: buildImageAssetUrlFromReference(product.images?.[0]),
         quantity: item.quantity,
         price: product.price,
-        pointsEarned: calculateProductPoints(product, item.quantity),
+        pointsEarned: 0,
       };
     });
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const normalizedShippingFee = Math.max(0, Number(shippingFee) || 0);
-    const loyaltyPointsEarned = orderItems.reduce((sum, item) => sum + item.pointsEarned, 0);
+    const estimatedPointsBeforeDiscount = Math.floor(subtotal + normalizedShippingFee);
     const persistentUserId =
       req.user?._id && mongoose.isValidObjectId(req.user._id) ? req.user._id : null;
+    const normalizedCheckoutRequestId = String(checkoutRequestId ?? '').trim().slice(0, 120);
+
+    if (persistentUserId && normalizedCheckoutRequestId) {
+      const existingCheckoutOrder = await Order.findOne({
+        user: persistentUserId,
+        checkoutRequestId: normalizedCheckoutRequestId,
+      })
+        .populate('user', 'name email role')
+        .populate('items.product');
+
+      if (existingCheckoutOrder) {
+        return res.status(200).json({
+          success: true,
+          message: 'Order already created for this checkout request.',
+          data: existingCheckoutOrder,
+          loyalty: {
+            pointsEarned: existingCheckoutOrder.earnedPoints ?? existingCheckoutOrder.loyaltyPointsEarned ?? 0,
+            balance: null,
+            applied: Boolean(existingCheckoutOrder.pointsAdded),
+            redeemedReward: existingCheckoutOrder.loyaltyReward ?? null,
+          },
+          user: req.user ? sanitizeCheckoutUser(req.user) : null,
+          notifications: {
+            whatsapp: { delivered: false, channel: 'skipped' },
+          },
+        });
+      }
+    }
+
     const selectedRewardId =
-      loyaltyRedemption && typeof loyaltyRedemption === 'object' ? loyaltyRedemption.rewardId ?? '' : '';
+      getCheckoutRewardId(Boolean(useRewardDiscount)) ||
+      (loyaltyRedemption && typeof loyaltyRedemption === 'object' ? loyaltyRedemption.rewardId ?? '' : '');
 
     const checkoutDraft = await runWithLoyaltyTransaction(async (session) => {
       const redemption = await redeemLoyaltyRewardForCheckout({
@@ -194,21 +230,40 @@ export const createOrder = async (req, res) => {
         rewardId: selectedRewardId,
         subtotal,
         shippingFee: normalizedShippingFee,
+        estimatedPointsFromOrder: estimatedPointsBeforeDiscount,
         session,
       });
+      const loyaltyPointsEarned = estimatedPointsBeforeDiscount;
+      const pointsBalanceBefore = Number(redemption.currentBalance ?? 0) || 0;
+      const projectedPointsBeforeRedemption =
+        redemption.projectedBalanceBeforeRedemption !== null && redemption.projectedBalanceBeforeRedemption !== undefined
+          ? redemption.projectedBalanceBeforeRedemption
+          : pointsBalanceBefore + loyaltyPointsEarned;
+      const pointsBalanceAfter =
+        redemption.pointsBalanceAfterRedemption !== null && redemption.pointsBalanceAfterRedemption !== undefined
+          ? redemption.pointsBalanceAfterRedemption
+          : projectedPointsBeforeRedemption;
 
       const orderPayload = {
         user: persistentUserId,
         orderNumber: generateOrderNumber(),
+        checkoutRequestId: normalizedCheckoutRequestId,
         items: orderItems,
         subtotal,
         shippingFee: normalizedShippingFee,
         discountAmount: redemption.discountAmount,
         total: redemption.finalTotal,
+        rewardsDiscountApplied: Boolean(redemption.reward),
+        rewardPointsRedeemed: redemption.pointsRedeemed,
+        rewardsDiscountAmount: redemption.discountAmount,
+        pointsEarnedFromOrder: loyaltyPointsEarned,
+        pointsBalanceBefore,
+        projectedPointsBeforeRedemption,
+        pointsBalanceAfter,
         loyaltyReward: redemption.reward
           ? {
               id: redemption.reward.id,
-              title: redemption.reward.title,
+              title: `${REWARD_DISCOUNT_PERCENT}% reward discount`,
               pointsRedeemed: redemption.pointsRedeemed,
             }
           : undefined,
@@ -231,6 +286,7 @@ export const createOrder = async (req, res) => {
         pointsRedeemed: redemption.pointsRedeemed,
         updatedUser: redemption.updatedUser,
         remainingBalance: redemption.remainingBalance,
+        pointsEarned: loyaltyPointsEarned,
       };
     });
 
@@ -276,7 +332,7 @@ export const createOrder = async (req, res) => {
       message: 'Order created successfully.',
       data: populatedOrder,
       loyalty: {
-        pointsEarned: loyaltyPointsEarned,
+        pointsEarned: checkoutDraft.pointsEarned,
         balance: loyaltyAward.balance,
         applied: loyaltyAward.applied,
         redeemedReward: checkoutDraft.reward
@@ -492,6 +548,20 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Employee accounts can update only confirmation-related statuses.',
+      });
+    }
+
+    if (status === 'Shipped' && !['Pending', 'Confirmed', 'Shipped'].includes(existingOrder.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending or confirmed orders can be marked as shipped.',
+      });
+    }
+
+    if (status === 'Delivered' && !['Shipped', 'Delivered'].includes(existingOrder.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only shipped orders can be marked as delivered.',
       });
     }
 

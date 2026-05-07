@@ -133,7 +133,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-ink/45 px-4 py-6 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}

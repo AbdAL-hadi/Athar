@@ -1,11 +1,11 @@
 const defaultSteps = [
-  { label: 'Ordered', value: 'Pending' },
+  { label: 'Confirmed', value: 'Confirmed' },
   { label: 'Shipped', value: 'Shipped' },
   { label: 'Delivered', value: 'Delivered' },
 ];
 
 const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '' }) => {
-  const normalizedStatus = status === 'Confirmed' ? 'Shipped' : status;
+  const normalizedStatus = status === 'Pending' ? 'Confirmed' : status;
 
   // Handle cancelled status
   if (normalizedStatus === 'Cancelled') {

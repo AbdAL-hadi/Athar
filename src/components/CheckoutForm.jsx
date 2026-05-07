@@ -1,3 +1,5 @@
+import { PALESTINIAN_CITIES } from '../data/palestinianCities';
+
 const CheckoutForm = ({
   formData,
   errors = {},
@@ -37,7 +39,14 @@ const CheckoutForm = ({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <input className="field" placeholder="City" value={formData.city} onChange={(event) => onFieldChange('city', event.target.value)} />
+          <select className="field" value={formData.city} onChange={(event) => onFieldChange('city', event.target.value)} aria-label="City">
+            <option value="">Select city</option>
+            {PALESTINIAN_CITIES.map((city) => (
+              <option key={city.value} value={city.value}>
+                {city.label}
+              </option>
+            ))}
+          </select>
           {errors.city ? <p className="mt-2 text-sm text-[#b56f64]">{errors.city}</p> : null}
         </div>
         <div>
