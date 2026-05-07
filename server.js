@@ -18,6 +18,7 @@ import patternStoryRoutes from './routes/patternStoryRoutes.js';
 import productMatchRoutes from './routes/productMatchRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import tryOnRoutes from './routes/tryOnRoutes.js';
+import customerChatbotRoutes from './routes/customerChatbotRoutes.js';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/ai', tryOnRoutes);
 app.use('/api/ai-try-on', aiTryOnRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/chatbot', customerChatbotRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/product-match', productMatchRoutes);
@@ -61,3 +63,4 @@ const startServer = async () => {
 };
 
 startServer();
+
