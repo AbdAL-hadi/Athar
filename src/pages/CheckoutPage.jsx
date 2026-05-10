@@ -4,9 +4,10 @@ import CheckoutForm from '../components/CheckoutForm';
 import PriceText from '../components/PriceText';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
-import { normalizeCityValue } from '../data/palestinianCities';
+import { isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
+import { getOrCreateSessionId } from '../utils/behaviorTracking';
 import { getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
 import {
@@ -175,7 +176,7 @@ const CheckoutPage = ({
     if (!formData.fullName.trim()) nextErrors.fullName = 'Full name is required.';
     if (!formData.phone.trim()) nextErrors.phone = 'Phone number is required.';
     if (!formData.line1.trim()) nextErrors.line1 = 'Address line is required.';
-    if (!normalizeCityValue(formData.city)) nextErrors.city = 'City is required.';
+    if (!isKnownCityValue(formData.city)) nextErrors.city = 'Please choose a valid Palestinian city.';
     if (!formData.postalCode.trim()) nextErrors.postalCode = 'Postal code is required.';
     if (!formData.country.trim()) nextErrors.country = 'Country is required.';
     if (formData.paymentMethod !== 'Cash on Delivery') nextErrors.paymentMethod = 'Only Cash on Delivery is available.';
@@ -224,6 +225,7 @@ const CheckoutPage = ({
         phone: formData.phone,
         useRewardDiscount: shouldApplyRewardDiscount,
         checkoutRequestId: checkoutRequestIdRef.current,
+        sessionId: getOrCreateSessionId(),
         address: {
           fullName: formData.fullName,
           line1: formData.line1,

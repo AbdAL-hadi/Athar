@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Comment from '../models/Comment.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
+import { recordBehaviorEventSafely } from '../services/behaviorEventService.js';
 import { awardProductReviewPoints } from '../services/loyalty/loyaltyPointsService.js';
 import { moderateComment } from '../services/moderation/commentModerationService.js';
 import { sendCommentRejectedEmail } from '../utils/notifications.js';
@@ -172,6 +173,21 @@ export const createProductComment = async (req, res) => {
         console.error('[Athar comments] Review reward failed:', error.message);
       });
     }
+
+    void recordBehaviorEventSafely({
+      body: {
+        eventType: 'review_create',
+        quantity: 1,
+        sourcePage: `/products/${product.slug}`,
+        metadata: {
+          status: comment.status || 'created',
+          hasRating: rating !== null,
+        },
+      },
+      user,
+      product,
+      userCity: user.address?.city || '',
+    });
 
     const message =
       comment.status === 'approved'

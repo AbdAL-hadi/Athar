@@ -8,6 +8,7 @@ import PriceText from '../components/PriceText';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
 import { resolveApiAssetUrl } from '../utils/api';
+import { trackBehavior } from '../utils/behaviorTracking';
 import { isProductFavorite } from '../utils/productCatalog';
 
 const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
@@ -34,6 +35,29 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
   const handleSubmit = (event) => {
     event.preventDefault();
     const trimmedQuery = inputValue.trim();
+    const nextResultsCount = trimmedQuery
+      ? products.filter((product) => {
+          const normalizedNextQuery = trimmedQuery.toLowerCase();
+          return (
+            product.name.toLowerCase().includes(normalizedNextQuery) ||
+            product.category.toLowerCase().includes(normalizedNextQuery) ||
+            product.material.toLowerCase().includes(normalizedNextQuery) ||
+            product.description.toLowerCase().includes(normalizedNextQuery)
+          );
+        }).length
+      : 0;
+
+    if (trimmedQuery) {
+      trackBehavior({
+        eventType: 'search',
+        searchQuery: trimmedQuery,
+        sourcePage: '/search',
+        metadata: {
+          resultsCount: nextResultsCount,
+        },
+      });
+    }
+
     setSearchParams(trimmedQuery ? { q: trimmedQuery } : {});
   };
 

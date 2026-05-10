@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import profileMotif from '../assets/products/Nprfile.png';
-import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../data/palestinianCities';
+import { PALESTINIAN_CITIES, getCityLabel, isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
 import {
@@ -431,8 +431,8 @@ const ProfilePage = ({ authUser, authToken, onLogout, onUpdateProfile }) => {
         country: addressForm.country.trim(),
       };
 
-      if (!normalizedAddress.city || !normalizedAddress.postalCode || !normalizedAddress.country) {
-        setSectionFeedback('address', 'City, postal code, and country are required.');
+      if (!isKnownCityValue(addressForm.city) || !normalizedAddress.postalCode || !normalizedAddress.country) {
+        setSectionFeedback('address', 'Please choose a valid city, postal code, and country.');
         return;
       }
 

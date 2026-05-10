@@ -2,6 +2,8 @@ import { NavLink } from 'react-router-dom';
 
 const adminLinks = [
   { to: '/employee-dashboard', label: 'All Products' },
+  { to: '/admin/inventory', label: 'Inventory' },
+  { to: '/admin/analytics', label: 'Analytics' },
   { to: '/admin/comments', label: 'Comments' },
   { to: '/admin/dashboard', label: 'Admin Dashboard' },
 ];

@@ -9,6 +9,7 @@ import QuantitySelector from '../components/QuantitySelector';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
+import { getTrackableProductId, trackBehavior } from '../utils/behaviorTracking';
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
 import { findProductByReference, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
@@ -61,6 +62,7 @@ const ProductDetailsPage = ({
   const [commentError, setCommentError] = useState('');
   const audioRef = useRef(null);
   const speechUtteranceRef = useRef(null);
+  const trackedProductViewsRef = useRef(new Set());
 
   const stopSpeechPlayback = () => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -186,6 +188,21 @@ const ProductDetailsPage = ({
       isCancelled = true;
     };
   }, [product?.id]);
+
+  useEffect(() => {
+    const trackableProductId = getTrackableProductId(product);
+
+    if (!trackableProductId || trackedProductViewsRef.current.has(trackableProductId)) {
+      return;
+    }
+
+    trackedProductViewsRef.current.add(trackableProductId);
+    trackBehavior({
+      eventType: 'product_view',
+      product,
+      sourcePage: window.location.pathname,
+    });
+  }, [product]);
 
   const buildSpokenProductDescription = () => {
     const visualDescriptions = visualDescriptionData?.inferences?.descriptions?.en ?? {};

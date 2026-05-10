@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
+import { trackBehavior } from '../utils/behaviorTracking';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -121,8 +122,29 @@ const AITryOnModal = ({ product, open, onClose }) => {
       }
 
       setResultImage(resolveApiAssetUrl(nextImage));
+      trackBehavior({
+        eventType: 'try_on_generate',
+        product,
+        sourcePage: window.location.pathname,
+        metadata: {
+          status: 'success',
+          style,
+          productType: product.tryOnCategory || product.category || '',
+        },
+      });
       setMessage(response?.data?.message || 'AI try-on preview generated successfully.');
     } catch (generateError) {
+      trackBehavior({
+        eventType: 'try_on_generate',
+        product,
+        sourcePage: window.location.pathname,
+        metadata: {
+          status: 'failed',
+          style,
+          productType: product.tryOnCategory || product.category || '',
+          reason: generateError?.status || 'request_failed',
+        },
+      });
       setError(
         generateError.message ||
           "We couldn't generate a try-on preview right now. Please try again.",

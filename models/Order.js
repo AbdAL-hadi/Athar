@@ -36,6 +36,16 @@ const orderItemSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    warehouse: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Warehouse',
+      default: null,
+    },
+    warehouseCity: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   { _id: false },
 );

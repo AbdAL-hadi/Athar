@@ -47,6 +47,8 @@ const AdminProductEditor = ({
     () => (Array.isArray(form.images) ? form.images.filter(Boolean).map((image) => resolveApiAssetUrl(image)) : []),
     [form.images],
   );
+  const warehouseStocks = Array.isArray(form.warehouseStocks) ? form.warehouseStocks : [];
+  const warehouseTotalStock = warehouseStocks.reduce((sum, stock) => sum + Math.max(0, Number(stock.quantity || 0)), 0);
   const galleryImages = [...existingImages, ...filePreviews];
   const activeImage = galleryImages[selectedImage] || galleryImages[0] || '';
   const hasImage = galleryImages.length > 0;
@@ -81,6 +83,19 @@ const AdminProductEditor = ({
 
   const handleApplySuggestion = (field, value) => {
     onFieldChange(field, value);
+  };
+
+  const handleWarehouseStockChange = (warehouseId, field, value) => {
+    const nextStocks = warehouseStocks.map((stock) =>
+      stock.warehouseId === warehouseId
+        ? {
+            ...stock,
+            [field]: value,
+          }
+        : stock,
+    );
+
+    onFieldChange('warehouseStocks', nextStocks);
   };
 
   const patternImageUrl = patternImagePreview || resolveApiAssetUrl(form.patternImage || '');
@@ -316,18 +331,19 @@ const AdminProductEditor = ({
 
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>
-                    <FieldLabel>Stock number</FieldLabel>
+                    <FieldLabel>Total stock preview</FieldLabel>
                     <input
                       type="number"
-                      value={form.stock}
+                      value={warehouseStocks.length > 0 ? warehouseTotalStock : form.stock}
                       onChange={(event) => onFieldChange('stock', event.target.value)}
                       className={fieldClassName}
                       min="0"
                       step="1"
                       placeholder="0"
+                      readOnly={warehouseStocks.length > 0}
                     />
                     <p className="mt-2 text-sm text-ink-soft">
-                      Availability preview: {Number(form.stock || 0) > 0 ? `${form.stock} in stock` : 'Out of stock'}
+                      Availability preview: {Number((warehouseStocks.length > 0 ? warehouseTotalStock : form.stock) || 0) > 0 ? `${warehouseStocks.length > 0 ? warehouseTotalStock : form.stock} in stock` : 'Out of stock'}
                     </p>
                   </div>
                   <div className="flex items-end">
@@ -342,6 +358,56 @@ const AdminProductEditor = ({
                     </label>
                   </div>
                 </div>
+
+                {warehouseStocks.length > 0 ? (
+                  <div className="rounded-[26px] border border-line bg-[#fffaf8] p-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-sm uppercase tracking-[0.18em] text-muted">Warehouse Stock</p>
+                        <h4 className="mt-2 font-display text-3xl text-ink">Distribution by city</h4>
+                      </div>
+                      <p className="text-sm font-semibold text-ink">Total stock preview: {warehouseTotalStock}</p>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      {warehouseStocks.map((stock) => (
+                        <div
+                          key={stock.warehouseId}
+                          className="rounded-[20px] border border-line bg-white p-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-ink">{stock.warehouseName}</p>
+                            <p className="mt-1 text-sm text-ink-soft">{stock.cityLabel || stock.city}</p>
+                          </div>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div className="min-w-0">
+                              <FieldLabel>Quantity</FieldLabel>
+                              <input
+                                type="number"
+                                value={stock.quantity}
+                                onChange={(event) => handleWarehouseStockChange(stock.warehouseId, 'quantity', event.target.value)}
+                                className={fieldClassName}
+                                min="0"
+                                step="1"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <FieldLabel>Low threshold</FieldLabel>
+                              <input
+                                type="number"
+                                value={stock.lowStockThreshold}
+                                onChange={(event) => handleWarehouseStockChange(stock.warehouseId, 'lowStockThreshold', event.target.value)}
+                                className={fieldClassName}
+                                min="0"
+                                step="1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="rounded-[26px] border border-line bg-[#fffaf8] p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

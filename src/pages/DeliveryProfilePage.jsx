@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../data/palestinianCities';
+import { PALESTINIAN_CITIES, getCityLabel, isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
 import { formatDate } from '../utils/format';
@@ -100,6 +100,11 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
 
     if (!form.name.trim() || !form.phone.trim()) {
       setError('Full name and phone number are required.');
+      return;
+    }
+
+    if (!isKnownCityValue(form.deliveryCity)) {
+      setError('Please choose a valid Palestinian city.');
       return;
     }
 
