@@ -6,9 +6,13 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import adminAiAssistRoutes from './routes/adminAiAssistRoutes.js';
+import adminAnalyticsRoutes from './routes/adminAnalyticsRoutes.js';
+import adminBehaviorRoutes from './routes/adminBehaviorRoutes.js';
 import adminCommentRoutes from './routes/adminCommentRoutes.js';
+import adminWarehouseRoutes from './routes/adminWarehouseRoutes.js';
 import aiTryOnRoutes from './routes/aiTryOnRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
+import behaviorRoutes from './routes/behaviorRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
@@ -33,9 +37,13 @@ app.get('/', (_req, res) => {
 
 app.use('/api/assets', assetRoutes);
 app.use('/api/admin/ai-assist', adminAiAssistRoutes);
+app.use('/api/admin/analytics', adminAnalyticsRoutes);
+app.use('/api/admin/behavior', adminBehaviorRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/behavior', behaviorRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/comments', adminCommentRoutes);
+app.use('/api/admin', adminWarehouseRoutes);
 app.use('/api/ai', tryOnRoutes);
 app.use('/api/ai-try-on', aiTryOnRoutes);
 app.use('/api/cart', cartRoutes);

@@ -16,6 +16,7 @@ import {
   getProductVisualDescription,
   ProductVisualDescriptionError,
 } from '../services/visualDescriber/productVisualDescriptionService.js';
+import { upsertProductWarehouseStocks } from '../services/inventoryService.js';
 import { matchProductByImage, ProductMatchError } from '../services/productMatch/productMatchService.js';
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
@@ -81,6 +82,25 @@ const normalizeOptionalNumber = (value) => {
 
   return Number(value);
 };
+
+const normalizeWarehouseStockPayload = (value) => {
+  const parsed = parseJsonField(value, value);
+
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+
+  return parsed
+    .map((stock) => ({
+      warehouseId: stock?.warehouseId ?? stock?.warehouse?._id ?? stock?.warehouse?.id ?? stock?.warehouse,
+      quantity: Number(stock?.quantity ?? 0),
+      lowStockThreshold: Number(stock?.lowStockThreshold ?? 3),
+    }))
+    .filter((stock) => stock.warehouseId);
+};
+
+const getWarehouseStockTotal = (stocks = []) =>
+  stocks.reduce((sum, stock) => sum + Math.max(0, Number(stock.quantity || 0)), 0);
 
 const serializeImageReferences = (references = []) =>
   Array.isArray(references)
@@ -307,6 +327,16 @@ export const createProduct = async (req, res) => {
     const buildResult = await buildProductPayload(req.body, req.files ?? []);
     const { payload } = buildResult;
     createdImageReferences = buildResult.createdImageReferences;
+    const warehouseStocks = normalizeWarehouseStockPayload(req.body?.warehouseStocks ?? req.body?.stocks);
+
+    if (warehouseStocks) {
+      const totalStock = getWarehouseStockTotal(warehouseStocks);
+      const inventoryState = getInventoryState(totalStock, payload.lowStockThreshold);
+
+      payload.stock = totalStock;
+      payload.lowStockFlag = inventoryState.lowStockFlag;
+      payload.inventoryStatus = inventoryState.inventoryStatus;
+    }
 
     if (!payload.title) {
       await cleanupCreatedImages();
@@ -333,7 +363,7 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Price must be a valid number.' });
     }
 
-    if (!String(req.body?.stock ?? '').trim() || !Number.isFinite(payload.stock)) {
+    if (!warehouseStocks && (!String(req.body?.stock ?? '').trim() || !Number.isFinite(payload.stock))) {
       await cleanupCreatedImages();
       return res.status(400).json({ success: false, message: 'Stock must be a valid number.' });
     }
@@ -352,6 +382,15 @@ export const createProduct = async (req, res) => {
       ...payload,
       slug: await ensureUniqueSlug(payload.title),
     });
+
+    let savedProduct = product;
+    if (warehouseStocks) {
+      savedProduct = await upsertProductWarehouseStocks({
+        productId: product._id,
+        stocks: warehouseStocks,
+      });
+    }
+
     await attachImageAssetsToOwner(createdImageReferences, {
       ownerModel: 'Product',
       ownerId: product._id,
@@ -364,7 +403,7 @@ export const createProduct = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Product created successfully',
-      data: serializeProduct(product),
+      data: serializeProduct(savedProduct),
     });
   } catch (error) {
     await cleanupCreatedImages();
@@ -405,6 +444,16 @@ export const updateProduct = async (req, res) => {
     );
     const { payload: updateData } = buildResult;
     createdImageReferences = buildResult.createdImageReferences;
+    const warehouseStocks = normalizeWarehouseStockPayload(req.body?.warehouseStocks ?? req.body?.stocks);
+
+    if (warehouseStocks) {
+      const totalStock = getWarehouseStockTotal(warehouseStocks);
+      const inventoryState = getInventoryState(totalStock, existingProduct.lowStockThreshold);
+
+      updateData.stock = totalStock;
+      updateData.lowStockFlag = inventoryState.lowStockFlag;
+      updateData.inventoryStatus = inventoryState.inventoryStatus;
+    }
 
     // Keep the public URL stable when admins edit the product title.
     delete updateData.slug;
@@ -426,10 +475,18 @@ export const updateProduct = async (req, res) => {
     }
 
     // Update and get the fresh product data
-    const product = await Product.findByIdAndUpdate(existingProduct._id, updateData, {
+    let product = await Product.findByIdAndUpdate(existingProduct._id, updateData, {
       new: true,
       runValidators: true,
-    }).lean(); // Using lean() for better performance
+    });
+
+    if (warehouseStocks) {
+      product = await upsertProductWarehouseStocks({
+        productId: existingProduct._id,
+        stocks: warehouseStocks,
+      });
+    }
+
     await attachImageAssetsToOwner(createdImageReferences, {
       ownerModel: 'Product',
       ownerId: existingProduct._id,

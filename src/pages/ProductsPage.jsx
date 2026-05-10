@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
@@ -9,6 +10,7 @@ import ProductCardSkeleton from '../components/ProductCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
 import { getHeritageCityById } from '../data/heritageCities';
+import { trackBehavior } from '../utils/behaviorTracking';
 import { getCatalogCategories, isProductFavorite } from '../utils/productCatalog';
 
 const PRODUCTS_PER_PAGE = 6;
@@ -79,6 +81,7 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
   const selectedCityId = searchParams.get('city') ?? '';
   const selectedCity = getHeritageCityById(selectedCityId);
   const rawPage = Number.parseInt(searchParams.get('page') ?? '1', 10);
+  const lastTrackedSearchRef = useRef('');
 
   const updateParams = (changes) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -129,6 +132,34 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
   const currentPage = Number.isNaN(rawPage) ? 1 : Math.min(Math.max(rawPage, 1), totalPages);
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * PRODUCTS_PER_PAGE, currentPage * PRODUCTS_PER_PAGE);
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const trackingKey = `${trimmedQuery.toLowerCase()}:${filteredProducts.length}`;
+
+      if (lastTrackedSearchRef.current === trackingKey) {
+        return;
+      }
+
+      lastTrackedSearchRef.current = trackingKey;
+      trackBehavior({
+        eventType: 'search',
+        searchQuery: trimmedQuery,
+        sourcePage: '/products',
+        metadata: {
+          resultsCount: filteredProducts.length,
+        },
+      });
+    }, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [filteredProducts.length, query]);
 
   const clearFilters = () => setSearchParams({});
   const hasActiveFilters =

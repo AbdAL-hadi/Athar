@@ -9,6 +9,7 @@ import SearchBar from '../components/SearchBar';
 import SectionTitle from '../components/SectionTitle';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getActiveAuthToken } from '../utils/authSession';
+import { trackBehavior } from '../utils/behaviorTracking';
 import { isProductFavorite } from '../utils/productCatalog';
 import { getCatalogCategories } from '../utils/productCatalog';
 
@@ -150,6 +151,15 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
   const handleSearch = (event) => {
     event.preventDefault();
     const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery) {
+      trackBehavior({
+        eventType: 'search',
+        searchQuery: trimmedQuery,
+        sourcePage: '/',
+      });
+    }
+
     navigate(trimmedQuery ? `/search?q=${encodeURIComponent(trimmedQuery)}` : '/search');
   };
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Toast from '../components/Toast';
-import { PALESTINIAN_CITIES, normalizeCityValue } from '../data/palestinianCities';
+import { PALESTINIAN_CITIES, isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 
 const COUNTRY_OPTIONS = [
@@ -114,8 +114,8 @@ const validateRegisterForm = (form, selectedCountry) => {
     errors.confirmPassword = 'Passwords do not match.';
   }
 
-  if (!normalizeCityValue(form.city)) {
-    errors.city = 'City is required.';
+  if (!isKnownCityValue(form.city)) {
+    errors.city = 'Please choose a valid Palestinian city.';
   }
 
   if (!form.postalCode.trim()) {

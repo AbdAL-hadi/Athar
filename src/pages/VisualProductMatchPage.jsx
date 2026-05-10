@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PriceText from '../components/PriceText';
 import { API_BASE_URL, apiRequest, resolveApiAssetUrl } from '../utils/api';
+import { trackBehavior } from '../utils/behaviorTracking';
 
 const acceptedImageTypes = 'image/png,image/jpeg,image/webp';
 
@@ -64,6 +65,15 @@ const VisualProductMatchPage = () => {
 
       if (response?.available === false) {
         const availabilityReason = String(response?.availabilityReason || '').trim();
+        trackBehavior({
+          eventType: 'visual_search',
+          sourcePage: '/visual-match',
+          metadata: {
+            status: 'success',
+            availabilityReason,
+            resultsCount: 0,
+          },
+        });
         setUnavailableState({
           type: availabilityReason === 'no_catalog_products' ? 'catalog_empty' : 'no_close_enough_match',
           message:
@@ -75,9 +85,35 @@ const VisualProductMatchPage = () => {
       }
 
       if (!resultData?.product) {
+        trackBehavior({
+          eventType: 'visual_search',
+          sourcePage: '/visual-match',
+          metadata: {
+            status: 'failed',
+            reason: 'missing_product_result',
+            resultsCount: 0,
+          },
+        });
         setErrorMessage(response?.message || 'We could not compare this image against the catalog right now.');
         return;
       }
+
+      trackBehavior({
+        eventType: 'visual_search',
+        productId: resultData.product?._id || resultData.product?.productId || resultData.product?.id || resultData.product?.slug || '',
+        sourcePage: '/visual-match',
+        metadata: {
+          status: 'success',
+          detectedTags: [
+            resultData.analyzedImage?.productType,
+            resultData.analyzedImage?.category,
+            ...(Array.isArray(resultData.analyzedImage?.colors) ? resultData.analyzedImage.colors : []),
+            ...(Array.isArray(resultData.analyzedImage?.materials) ? resultData.analyzedImage.materials : []),
+          ].filter(Boolean).slice(0, 12),
+          matchQuality: resultData.matchQuality,
+          resultsCount: 1,
+        },
+      });
 
       setMatchResult({
         score: Number(resultData?.score || 0),
@@ -87,6 +123,15 @@ const VisualProductMatchPage = () => {
         product: resultData?.product ?? null,
       });
     } catch (error) {
+      trackBehavior({
+        eventType: 'visual_search',
+        sourcePage: '/visual-match',
+        metadata: {
+          status: 'failed',
+          reason: error?.status || 'request_failed',
+          resultsCount: 0,
+        },
+      });
       setErrorMessage(
         error?.message || 'We could not find a match right now. Please try again.',
       );

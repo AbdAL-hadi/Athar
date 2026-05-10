@@ -7,6 +7,8 @@ import MainLayout from './layout/MainLayout';
 import AboutPage from './pages/AboutPage';
 import AdminCommentModerationPage from './pages/AdminCommentModerationPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminBehaviorAnalyticsPage from './pages/AdminBehaviorAnalyticsPage';
+import AdminWarehouseInventoryPage from './pages/AdminWarehouseInventoryPage';
 import AuthPage from './pages/AuthPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -26,6 +28,7 @@ import VisualProductMatchPage from './pages/VisualProductMatchPage';
 import Toast from './components/Toast';
 import { apiRequest } from './utils/api';
 import { clearAuthSession, getActiveAuthToken, loadAuthToken, loadAuthUser, saveAuthSession } from './utils/authSession';
+import { getTrackableProductId, trackBehavior } from './utils/behaviorTracking';
 import { addCartItem, getCartItemCount, loadCart, removeCartItem, saveCart, updateCartItemQuantity } from './utils/cart';
 import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, normalizeProduct, normalizeProducts } from './utils/productCatalog';
 
@@ -173,6 +176,12 @@ const App = () => {
     }
 
     setCartItems((currentItems) => addCartItem(currentItems, product, quantity));
+    trackBehavior({
+      eventType: 'add_to_cart',
+      product,
+      quantity,
+      sourcePage: window.location.pathname,
+    });
     return true;
   };
 
@@ -181,7 +190,17 @@ const App = () => {
   };
 
   const handleRemoveCartItem = (productId) => {
+    const removedItem = cartItems.find((item) => item.id === productId || item.productId === productId);
     setCartItems((currentItems) => removeCartItem(currentItems, productId));
+    trackBehavior({
+      eventType: 'remove_from_cart',
+      productId: removedItem?.productId || removedItem?.id || productId,
+      productTitle: removedItem?.name || '',
+      productCategory: removedItem?.category || '',
+      productPrice: removedItem?.price,
+      quantity: removedItem?.quantity || 1,
+      sourcePage: window.location.pathname,
+    });
   };
 
   const handleProductLoaded = (updatedProduct) => {
@@ -264,6 +283,12 @@ const App = () => {
       );
 
       syncFavoriteIds(response?.data?.favoriteIds ?? []);
+      trackBehavior({
+        eventType: isFavorite ? 'favorite_remove' : 'favorite_add',
+        productId: getTrackableProductId(product) || productReference,
+        product: typeof product === 'object' ? product : undefined,
+        sourcePage: window.location.pathname,
+      });
     } catch (error) {
       if (error?.status === 401) {
         clearAuthSession();
@@ -338,13 +363,15 @@ const App = () => {
           element={<VisualProductMatchPage />}
         />
         <Route path="/favorites" element={<FavoritesPage products={products} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} authUser={authUser} onOpenTryOn={handleOpenTryOn} />} />
-        <Route path="/cart" element={<CartPage items={cartItems} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
+        <Route path="/cart" element={<CartPage items={cartItems} products={products} authUser={authUser} onUpdateQuantity={handleUpdateCartItem} onRemoveItem={handleRemoveCartItem} />} />
         <Route path="/checkout" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/checkout/success" element={<CheckoutPage items={cartItems} products={products} productsLoading={productsLoading} productsError={productsError} authToken={authToken} authUser={authUser} authLoading={authLoading} onCheckoutSuccess={handleClearCart} />} />
         <Route path="/order-tracking" element={<OrderTrackingPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/profile" element={<ProfilePage authUser={authUser} authToken={authToken} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} />} />
         <Route path="/heritage-map" element={<HeritageMapPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
+        <Route path="/admin/analytics" element={<AdminBehaviorAnalyticsPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
+        <Route path="/admin/inventory" element={<AdminWarehouseInventoryPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/admin/comments" element={<AdminCommentModerationPage authToken={authToken} authUser={authUser} authLoading={authLoading} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/auth" element={<AuthPage authUser={authUser} authLoading={authLoading} onAuthSuccess={handleAuthSuccess} onLogout={handleLogout} />} />

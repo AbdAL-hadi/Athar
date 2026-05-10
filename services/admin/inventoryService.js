@@ -2,8 +2,13 @@ import mongoose from 'mongoose';
 import Order from '../../models/Order.js';
 import Product from '../../models/Product.js';
 import StockLog from '../../models/StockLog.js';
+import WarehouseStock from '../../models/WarehouseStock.js';
 import { DEFAULT_LOW_STOCK_THRESHOLD } from './constants.js';
 import { getInventoryState } from './inventoryState.js';
+import {
+  decrementWarehouseStockForOrderItem,
+  restoreWarehouseStockForOrderItem,
+} from '../inventoryService.js';
 
 // Creates a typed error object so controllers can map service failures to HTTP responses.
 const createServiceError = (message, statusCode = 500) => {
@@ -105,17 +110,35 @@ const commitInventoryForOrder = async (order, session) => {
       throw createServiceError(`Insufficient stock for ${product.title}.`, 409);
     }
 
-    productEntries.push({ index, item, product, quantity });
+    const warehouseStockCountQuery = WarehouseStock.countDocuments({ product: product._id });
+    const warehouseStockCount = await (session ? warehouseStockCountQuery.session(session) : warehouseStockCountQuery);
+    productEntries.push({ index, item, product, quantity, hasWarehouseStock: warehouseStockCount > 0 });
   }
 
-  for (const { index, item, product, quantity } of productEntries) {
-    await applyProductStockChange({
-      product,
-      quantityChanged: -quantity,
-      orderId: order._id,
-      reason: 'order-shipped',
-      session,
-    });
+  for (const { index, product, quantity, hasWarehouseStock } of productEntries) {
+    if (hasWarehouseStock) {
+      const allocation = await decrementWarehouseStockForOrderItem({
+        productId: product._id,
+        quantity,
+        customerCity: order.address?.city,
+        session,
+      });
+
+      if (!allocation) {
+        throw createServiceError(`Insufficient warehouse stock for ${product.title}.`, 409);
+      }
+
+      order.items[index].warehouse = allocation.warehouse;
+      order.items[index].warehouseCity = allocation.warehouseCity;
+    } else {
+      await applyProductStockChange({
+        product,
+        quantityChanged: -quantity,
+        orderId: order._id,
+        reason: 'order-shipped',
+        session,
+      });
+    }
 
     order.items[index].fulfilledQuantity = quantity;
   }
@@ -142,13 +165,24 @@ const restoreInventoryForOrder = async (order, reason, session) => {
       continue;
     }
 
-    await applyProductStockChange({
-      product,
-      quantityChanged: fulfilledQuantity,
-      orderId: order._id,
-      reason,
-      session,
-    });
+    if (item.warehouse) {
+      await restoreWarehouseStockForOrderItem({
+        productId: product._id,
+        warehouseId: item.warehouse,
+        quantity: fulfilledQuantity,
+        session,
+      });
+      order.items[index].warehouse = null;
+      order.items[index].warehouseCity = '';
+    } else {
+      await applyProductStockChange({
+        product,
+        quantityChanged: fulfilledQuantity,
+        orderId: order._id,
+        reason,
+        session,
+      });
+    }
 
     order.items[index].fulfilledQuantity = 0;
   }

@@ -4,7 +4,8 @@ import Product from '../models/Product.js';
 import { queueSalesExportRefreshWithRetry } from '../services/admin/excelExportService.js';
 import { transitionOrderStatusWithInventory } from '../services/admin/inventoryService.js';
 import { buildImageAssetUrlFromReference } from '../services/assets/imageAssetService.js';
-import { normalizeCityValue } from '../constants/palestinianCities.js';
+import { recordBehaviorEventSafely } from '../services/behaviorEventService.js';
+import { isKnownCityValue, normalizeCityValue } from '../constants/palestinianCities.js';
 import {
   awardLoyaltyPointsForOrder,
   getCheckoutRewardId,
@@ -135,6 +136,13 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Shipping details are incomplete.',
+      });
+    }
+
+    if (!isKnownCityValue(address.city)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please choose a valid Palestinian city.',
       });
     }
 
@@ -308,6 +316,31 @@ export const createOrder = async (req, res) => {
     } catch (counterError) {
       console.error('[Athar orders] Failed to update product sold counters:', counterError.message);
     }
+
+    await Promise.all(
+      orderItems.map((item) => {
+        const product = productLookup.get(String(item.product));
+
+        return recordBehaviorEventSafely({
+          body: {
+            eventType: 'purchase',
+            quantity: item.quantity,
+            sessionId: req.body?.sessionId || '',
+            userCity: address.city,
+            sourcePage: '/checkout',
+            metadata: {
+              orderId: populatedOrder._id.toString(),
+              orderTotal: populatedOrder.total,
+              paymentMethod,
+            },
+          },
+          user: req.user,
+          sessionId: req.body?.sessionId || '',
+          product,
+          userCity: address.city,
+        });
+      }),
+    );
 
     scheduleSalesWorkbookRefresh();
 

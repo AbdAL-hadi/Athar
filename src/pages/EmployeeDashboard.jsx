@@ -9,6 +9,7 @@ import SectionTitle from '../components/SectionTitle';
 import PriceText from '../components/PriceText';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import AdminProductEditor from '../components/admin/AdminProductEditor';
+import { getCityLabel } from '../data/palestinianCities';
 import { getOrderDiscountAmount, getOrderRewardTitle, getOrderTotal } from '../utils/orderPricing';
 import { formatCurrency } from '../utils/format';
 
@@ -127,6 +128,7 @@ const buildEditForm = (product) => ({
   promoSubtitle: product.promoSubtitle || '',
   ctaText: product.ctaText || 'View Product',
   highlightBullets: product.highlightBullets || [],
+  warehouseStocks: Array.isArray(product.warehouseStocks) ? product.warehouseStocks : [],
 });
 
 const buildEmptyProductForm = () => ({
@@ -168,7 +170,31 @@ const buildEmptyProductForm = () => ({
   promoSubtitle: '',
   ctaText: 'View Product',
   highlightBullets: [],
+  warehouseStocks: [],
 });
+
+const buildWarehouseRows = (warehouses = [], stockRows = []) => {
+  const stockByWarehouse = new Map(
+    stockRows.map((stock) => [
+      String(stock.warehouseId ?? stock.warehouse?._id ?? stock.warehouse?.id ?? stock.warehouse ?? ''),
+      stock,
+    ]),
+  );
+
+  return warehouses.map((warehouse) => {
+    const warehouseId = String(warehouse._id ?? warehouse.id ?? '');
+    const stock = stockByWarehouse.get(warehouseId);
+
+    return {
+      warehouseId,
+      warehouseName: warehouse.name,
+      city: warehouse.city,
+      cityLabel: warehouse.cityLabel || warehouse.city,
+      quantity: stock?.quantity ?? 0,
+      lowStockThreshold: stock?.lowStockThreshold ?? 3,
+    };
+  });
+};
 
 const appendProductFormData = (form, imageFiles) => {
   const data = new FormData();
@@ -186,6 +212,13 @@ const appendProductFormData = (form, imageFiles) => {
 
     if (key === 'images') {
       data.append('existingImages', JSON.stringify(Array.isArray(value) ? value : []));
+      return;
+    }
+
+    if (key === 'warehouseStocks') {
+      if (Array.isArray(value) && value.length > 0) {
+        data.append('warehouseStocks', JSON.stringify(value));
+      }
       return;
     }
 
@@ -230,6 +263,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
   const [patternStories, setPatternStories] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [orders, setOrders] = useState([]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
@@ -304,6 +338,24 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
   }, [authToken, canManageProducts]);
 
   useEffect(() => {
+    const loadWarehouses = async () => {
+      if (!authToken || !isAdmin) {
+        setWarehouses([]);
+        return;
+      }
+
+      try {
+        const response = await apiRequest('/api/admin/warehouses', { token: authToken });
+        setWarehouses(Array.isArray(response?.data) ? response.data : []);
+      } catch (_error) {
+        setWarehouses([]);
+      }
+    };
+
+    loadWarehouses();
+  }, [authToken, isAdmin]);
+
+  useEffect(() => {
     const loadOrders = async () => {
       if (!authToken || !canManageProducts || activeTab !== 'orders') {
         return;
@@ -342,12 +394,43 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
     };
   }, [accountMenuOpen]);
 
-  const handleEditProduct = (product) => {
+  const handleEditProduct = async (product) => {
     setEditingProduct(product);
     setProductEditorMode('edit');
     setProductImageFiles([]);
     setPatternImageFile(null);
-    setEditForm(buildEditForm(product));
+    setEditForm({
+      ...buildEditForm(product),
+      warehouseStocks: buildWarehouseRows(warehouses, []),
+      stock: product.stock ?? '',
+    });
+
+    if (isAdmin && product?._id) {
+      try {
+        const response = await apiRequest(`/api/admin/products/${product._id}/warehouse-stock`, { token: authToken });
+        const rows = Array.isArray(response?.data?.stocks)
+          ? response.data.stocks.map((stock) => ({
+              warehouseId: stock.warehouse?._id ?? stock.warehouse?.id ?? '',
+              warehouseName: stock.warehouse?.name ?? '',
+              city: stock.warehouse?.city ?? '',
+              cityLabel: stock.warehouse?.cityLabel ?? stock.warehouse?.city ?? '',
+              quantity: stock.quantity ?? 0,
+              lowStockThreshold: stock.lowStockThreshold ?? 3,
+            }))
+          : [];
+
+        setEditForm((current) => ({
+          ...current,
+          warehouseStocks: rows,
+          stock: response?.data?.totalStock ?? product.stock ?? current.stock,
+        }));
+      } catch (_error) {
+        setEditForm((current) => ({
+          ...current,
+          warehouseStocks: buildWarehouseRows(warehouses, []),
+        }));
+      }
+    }
   };
 
   const handleAddProduct = () => {
@@ -355,7 +438,11 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
     setProductEditorMode('create');
     setProductImageFiles([]);
     setPatternImageFile(null);
-    setEditForm(buildEmptyProductForm());
+    setEditForm({
+      ...buildEmptyProductForm(),
+      warehouseStocks: buildWarehouseRows(warehouses, []),
+      stock: 0,
+    });
   };
 
   const handleCloseProductEditor = () => {
@@ -380,6 +467,14 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
           patternImage: selectedStory?.image || current.patternImage,
           patternMotifTags: Array.isArray(selectedStory?.motifTags) ? selectedStory.motifTags.join(', ') : current.patternMotifTags,
         };
+      }
+
+      if (field === 'warehouseStocks') {
+        const totalStock = Array.isArray(value)
+          ? value.reduce((sum, stock) => sum + Math.max(0, Number(stock.quantity || 0)), 0)
+          : current.stock;
+
+        return { ...current, warehouseStocks: value, stock: totalStock };
       }
 
       return { ...current, [field]: value };
@@ -937,7 +1032,7 @@ const EmployeeDashboard = ({ authToken, authUser, authLoading, onLogout, onProdu
                     <div className="bg-gray-50 rounded p-4 mb-4">
                       <p className="font-semibold text-ink mb-2">Shipping Address:</p>
                       <p className="text-sm text-text">
-                        {order.address?.line1}, {order.address?.city}, {order.address?.country}
+                        {order.address?.line1}, {getCityLabel(order.address?.city)}, {order.address?.country}
                       </p>
                     </div>
 
