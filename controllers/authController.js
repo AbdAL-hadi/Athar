@@ -150,14 +150,24 @@ const buildVerificationPayload = (userDocument, delivery = null) => ({
   delivery,
 });
 
+const getVerificationDeliveryMessage = (delivery, successMessage) => {
+  if (delivery?.delivered) {
+    return successMessage;
+  }
+
+  if (delivery?.channel === 'console') {
+    return 'Verification code created, but email delivery is not configured on the server. Check the backend console for the test code.';
+  }
+
+  if (delivery?.channel === 'failed') {
+    return `Verification code created, but the email could not be sent. ${delivery.message || 'Please check SMTP settings and try Resend code.'}`;
+  }
+
+  return successMessage;
+};
+
 const issueVerificationCode = async (userDocument) => {
   const { code, hash, expiresAt } = createVerificationCodeRecord();
-
-  const delivery = await sendVerificationEmail({
-    email: userDocument.email,
-    name: userDocument.name,
-    code,
-  });
 
   if ('emailVerificationCodeHash' in userDocument) {
     userDocument.emailVerificationCodeHash = hash;
@@ -170,6 +180,23 @@ const issueVerificationCode = async (userDocument) => {
   }
 
   await userDocument.save();
+
+  let delivery;
+
+  try {
+    delivery = await sendVerificationEmail({
+      email: userDocument.email,
+      name: userDocument.name,
+      code,
+    });
+  } catch (error) {
+    console.error('[Athar email] Verification email failed:', error.message);
+    delivery = {
+      delivered: false,
+      channel: 'failed',
+      message: getEmailDeliveryFailureMessage(error),
+    };
+  }
 
   return {
     delivery,
@@ -491,7 +518,10 @@ export const registerUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Account created successfully. We sent a ${VERIFICATION_CODE_TTL_MINUTES}-minute verification code to your email.`,
+      message: getVerificationDeliveryMessage(
+        delivery,
+        `Account created successfully. We sent a ${VERIFICATION_CODE_TTL_MINUTES}-minute verification code to your email.`,
+      ),
       requiresVerification: true,
       data: buildVerificationPayload(pendingRegistration, delivery),
     });
@@ -619,7 +649,10 @@ export const loginUser = async (req, res) => {
 
         return res.status(403).json({
           success: false,
-          message: 'Please verify your email first. We sent you a fresh verification code.',
+          message: getVerificationDeliveryMessage(
+            delivery,
+            'Please verify your email first. We sent you a fresh verification code.',
+          ),
           requiresVerification: true,
           data: buildVerificationPayload(user, delivery),
         });
@@ -656,7 +689,10 @@ export const loginUser = async (req, res) => {
 
       return res.status(403).json({
         success: false,
-        message: 'Please verify your email first. We sent you a fresh verification code.',
+        message: getVerificationDeliveryMessage(
+          delivery,
+          'Please verify your email first. We sent you a fresh verification code.',
+        ),
         requiresVerification: true,
         data: buildVerificationPayload(pendingRegistration, delivery),
       });
@@ -857,7 +893,10 @@ export const resendVerificationCode = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        message: `A new verification code has been sent. It stays valid for ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
+        message: getVerificationDeliveryMessage(
+          verificationResult.delivery,
+          `A new verification code has been sent. It stays valid for ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
+        ),
         requiresVerification: true,
         data: buildVerificationPayload(pendingRegistration, verificationResult.delivery),
       });
@@ -894,7 +933,10 @@ export const resendVerificationCode = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `A new verification code has been sent. It stays valid for ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
+      message: getVerificationDeliveryMessage(
+        verificationResult.delivery,
+        `A new verification code has been sent. It stays valid for ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
+      ),
       requiresVerification: true,
       data: buildVerificationPayload(user, verificationResult.delivery),
     });

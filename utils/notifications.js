@@ -1,6 +1,33 @@
 import nodemailer from 'nodemailer';
 
 const getEnvValue = (key) => String(process.env[key] ?? '').trim();
+const emailAddressPattern = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+const extractEmailAddress = (value = '') => {
+  const normalizedValue = String(value ?? '').trim();
+  const bracketMatch = normalizedValue.match(/<([^>]+)>/);
+  const candidate = String(bracketMatch?.[1] ?? normalizedValue).trim();
+
+  return emailAddressPattern.test(candidate) ? candidate : '';
+};
+
+const getLegacySmtpPassword = () => {
+  const smtpFrom = getEnvValue('SMTP_FROM');
+
+  if (!smtpFrom || extractEmailAddress(smtpFrom)) {
+    return '';
+  }
+
+  return smtpFrom;
+};
+
+const getMailFrom = () => {
+  const emailFrom = getEnvValue('EMAIL_FROM');
+  const smtpFrom = getEnvValue('SMTP_FROM');
+  const smtpUser = getEnvValue('SMTP_USER');
+
+  return emailFrom || (extractEmailAddress(smtpFrom) ? smtpFrom : '') || smtpUser;
+};
 
 const buildWelcomeEmailHtml = ({ name, code }) => {
   return `
@@ -47,8 +74,8 @@ const buildCommentRejectedEmailHtml = ({ name, reason }) => {
 const createSmtpTransporter = () => {
   const host = getEnvValue('SMTP_HOST');
   const port = Number(getEnvValue('SMTP_PORT') || 0);
-  const user = getEnvValue('SMTP_USER');
-  const pass = getEnvValue('SMTP_PASS');
+  const user = getEnvValue('SMTP_USER') || extractEmailAddress(getEnvValue('EMAIL_FROM'));
+  const pass = getEnvValue('SMTP_PASS') || getLegacySmtpPassword();
 
   if (!host || !port || !user || !pass) {
     return null;
@@ -67,7 +94,7 @@ const createSmtpTransporter = () => {
 
 export const sendVerificationEmail = async ({ email, name, code }) => {
   const transporter = createSmtpTransporter();
-  const from = getEnvValue('EMAIL_FROM') || getEnvValue('SMTP_FROM');
+  const from = getMailFrom();
 
   if (!transporter || !from) {
     console.warn(
@@ -95,7 +122,7 @@ export const sendVerificationEmail = async ({ email, name, code }) => {
 
 export const sendCommentRejectedEmail = async ({ email, name, reason }) => {
   const transporter = createSmtpTransporter();
-  const from = getEnvValue('EMAIL_FROM') || getEnvValue('SMTP_FROM');
+  const from = getMailFrom();
 
   if (!transporter || !from) {
     console.warn(
