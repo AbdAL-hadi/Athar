@@ -380,7 +380,10 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
           <form onSubmit={submitVerification} className="mx-auto mt-8 max-w-2xl space-y-5 rounded-[28px] bg-cream p-6">
             <div className="rounded-[24px] border border-line bg-white px-5 py-4 text-sm text-ink-soft">
               <p className="font-medium text-ink">
-                We sent a welcome code to <span className="font-semibold">{verificationState.email}</span>.
+                {verificationState.delivery?.delivered === false
+                  ? 'A verification code was created for '
+                  : 'We sent a welcome code to '}
+                <span className="font-semibold">{verificationState.email}</span>.
               </p>
               <p className="mt-2">
                 Enter the code below to activate your Athar account and finish signing in.
@@ -393,6 +396,11 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
               {verificationState.delivery?.channel === 'console' ? (
                 <p className="mt-3 rounded-[18px] bg-blush px-4 py-3 text-sm text-ink">
                   Email delivery is not configured yet on the server, so the code is currently printed in the backend console for testing.
+                </p>
+              ) : null}
+              {verificationState.delivery?.channel === 'failed' ? (
+                <p className="mt-3 rounded-[18px] bg-[#fff8f6] px-4 py-3 text-sm text-[#8b5b5b]">
+                  Email delivery failed. {verificationState.delivery.message || 'Please check the SMTP settings and try Resend code.'}
                 </p>
               ) : null}
             </div>
