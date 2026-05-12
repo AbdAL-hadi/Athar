@@ -203,6 +203,15 @@ export const mapSubmittedImageValuesToReferences = (submittedValues = [], curren
   const currentReferenceLookup = new Map();
 
   currentReferences.forEach((reference) => {
+    if (typeof reference === 'string') {
+      const normalizedReference = normalizeImageValue(reference);
+
+      if (normalizedReference) {
+        currentReferenceLookup.set(normalizedReference, reference);
+      }
+      return;
+    }
+
     if (!isImageAssetReference(reference)) {
       return;
     }

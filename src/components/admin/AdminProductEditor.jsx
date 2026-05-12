@@ -14,6 +14,8 @@ const FieldLabel = ({ children }) => (
 const fieldClassName =
   'min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-rose focus:ring-2 focus:ring-rose/15';
 
+const getUploadImageOrderToken = (index) => `__upload__:${index}`;
+
 const AdminProductEditor = ({
   authToken,
   error,
@@ -44,13 +46,43 @@ const AdminProductEditor = ({
   }, [imageFiles]);
 
   const existingImages = useMemo(
-    () => (Array.isArray(form.images) ? form.images.filter(Boolean).map((image) => resolveApiAssetUrl(image)) : []),
+    () =>
+      (Array.isArray(form.images) ? form.images.filter(Boolean) : []).map((image) => ({
+        key: `existing:${image}`,
+        orderValue: image,
+        src: resolveApiAssetUrl(image),
+        type: 'existing',
+      })),
     [form.images],
   );
   const warehouseStocks = Array.isArray(form.warehouseStocks) ? form.warehouseStocks : [];
   const warehouseTotalStock = warehouseStocks.reduce((sum, stock) => sum + Math.max(0, Number(stock.quantity || 0)), 0);
-  const galleryImages = [...existingImages, ...filePreviews];
-  const activeImage = galleryImages[selectedImage] || galleryImages[0] || '';
+  const uploadedImages = useMemo(
+    () =>
+      filePreviews.map((preview, index) => ({
+        key: `upload:${index}`,
+        orderValue: getUploadImageOrderToken(index),
+        src: preview,
+        type: 'upload',
+      })),
+    [filePreviews],
+  );
+  const galleryImages = useMemo(() => {
+    const defaultOrder = [...existingImages, ...uploadedImages];
+    const order = Array.isArray(form.imageOrder) ? form.imageOrder.filter(Boolean) : [];
+
+    if (!order.length) {
+      return defaultOrder;
+    }
+
+    const entryByOrderValue = new Map(defaultOrder.map((entry) => [entry.orderValue, entry]));
+    const orderedEntries = order.map((orderValue) => entryByOrderValue.get(orderValue)).filter(Boolean);
+    const orderedKeys = new Set(orderedEntries.map((entry) => entry.key));
+    const remainingEntries = defaultOrder.filter((entry) => !orderedKeys.has(entry.key));
+
+    return [...orderedEntries, ...remainingEntries];
+  }, [existingImages, form.imageOrder, uploadedImages]);
+  const activeImage = galleryImages[selectedImage]?.src || galleryImages[0]?.src || '';
   const hasImage = galleryImages.length > 0;
 
   useEffect(() => {
@@ -73,6 +105,30 @@ const AdminProductEditor = ({
     const nextFiles = Array.from(event.target.files || []);
     onImagesChange((currentFiles) => [...currentFiles, ...nextFiles]);
     event.target.value = '';
+  };
+
+  const handleSetMainImage = (index) => {
+    const selectedEntry = galleryImages[index];
+
+    if (!selectedEntry) {
+      return;
+    }
+
+    const nextOrder = [
+      selectedEntry.orderValue,
+      ...galleryImages
+        .filter((entry) => entry.key !== selectedEntry.key)
+        .map((entry) => entry.orderValue),
+    ];
+    const nextExistingImages = galleryImages
+      .filter((entry) => entry.key === selectedEntry.key || entry.type === 'existing')
+      .sort((a, b) => nextOrder.indexOf(a.orderValue) - nextOrder.indexOf(b.orderValue))
+      .filter((entry) => entry.type === 'existing')
+      .map((entry) => entry.orderValue);
+
+    onFieldChange('images', nextExistingImages);
+    onFieldChange('imageOrder', nextOrder);
+    setSelectedImage(0);
   };
 
   const handlePatternImageUpload = (event) => {
@@ -157,16 +213,30 @@ const AdminProductEditor = ({
               {hasImage ? (
                 <div className="mt-4 grid grid-cols-4 gap-3">
                   {galleryImages.map((image, index) => (
-                    <button
-                      key={`${image}-${index}`}
-                      type="button"
-                      onClick={() => setSelectedImage(index)}
+                    <div
+                      key={`${image.key}-${index}`}
                       className={`overflow-hidden rounded-[16px] border bg-cream ${
                         selectedImage === index ? 'border-ink' : 'border-line'
                       }`}
                     >
-                      <img src={image} alt={`Product view ${index + 1}`} className="aspect-square w-full object-cover" />
-                    </button>
+                      <button type="button" onClick={() => setSelectedImage(index)} className="relative block w-full">
+                        <img src={image.src} alt={`Product view ${index + 1}`} className="aspect-square w-full object-cover" />
+                        {index === 0 ? (
+                          <span className="absolute left-1.5 top-1.5 rounded-full bg-ink px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white">
+                            Main image
+                          </span>
+                        ) : null}
+                      </button>
+                      {index === 0 ? null : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetMainImage(index)}
+                          className="block w-full bg-white px-2 py-2 text-xs font-semibold text-[#8f5f45] transition hover:bg-[#fff7f0]"
+                        >
+                          Set as main
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : null}

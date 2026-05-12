@@ -7,6 +7,7 @@ import {
   buildImageAssetUrlFromReference,
   createImageAssetFromUpload,
   deleteImageAssetsByReferences,
+  extractAssetIdFromValue,
   mapSubmittedImageValuesToReferences,
 } from '../services/assets/imageAssetService.js';
 import {
@@ -21,6 +22,7 @@ import { matchProductByImage, ProductMatchError } from '../services/productMatch
 
 const productCategories = ['Bags', 'Bracelets', 'Rings', 'Wallets', 'Accessories', 'Watches'];
 const heritageCityIds = new Set(['', 'jerusalem', 'nablus', 'hebron', 'gaza', 'jaffa', 'ramallah', 'bethlehem']);
+const uploadImageOrderPrefix = '__upload__:';
 
 const createSlug = (value) =>
   String(value ?? '')
@@ -107,6 +109,67 @@ const serializeImageReferences = (references = []) =>
     ? references.map((reference) => buildImageAssetUrlFromReference(reference)).filter(Boolean)
     : [];
 
+const normalizeImageOrderValue = (value = '') => String(value ?? '').trim().replace(/\\/g, '/');
+
+const getImageReferenceKey = (reference) => {
+  if (!reference) return '';
+  if (typeof reference === 'string') return `value:${normalizeImageOrderValue(reference)}`;
+  if (reference.assetId) return `asset:${String(reference.assetId)}`;
+  return `value:${normalizeImageOrderValue(buildImageAssetUrlFromReference(reference))}`;
+};
+
+const addOrderedImageReference = (target, usedKeys, reference) => {
+  const key = getImageReferenceKey(reference);
+
+  if (!key || usedKeys.has(key)) {
+    return;
+  }
+
+  usedKeys.add(key);
+  target.push(reference);
+};
+
+const applySubmittedImageOrder = ({ keptImages = [], uploadedImages = [], imageOrder = [] }) => {
+  const keptImageLookup = new Map();
+
+  keptImages.forEach((reference) => {
+    const url = normalizeImageOrderValue(buildImageAssetUrlFromReference(reference));
+    const assetId = reference?.assetId ? String(reference.assetId) : extractAssetIdFromValue(url);
+
+    if (url) keptImageLookup.set(url, reference);
+    if (assetId) keptImageLookup.set(assetId, reference);
+  });
+
+  const orderedImages = [];
+  const usedKeys = new Set();
+
+  imageOrder.forEach((orderValue) => {
+    const normalizedValue = normalizeImageOrderValue(orderValue);
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    if (normalizedValue.startsWith(uploadImageOrderPrefix)) {
+      const uploadIndex = Number(normalizedValue.slice(uploadImageOrderPrefix.length));
+      if (Number.isInteger(uploadIndex)) {
+        addOrderedImageReference(orderedImages, usedKeys, uploadedImages[uploadIndex]);
+      }
+      return;
+    }
+
+    const assetId = extractAssetIdFromValue(normalizedValue);
+    const reference = keptImageLookup.get(normalizedValue) || (assetId ? keptImageLookup.get(assetId) : null);
+    addOrderedImageReference(orderedImages, usedKeys, reference);
+  });
+
+  [...keptImages, ...uploadedImages].forEach((reference) => {
+    addOrderedImageReference(orderedImages, usedKeys, reference);
+  });
+
+  return orderedImages;
+};
+
 const buildProductPayload = async (body = {}, files = [], existingProduct = null) => {
   const currentImages = Array.isArray(existingProduct?.images) ? existingProduct.images : [];
   const keptImages = mapSubmittedImageValuesToReferences(
@@ -121,7 +184,10 @@ const buildProductPayload = async (body = {}, files = [], existingProduct = null
       }),
     ),
   );
-  const images = [...keptImages, ...uploadedImages];
+  const imageOrder = normalizeArrayField(body.imageOrder);
+  const images = imageOrder.length
+    ? applySubmittedImageOrder({ keptImages, uploadedImages, imageOrder })
+    : [...keptImages, ...uploadedImages];
   const payload = {};
 
   [
