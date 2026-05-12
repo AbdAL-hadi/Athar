@@ -1,0 +1,411 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { apiRequest } from '../../utils/api';
+
+const formatNumber = (value) => Number(value || 0).toLocaleString();
+const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
+
+const severityClass = (severity = '') => {
+  const normalized = String(severity).toLowerCase();
+
+  if (normalized === 'critical') return 'border-[#e6b8b0] bg-[#fff4f1] text-[#9b3f31]';
+  if (normalized === 'high') return 'border-[#ead3a6] bg-[#fff8e9] text-[#8a6317]';
+  if (normalized === 'medium') return 'border-[#c8d9c7] bg-[#f1faf0] text-[#426b42]';
+  return 'border-line bg-white text-ink-soft';
+};
+
+const Badge = ({ children }) => (
+  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold capitalize ${severityClass(children)}`}>
+    {children}
+  </span>
+);
+
+const EmptyState = ({ children }) => (
+  <div className="rounded-[22px] bg-[#fffaf8] px-5 py-6 text-sm leading-6 text-ink-soft">{children}</div>
+);
+
+const Panel = ({ title, description = '', children, actions = null }) => (
+  <section className="rounded-[24px] border border-line bg-white p-5">
+    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <h3 className="font-display text-3xl text-ink">{title}</h3>
+        {description ? <p className="mt-1 text-sm leading-6 text-ink-soft">{description}</p> : null}
+      </div>
+      {actions}
+    </div>
+    {children}
+  </section>
+);
+
+const TableShell = ({ children, maxHeight = '420px' }) => (
+  <div className="overflow-auto rounded-[20px] border border-line" style={{ maxHeight }}>
+    {children}
+  </div>
+);
+
+const AiOutputMeta = ({ output }) => {
+  if (!output) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">
+      {output.cached ? <span>Cached AI output</span> : null}
+      {output.fallback ? <span>Fallback output</span> : null}
+      {output.usedAI ? <span>Generated with AI</span> : <span>Template generated</span>}
+    </div>
+  );
+};
+
+const AdvancedAiInsightsSection = ({ authToken, range }) => {
+  const [insights, setInsights] = useState({
+    demandForecast: [],
+    marketingOpportunities: [],
+    productContentAudit: [],
+    cityPersonalization: [],
+    riskAlerts: [],
+  });
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [businessSummary, setBusinessSummary] = useState(null);
+  const [campaignSuggestions, setCampaignSuggestions] = useState(null);
+  const [aiError, setAiError] = useState('');
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [generatingCampaigns, setGeneratingCampaigns] = useState(false);
+
+  const loadRuleBasedInsights = useCallback(async () => {
+    if (!authToken) return;
+
+    setIsLoading(true);
+    setErrors({});
+
+    const endpoints = {
+      demandForecast: `/api/admin/advanced-ai/demand-forecast?range=${encodeURIComponent(range)}`,
+      marketingOpportunities: `/api/admin/advanced-ai/marketing-opportunities?range=${encodeURIComponent(range)}`,
+      productContentAudit: `/api/admin/advanced-ai/product-content-audit?range=${encodeURIComponent(range)}`,
+      cityPersonalization: `/api/admin/advanced-ai/city-personalization?range=${encodeURIComponent(range)}`,
+      riskAlerts: `/api/admin/advanced-ai/risk-alerts?range=${encodeURIComponent(range)}`,
+    };
+
+    const results = await Promise.allSettled(
+      Object.entries(endpoints).map(async ([key, endpoint]) => {
+        const response = await apiRequest(endpoint, { token: authToken });
+        return [key, response?.data || []];
+      }),
+    );
+
+    const nextInsights = {
+      demandForecast: [],
+      marketingOpportunities: [],
+      productContentAudit: [],
+      cityPersonalization: [],
+      riskAlerts: [],
+    };
+    const nextErrors = {};
+
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const [key, value] = result.value;
+        nextInsights[key] = Array.isArray(value) ? value : [];
+        return;
+      }
+
+      nextErrors.general = result.reason?.message || 'Some Advanced AI sections could not be calculated.';
+    });
+
+    setInsights(nextInsights);
+    setErrors(nextErrors);
+    setIsLoading(false);
+  }, [authToken, range]);
+
+  useEffect(() => {
+    void loadRuleBasedInsights();
+    setBusinessSummary(null);
+    setCampaignSuggestions(null);
+    setAiError('');
+  }, [loadRuleBasedInsights]);
+
+  const generateBusinessSummary = async (forceRegenerate = false) => {
+    try {
+      setGeneratingSummary(true);
+      setAiError('');
+      const response = await apiRequest('/api/admin/advanced-ai/business-summary', {
+        method: 'POST',
+        token: authToken,
+        body: { range, forceRegenerate },
+      });
+      setBusinessSummary(response?.data || null);
+    } catch (error) {
+      setAiError(error.message || 'Business summary could not be generated.');
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  const generateCampaignSuggestions = async (forceRegenerate = false) => {
+    try {
+      setGeneratingCampaigns(true);
+      setAiError('');
+      const response = await apiRequest('/api/admin/advanced-ai/campaign-suggestions', {
+        method: 'POST',
+        token: authToken,
+        body: { range, forceRegenerate },
+      });
+      setCampaignSuggestions(response?.data || null);
+    } catch (error) {
+      setAiError(error.message || 'Campaign suggestions could not be generated.');
+    } finally {
+      setGeneratingCampaigns(false);
+    }
+  };
+
+  return (
+    <section id="advanced-ai" className="rounded-[30px] bg-white p-5 shadow-card sm:p-6">
+      <div className="mb-6">
+        <h2 className="font-display text-4xl text-ink">Advanced AI</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-soft">
+          AI-assisted business insights generated from tracked demand, warehouse stock, product behavior, and customer activity.
+        </p>
+      </div>
+
+      {errors.general ? (
+        <div className="mb-5 rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546]">
+          {errors.general}
+        </div>
+      ) : null}
+
+      {aiError ? (
+        <div className="mb-5 rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546]">
+          {aiError}
+        </div>
+      ) : null}
+
+      <div className="space-y-5">
+        <Panel title="Demand Forecast" description="Rule-based near-term product demand by city. Gemini is not used here.">
+          {isLoading ? (
+            <EmptyState>Calculating insights...</EmptyState>
+          ) : insights.demandForecast.length > 0 ? (
+            <TableShell>
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="sticky top-0 z-10 border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">City</th>
+                    <th className="px-4 py-3">Current Demand</th>
+                    <th className="px-4 py-3">Growth</th>
+                    <th className="px-4 py-3">Projected Need</th>
+                    <th className="px-4 py-3">City Stock</th>
+                    <th className="px-4 py-3">Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insights.demandForecast.map((row) => (
+                    <tr key={`${row.productId}-${row.city}`} className="border-b border-line/60 text-ink">
+                      <td className="px-4 py-4 font-semibold">{row.productTitle}</td>
+                      <td className="px-4 py-4">{row.cityLabel}</td>
+                      <td className="px-4 py-4">{formatNumber(row.currentScore)}</td>
+                      <td className="px-4 py-4">{formatPercent(row.growthRate)}</td>
+                      <td className="px-4 py-4">{formatNumber(row.estimatedUnitsNeeded)}</td>
+                      <td className="px-4 py-4">{formatNumber(row.cityWarehouseStock)}</td>
+                      <td className="px-4 py-4"><Badge>{row.shortageRisk}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableShell>
+          ) : (
+            <EmptyState>No demand forecast data yet. Collect more behavior events first.</EmptyState>
+          )}
+        </Panel>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <Panel
+            title="AI Business Summary"
+            description="Generated only when you click the button. Cached for 24 hours."
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => generateBusinessSummary(false)}
+                  disabled={generatingSummary}
+                  className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-rose disabled:opacity-60"
+                >
+                  {generatingSummary ? 'Generating...' : 'Generate Business Summary'}
+                </button>
+                {businessSummary ? (
+                  <button
+                    type="button"
+                    onClick={() => generateBusinessSummary(true)}
+                    disabled={generatingSummary}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-blush/60 disabled:opacity-60"
+                  >
+                    Regenerate
+                  </button>
+                ) : null}
+              </div>
+            }
+          >
+            {businessSummary ? (
+              <div className="rounded-[20px] bg-[#fffaf8] px-5 py-4 text-sm leading-6 text-ink-soft">
+                {businessSummary.summary}
+                <AiOutputMeta output={businessSummary} />
+              </div>
+            ) : (
+              <EmptyState>Click Generate Business Summary when you want an AI-written executive summary.</EmptyState>
+            )}
+          </Panel>
+
+          <Panel
+            title="AI Campaign Suggestions"
+            description="Maximum 3 campaigns, generated only by explicit admin action."
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => generateCampaignSuggestions(false)}
+                  disabled={generatingCampaigns}
+                  className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-rose disabled:opacity-60"
+                >
+                  {generatingCampaigns ? 'Generating...' : 'Generate Campaign Suggestions'}
+                </button>
+                {campaignSuggestions ? (
+                  <button
+                    type="button"
+                    onClick={() => generateCampaignSuggestions(true)}
+                    disabled={generatingCampaigns}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-blush/60 disabled:opacity-60"
+                  >
+                    Regenerate
+                  </button>
+                ) : null}
+              </div>
+            }
+          >
+            {campaignSuggestions?.campaigns?.length > 0 ? (
+              <div className="space-y-3">
+                {campaignSuggestions.campaigns.map((campaign) => (
+                  <article key={`${campaign.title}-${campaign.cta}`} className="rounded-[20px] bg-[#fffaf8] px-4 py-4 text-sm">
+                    <h4 className="font-bold text-ink">{campaign.title}</h4>
+                    <p className="mt-1 text-ink-soft">{campaign.message}</p>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">{campaign.target}</p>
+                    <p className="mt-2 text-ink-soft">Featured: {campaign.featuredItems}</p>
+                    <p className="text-ink-soft">CTA: {campaign.cta}</p>
+                    <p className="text-ink-soft">Reason: {campaign.reason}</p>
+                  </article>
+                ))}
+                <AiOutputMeta output={campaignSuggestions} />
+              </div>
+            ) : (
+              <EmptyState>Click Generate Campaign Suggestions to draft campaign ideas from aggregate data.</EmptyState>
+            )}
+          </Panel>
+        </div>
+
+        <Panel title="Marketing Opportunities" description="Rule-based opportunities from conversion, search gaps, city trends, and Try-On behavior.">
+          {isLoading ? (
+            <EmptyState>Calculating insights...</EmptyState>
+          ) : insights.marketingOpportunities.length > 0 ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {insights.marketingOpportunities.slice(0, 12).map((item, index) => (
+                <article key={`${item.type}-${index}`} className="rounded-[20px] border border-line bg-[#fffaf8] px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <h4 className="font-bold text-ink">{item.title}</h4>
+                    <Badge>{item.severity}</Badge>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-ink-soft">{item.description}</p>
+                  <p className="mt-2 text-sm font-semibold text-ink">{item.suggestedAction}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.14em] text-muted">
+                    {[item.relatedProduct?.title, item.cityLabel, item.category].filter(Boolean).join(' / ') || item.type}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState>No marketing opportunities found for this range.</EmptyState>
+          )}
+        </Panel>
+
+        <Panel title="Product Content Audit" description="Rule-based product content score. No product content is changed automatically.">
+          {isLoading ? (
+            <EmptyState>Calculating insights...</EmptyState>
+          ) : insights.productContentAudit.length > 0 ? (
+            <TableShell>
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="sticky top-0 z-10 border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">Score</th>
+                    <th className="px-4 py-3">Missing</th>
+                    <th className="px-4 py-3">Suggestions</th>
+                    <th className="px-4 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insights.productContentAudit.slice(0, 80).map((row) => (
+                    <tr key={row.productId} className="border-b border-line/60 align-top text-ink">
+                      <td className="px-4 py-4 font-semibold">{row.productTitle}</td>
+                      <td className="px-4 py-4"><Badge>{row.priority}</Badge> {formatNumber(row.contentScore)}</td>
+                      <td className="px-4 py-4 text-ink-soft">{row.missingFields?.join(', ') || '-'}</td>
+                      <td className="px-4 py-4 text-ink-soft">{row.improvementSuggestions?.join(' ') || '-'}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {row.slug ? <Link className="font-semibold text-[#8f5f45] underline" to={`/products/${row.slug}`}>Open Product</Link> : null}
+                          <Link className="font-semibold text-[#8f5f45] underline" to="/employee-dashboard">Edit Product</Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableShell>
+          ) : (
+            <EmptyState>No products found for content audit.</EmptyState>
+          )}
+        </Panel>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <Panel title="City Personalization Ideas" description="Rule-based city collection ideas from aggregate city behavior.">
+            {isLoading ? (
+              <EmptyState>Calculating insights...</EmptyState>
+            ) : insights.cityPersonalization.length > 0 ? (
+              <div className="space-y-3">
+                {insights.cityPersonalization.slice(0, 8).map((item) => (
+                  <article key={item.city} className="rounded-[20px] bg-[#fffaf8] px-4 py-4 text-sm">
+                    <h4 className="font-bold text-ink">{item.suggestedCollectionTitle}</h4>
+                    <p className="mt-1 text-ink-soft">{item.suggestedCopy}</p>
+                    <p className="mt-2 text-ink-soft">Top category: {item.topCategory || '-'}</p>
+                    <p className="text-ink-soft">Top product: {item.topProduct || '-'}</p>
+                    <p className="font-semibold text-ink">CTA: {item.suggestedCTA}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState>No city personalization ideas yet.</EmptyState>
+            )}
+          </Panel>
+
+          <Panel title="Risk Alerts" description="Rule-based operational risks from stock, demand, search, and AI tool health.">
+            {isLoading ? (
+              <EmptyState>Calculating insights...</EmptyState>
+            ) : insights.riskAlerts.length > 0 ? (
+              <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
+                {insights.riskAlerts.map((alert, index) => (
+                  <article key={`${alert.alertType}-${index}`} className="rounded-[20px] border border-line bg-[#fffaf8] px-4 py-4 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <h4 className="font-bold text-ink">{alert.title}</h4>
+                      <Badge>{alert.severity}</Badge>
+                    </div>
+                    <p className="mt-2 leading-6 text-ink-soft">{alert.description}</p>
+                    <p className="mt-2 font-semibold text-ink">{alert.recommendedAction}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState>No risk alerts detected for this range.</EmptyState>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default AdvancedAiInsightsSection;

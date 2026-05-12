@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNavigation from '../components/admin/AdminNavigation';
+import AdvancedAiInsightsSection from '../components/admin/AdvancedAiInsightsSection';
 import SectionTitle from '../components/SectionTitle';
 import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
@@ -36,6 +37,12 @@ const formatEventType = (value = '') =>
 const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 
 const formatNumber = (value) => Number(value || 0).toLocaleString();
+
+const getRecommendationId = (recommendation) => recommendation?._id || recommendation?.id;
+
+const getWarehouseName = (warehouse, fallback = '') => warehouse?.name || fallback || '-';
+
+const getProductTitle = (product, fallback = '') => product?.title || fallback || 'Unknown product';
 
 const getStatusClass = (status = '') => {
   const normalized = status.toLowerCase();
@@ -110,6 +117,13 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
   const [eventsError, setEventsError] = useState('');
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(true);
   const [isEventsLoading, setIsEventsLoading] = useState(true);
+  const [recommendations, setRecommendations] = useState([]);
+  const [movements, setMovements] = useState([]);
+  const [recommendationsError, setRecommendationsError] = useState('');
+  const [recommendationsMessage, setRecommendationsMessage] = useState('');
+  const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(true);
+  const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
+  const [activeRecommendationAction, setActiveRecommendationAction] = useState('');
 
   useEffect(() => {
     if (authLoading) {
@@ -120,6 +134,37 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
       navigate('/auth');
     }
   }, [authLoading, authToken, authUser?.role, navigate]);
+
+  const loadRecommendationData = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!authToken || authUser?.role !== 'admin') {
+        return;
+      }
+
+      try {
+        if (!quiet) {
+          setIsRecommendationsLoading(true);
+        }
+        setRecommendationsError('');
+        const [recommendationsResponse, movementsResponse] = await Promise.all([
+          apiRequest(`/api/admin/inventory-recommendations?status=all&range=${encodeURIComponent(range)}`, {
+            token: authToken,
+          }),
+          apiRequest('/api/admin/inventory-movements?limit=50', { token: authToken }),
+        ]);
+
+        setRecommendations(Array.isArray(recommendationsResponse?.data) ? recommendationsResponse.data : []);
+        setMovements(Array.isArray(movementsResponse?.data) ? movementsResponse.data : []);
+      } catch (error) {
+        setRecommendationsError(error.message || 'Failed to load inventory recommendations.');
+      } finally {
+        if (!quiet) {
+          setIsRecommendationsLoading(false);
+        }
+      }
+    },
+    [authToken, authUser?.role, range],
+  );
 
   useEffect(() => {
     if (!authToken || authUser?.role !== 'admin') {
@@ -222,6 +267,14 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
     };
   }, [authToken, authUser?.role, city, eventType, range]);
 
+  useEffect(() => {
+    if (!authToken || authUser?.role !== 'admin') {
+      return;
+    }
+
+    void loadRecommendationData();
+  }, [authToken, authUser?.role, loadRecommendationData]);
+
   const overviewCards = useMemo(() => {
     const overview = analytics.overview || {};
     return [
@@ -235,6 +288,53 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
       { label: 'Searches', value: formatNumber(overview.searchesCount), helper: overview.topCategory?.category ? `Top category: ${overview.topCategory.category}` : 'No search data yet' },
     ];
   }, [analytics.overview]);
+
+  const handleGenerateRecommendations = async () => {
+    try {
+      setIsGeneratingRecommendations(true);
+      setRecommendationsError('');
+      setRecommendationsMessage('');
+      const response = await apiRequest('/api/admin/inventory-recommendations/generate', {
+        method: 'POST',
+        token: authToken,
+        body: { range },
+      });
+      const generatedCount = Number(response?.generatedCount || 0);
+      const updatedCount = Number(response?.updatedCount || 0);
+      const skippedCount = Number(response?.skippedCount || 0);
+      setRecommendationsMessage(
+        response?.message ||
+          `Generated ${generatedCount} recommendation${generatedCount === 1 ? '' : 's'}, updated ${updatedCount}, skipped ${skippedCount}.`,
+      );
+      await loadRecommendationData({ quiet: true });
+    } catch (error) {
+      setRecommendationsError(error.message || 'Failed to generate inventory recommendations.');
+    } finally {
+      setIsGeneratingRecommendations(false);
+    }
+  };
+
+  const handleRecommendationAction = async (recommendationId, action) => {
+    if (!recommendationId || activeRecommendationAction) {
+      return;
+    }
+
+    try {
+      setActiveRecommendationAction(`${action}:${recommendationId}`);
+      setRecommendationsError('');
+      setRecommendationsMessage('');
+      const response = await apiRequest(`/api/admin/inventory-recommendations/${recommendationId}/${action}`, {
+        method: 'PATCH',
+        token: authToken,
+      });
+      setRecommendationsMessage(response?.message || 'Recommendation updated.');
+      await loadRecommendationData({ quiet: true });
+    } catch (error) {
+      setRecommendationsError(error.message || 'Recommendation action failed.');
+    } finally {
+      setActiveRecommendationAction('');
+    }
+  };
 
   const pressureRows = useMemo(
     () =>
@@ -276,13 +376,13 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
       <section className="rounded-[30px] bg-white p-5 shadow-card">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            {['overview', 'products', 'cities', 'warehouses', 'searches', 'ai-tools', 'events'].map((section) => (
+            {['overview', 'products', 'cities', 'warehouses', 'searches', 'ai-tools', 'events', 'recommendations', 'advanced-ai'].map((section) => (
               <a
                 key={section}
                 href={`#${section}`}
                 className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold capitalize text-ink-soft transition hover:bg-blush/60 hover:text-ink"
               >
-                {section === 'ai-tools' ? 'AI Tool Usage' : section.replace('-', ' ')}
+                {section === 'ai-tools' ? 'AI Tool Usage' : section === 'advanced-ai' ? 'Advanced AI' : section.replace('-', ' ')}
               </a>
             ))}
           </div>
@@ -407,7 +507,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         )}
       </SectionCard>
 
-      <SectionCard id="warehouses" title="Warehouse Intelligence" description="Demand by city connected to each warehouse's local product stock. This is analytics only, not transfer recommendations.">
+      <SectionCard id="warehouses" title="Warehouse Intelligence" description="Demand by city connected to each warehouse's local product stock. Use recommendations when pressure needs a manual transfer decision.">
         {isAnalyticsLoading ? (
           <EmptyState>Loading warehouse intelligence...</EmptyState>
         ) : analytics.warehouses ? (
@@ -417,6 +517,19 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
               <MetricCard label="Low Stock Items" value={formatNumber(analytics.warehouses.summary?.lowStockItems)} helper="Per-warehouse low inventory" />
               <MetricCard label="Critical Pressure" value={formatNumber(analytics.warehouses.summary?.criticalStockPressure)} helper="High demand with very low city stock" />
               <MetricCard label="Top Demand City" value={analytics.warehouses.summary?.topDemandCity?.cityLabel || 'None'} helper="Based on city demand score" />
+            </div>
+
+            <div className="mb-5 flex flex-col gap-3 rounded-[24px] border border-line bg-[#fffaf8] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-ink-soft">
+                Turn current warehouse pressure into reviewable stock transfer recommendations. Admin approval is still required before stock changes.
+              </p>
+              <a
+                href="#recommendations"
+                onClick={handleGenerateRecommendations}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-bold text-white transition hover:bg-rose"
+              >
+                Generate Recommendations
+              </a>
             </div>
 
             {pressureRows.length > 0 ? (
@@ -456,6 +569,185 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         ) : (
           <EmptyState>No warehouse pressure detected yet.</EmptyState>
         )}
+      </SectionCard>
+
+      <SectionCard id="recommendations" title="AI Inventory Recommendations" description="Rule-based transfer recommendations generated from tracked demand and warehouse stock. Gemini only writes optional explanation text.">
+        <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 lg:grid-cols-[220px_1fr_auto] lg:items-end">
+          <label>
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Recommendation range</span>
+            <select
+              value={range}
+              onChange={(event) => setRange(event.target.value)}
+              className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
+            >
+              {timeRanges.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-sm leading-6 text-ink-soft">
+            AI explanation is based on tracked demand and warehouse stock. Admin approval is required before stock changes.
+          </p>
+          <button
+            type="button"
+            onClick={handleGenerateRecommendations}
+            disabled={isGeneratingRecommendations}
+            className="min-h-12 rounded-full bg-ink px-5 py-3 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isGeneratingRecommendations ? 'Generating...' : 'Generate AI Inventory Recommendations'}
+          </button>
+        </div>
+
+        {recommendationsError ? <AnalyticsError message={recommendationsError} /> : null}
+        {recommendationsMessage ? (
+          <div className="mb-5 rounded-[24px] border border-[#d7e6d1] bg-[#f4fbf1] px-5 py-4 text-sm text-[#426b42]">
+            {recommendationsMessage}
+          </div>
+        ) : null}
+
+        {isRecommendationsLoading ? (
+          <EmptyState>Loading inventory recommendations...</EmptyState>
+        ) : recommendations.length > 0 ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {recommendations.map((recommendation) => {
+              const recommendationId = getRecommendationId(recommendation);
+              const explanation = recommendation.aiExplanation || recommendation.reason || '';
+              const actionPrefix = (action) => `${action}:${recommendationId}`;
+              const isPending = recommendation.status === 'pending';
+              const isApproved = recommendation.status === 'approved';
+              const canApply = isPending || isApproved;
+              const canReject = isPending || isApproved;
+
+              return (
+                <article key={recommendationId} className="rounded-[24px] border border-line bg-white p-5 shadow-card">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">
+                        {recommendation.productCategory || recommendation.product?.category || 'Product'}
+                      </p>
+                      <h3 className="mt-2 font-display text-3xl leading-tight text-ink">
+                        {getProductTitle(recommendation.product, recommendation.productTitle)}
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge>{recommendation.pressureLevel}</StatusBadge>
+                      <StatusBadge>{recommendation.status}</StatusBadge>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 text-sm text-ink sm:grid-cols-2">
+                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Demand City</span>
+                      <span className="mt-1 block font-semibold">{recommendation.demandCityLabel || getCityLabel(recommendation.demandCity)}</span>
+                    </div>
+                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Confidence</span>
+                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.confidence)}%</span>
+                    </div>
+                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Current City Stock</span>
+                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.destinationStock)} units</span>
+                    </div>
+                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Source Stock</span>
+                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.sourceStock)} units</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-[18px] border border-line px-4 py-4 text-sm leading-6 text-ink">
+                    <span className="font-bold">Move {formatNumber(recommendation.suggestedQuantity)} units</span> from{' '}
+                    {getWarehouseName(recommendation.fromWarehouse, recommendation.fromWarehouseName)} to{' '}
+                    {getWarehouseName(recommendation.toWarehouse, recommendation.toWarehouseName)}.
+                  </div>
+
+                  {explanation ? (
+                    <div className="mt-4 rounded-[18px] bg-[#f7f1eb] px-4 py-4 text-sm leading-6 text-ink-soft">
+                      {explanation}
+                      {!recommendation.aiExplanation ? (
+                        <span className="mt-2 block text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                          Template explanation used
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {canApply || canReject ? (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {isPending ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRecommendationAction(recommendationId, 'approve')}
+                          disabled={Boolean(activeRecommendationAction)}
+                          className="rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-blush/60 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {activeRecommendationAction === actionPrefix('approve') ? 'Approving...' : 'Approve'}
+                        </button>
+                      ) : null}
+                      {canReject ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRecommendationAction(recommendationId, 'reject')}
+                          disabled={Boolean(activeRecommendationAction)}
+                          className="rounded-full border border-[#e7c8c8] bg-white px-4 py-2 text-sm font-bold text-[#8c6546] transition hover:bg-[#fff4f1] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {activeRecommendationAction === actionPrefix('reject') ? 'Rejecting...' : 'Reject'}
+                        </button>
+                      ) : null}
+                      {canApply ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRecommendationAction(recommendationId, 'apply')}
+                          disabled={Boolean(activeRecommendationAction)}
+                          className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {activeRecommendationAction === actionPrefix('apply') ? 'Applying...' : 'Apply Transfer'}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState>No inventory recommendations found for this range.</EmptyState>
+        )}
+
+        <div className="mt-8">
+          <h3 className="font-display text-3xl text-ink">Movement History</h3>
+          <div className="mt-4 overflow-x-auto rounded-[24px] border border-line">
+            {movements.length > 0 ? (
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">From</th>
+                    <th className="px-4 py-3">To</th>
+                    <th className="px-4 py-3">Quantity</th>
+                    <th className="px-4 py-3">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((movement) => (
+                    <tr key={movement._id || movement.id} className="border-b border-line/60 align-top text-ink">
+                      <td className="whitespace-nowrap px-4 py-4">{movement.createdAt ? new Date(movement.createdAt).toLocaleString() : '-'}</td>
+                      <td className="px-4 py-4 font-semibold">{getProductTitle(movement.product)}</td>
+                      <td className="px-4 py-4">{getWarehouseName(movement.fromWarehouse)}</td>
+                      <td className="px-4 py-4">{getWarehouseName(movement.toWarehouse)}</td>
+                      <td className="px-4 py-4 font-bold">{formatNumber(movement.quantity)}</td>
+                      <td className="px-4 py-4 text-ink-soft">{movement.reason || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-5 py-6 text-sm text-ink-soft">No stock transfers have been applied yet.</div>
+            )}
+          </div>
+        </div>
       </SectionCard>
 
       <SectionCard id="searches" title="Search Trends" description="Search terms help reveal product and marketing gaps. Zero-result searches are highlighted when result metadata exists.">
@@ -586,10 +878,10 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         {isEventsLoading ? (
           <EmptyState>Loading behavior events...</EmptyState>
         ) : events.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="max-h-[560px] overflow-auto rounded-[24px] border border-line">
             <table className="min-w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                <tr className="sticky top-0 z-10 border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
                   <th className="px-4 py-3">Time</th>
                   <th className="px-4 py-3">Event Type</th>
                   <th className="px-4 py-3">User City</th>
@@ -620,6 +912,8 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
           <EmptyState>No behavior events found yet.</EmptyState>
         )}
       </SectionCard>
+
+      <AdvancedAiInsightsSection authToken={authToken} range={range} />
     </div>
   );
 };

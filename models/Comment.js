@@ -65,6 +65,43 @@ const commentSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    category: {
+      type: String,
+      enum: [
+        'praise',
+        'product_complaint',
+        'delivery_complaint',
+        'price_complaint',
+        'offensive',
+        'spam',
+        'general_feedback',
+        'unknown',
+      ],
+      default: 'unknown',
+      index: true,
+    },
+    riskScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    sentiment: {
+      type: String,
+      enum: ['positive', 'neutral', 'negative', 'unknown'],
+      default: 'unknown',
+      index: true,
+    },
+    moderationStatus: {
+      type: String,
+      enum: ['approved', 'needs_review', 'rejected'],
+      default: 'needs_review',
+      index: true,
+    },
+    moderationReasons: {
+      type: [String],
+      default: [],
+    },
     moderationScore: {
       type: Number,
       default: 0,

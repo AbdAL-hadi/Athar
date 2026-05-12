@@ -8,6 +8,71 @@ const REJECT_THRESHOLD = 80;
 const PENDING_THRESHOLD = 40;
 const TOXIC_LABEL_HINTS = ['toxic', 'insult', 'obscene', 'threat', 'hate', 'identity'];
 
+const categoryRules = [
+  {
+    category: 'spam',
+    sentiment: 'negative',
+    terms: ['http', 'https', 'www', 'click here', 'click this link', 'free money', 'promo spam'],
+  },
+  {
+    category: 'price_complaint',
+    sentiment: 'negative',
+    terms: ['expensive', 'price', 'costly', 'overpriced', 'غالي', 'سعر', 'مكلف'],
+  },
+  {
+    category: 'delivery_complaint',
+    sentiment: 'negative',
+    terms: ['delivery', 'shipping', 'late', 'delayed', 'courier', 'توصيل', 'شحن', 'تأخير', 'متأخر', 'مندوب'],
+  },
+  {
+    category: 'product_complaint',
+    sentiment: 'negative',
+    terms: [
+      'broken',
+      'broke',
+      'damaged',
+      'quality',
+      'poor',
+      'bad',
+      'color',
+      'size',
+      'wrong',
+      'disappointed',
+      'مكسور',
+      'خربان',
+      'تالف',
+      'جودة',
+      'سيء',
+      'مش منيح',
+      'لون',
+      'مقاس',
+      'غلط',
+    ],
+  },
+  {
+    category: 'praise',
+    sentiment: 'positive',
+    terms: [
+      'good',
+      'great',
+      'amazing',
+      'beautiful',
+      'love',
+      'perfect',
+      'elegant',
+      'excellent',
+      'جميل',
+      'ممتاز',
+      'رائع',
+      'حلو',
+      'بحبه',
+      'فخم',
+      'مرتب',
+      'جودة',
+    ],
+  },
+];
+
 let classifierPromise = null;
 
 const clampScore = (score) => Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
@@ -24,6 +89,47 @@ const includesTerm = (normalizedText, normalizedTokens, rawTerm) => {
   }
 
   return normalizedTokens.includes(normalizedTerm);
+};
+
+export const classifyCommentCategory = (text = '', moderationLabels = []) => {
+  const normalizedText = normalizeText(text);
+  const normalizedTokens = tokenizeText(text);
+
+  if (!normalizedText) {
+    return {
+      category: 'unknown',
+      sentiment: 'unknown',
+      reasons: [],
+    };
+  }
+
+  const labelSet = new Set(moderationLabels.map((label) => String(label || '').toLowerCase()));
+
+  if (['threats', 'hate', 'profanity', 'harassment'].some((label) => labelSet.has(label))) {
+    return {
+      category: 'offensive',
+      sentiment: 'negative',
+      reasons: ['Matched offensive moderation label.'],
+    };
+  }
+
+  for (const rule of categoryRules) {
+    const matchedTerm = rule.terms.find((term) => includesTerm(normalizedText, normalizedTokens, term));
+
+    if (matchedTerm) {
+      return {
+        category: rule.category,
+        sentiment: rule.sentiment,
+        reasons: [`Matched ${rule.category.replace('_', ' ')} keyword: ${matchedTerm}`],
+      };
+    }
+  }
+
+  return {
+    category: 'general_feedback',
+    sentiment: 'neutral',
+    reasons: ['Meaningful comment with no specific issue keyword.'],
+  };
 };
 
 const runRuleBasedModeration = (text) => {
@@ -180,12 +286,16 @@ export const moderateComment = async (text) => {
     ruleScore: ruleResult.score,
   });
   const labels = Array.from(new Set([...ruleResult.labels, ...aiResult.labels]));
+  const classification = classifyCommentCategory(normalizedText, labels);
 
   return {
     decision,
     score,
     reason: buildReason({ decision, aiFailed, ruleResult, aiResult }),
     labels,
+    category: classification.category,
+    sentiment: classification.sentiment,
+    moderationReasons: classification.reasons,
     details: {
       aiScore: aiResult.score,
       ruleScore: ruleResult.score,
