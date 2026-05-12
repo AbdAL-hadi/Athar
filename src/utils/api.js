@@ -108,7 +108,25 @@ export const resolveApiAssetUrl = (value) => {
     return '';
   }
 
-  const normalizedValue = value.replace(/\\/g, '/').replace(/^\.?\//, '');
+  const rawValue = value.trim().replace(/\\/g, '/');
+
+  if (
+    /^(?:https?:)?\/\//i.test(rawValue) ||
+    rawValue.startsWith('data:') ||
+    rawValue.startsWith('blob:')
+  ) {
+    return rawValue;
+  }
+
+  const normalizedValue = rawValue.replace(/^\.?\//, '');
+
+  if (
+    normalizedValue.startsWith('api/') ||
+    normalizedValue.startsWith('uploads/') ||
+    normalizedValue.startsWith('generated/')
+  ) {
+    return buildApiUrl(normalizedValue);
+  }
 
   if (assetUrlLookup.has(normalizedValue)) {
     return assetUrlLookup.get(normalizedValue);
@@ -122,25 +140,6 @@ export const resolveApiAssetUrl = (value) => {
 
   if (fileName && assetUrlLookup.has(fileName)) {
     return assetUrlLookup.get(fileName);
-  }
-
-  if (
-    /^(?:https?:)?\/\//i.test(normalizedValue) ||
-    normalizedValue.startsWith('data:') ||
-    normalizedValue.startsWith('blob:')
-  ) {
-    return normalizedValue;
-  }
-
-  if (
-    normalizedValue.startsWith('api/') ||
-    normalizedValue.startsWith('/api/') ||
-    normalizedValue.startsWith('uploads/') ||
-    normalizedValue.startsWith('/uploads/') ||
-    normalizedValue.startsWith('generated/') ||
-    normalizedValue.startsWith('/generated/')
-  ) {
-    return buildApiUrl(normalizedValue);
   }
 
   return '';
