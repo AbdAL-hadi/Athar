@@ -126,6 +126,21 @@ const commentSchema = new mongoose.Schema(
       type: moderationDetailsSchema,
       default: () => ({}),
     },
+    language: {
+      type: String,
+      enum: ['en', 'ar', 'mixed', 'unknown'],
+      default: 'unknown',
+      index: true,
+    },
+    analyzedAt: {
+      type: Date,
+      default: null,
+    },
+    demoSeed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     reviewedBy: {
       type: String,
       default: '',

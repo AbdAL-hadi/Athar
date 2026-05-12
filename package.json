@@ -7,6 +7,7 @@
     "dev": "vite",
     "server": "node server.js",
     "seed:products": "node scripts/seedProducts.js",
+    "seed:demo-comments": "node scripts/seedDemoComments.js",
     "seed:warehouses": "node scripts/seedWarehouses.js",
     "migrate:images": "node scripts/migrateImageAssetsToDatabase.js",
     "build": "vite build",
