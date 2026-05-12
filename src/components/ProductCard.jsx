@@ -5,6 +5,7 @@ import PriceText from './PriceText';
 import { resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
+import { getProductMainImageUrl } from '../utils/productCatalog';
 
 const MOTION_EASE = [0.22, 1, 0.36, 1];
 
@@ -21,7 +22,7 @@ const ProductCard = ({
   const prefersReducedMotion = useReducedMotion();
   const hasSale = product.compareAt && product.compareAt > product.price;
   const productHref = `/products/${product.id}`;
-  const primaryImage = resolveApiAssetUrl(product?.images?.[0]);
+  const primaryImage = getProductMainImageUrl(product) || resolveApiAssetUrl('design/logo.jpeg');
   const productName = product?.name || product?.title || 'Athar product';
   const productPoints = calculateProductPoints(product);
   const isHorizontal = variant === 'horizontal';

@@ -8,19 +8,19 @@ import PriceText from '../components/PriceText';
 import QuantitySelector from '../components/QuantitySelector';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
-import { apiRequest, resolveApiAssetUrl } from '../utils/api';
+import { apiRequest } from '../utils/api';
 import { getTrackableProductId, trackBehavior } from '../utils/behaviorTracking';
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
-import { findProductByReference, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
+import { findProductByReference, getProductImageUrls, getProductMainImageUrl, isProductFavorite, normalizeProduct } from '../utils/productCatalog';
 
 const getDefaultMedia = (product) => {
-  const firstImage = product?.images?.[0];
+  const firstImage = getProductMainImageUrl(product);
 
   if (firstImage) {
     return {
       type: 'image',
-      src: resolveApiAssetUrl(firstImage),
+      src: firstImage,
       alt: product.name,
     };
   }
@@ -321,7 +321,7 @@ const ProductDetailsPage = ({
     [products, product],
   );
   const galleryItems = useMemo(
-    () => (product ? product.images.map((image, index) => ({ type: 'image', src: image, alt: `${product.name} view ${index + 1}` })) : []),
+    () => (product ? getProductImageUrls(product).map((image, index) => ({ type: 'image', src: image, alt: `${product.name} view ${index + 1}` })) : []),
     [product],
   );
   const patternStoryTarget = product?.patternStory?.slug || product?.patternStoryId || '';

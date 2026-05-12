@@ -35,7 +35,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/generated', express.static(path.join(process.cwd(), 'generated')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-app.get('/', (_req, res) => {
+app.get('/api/health', (_req, res) => {
   res.send('Athar API is running');
 });
 
@@ -62,6 +62,18 @@ app.use('/api/product-match', productMatchRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/pattern-stories', patternStoryRoutes);
+
+const distPath = path.join(process.cwd(), 'dist');
+
+app.use(express.static(distPath));
+
+app.get('/{*splat}', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ message: 'API route not found' });
+  }
+
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 

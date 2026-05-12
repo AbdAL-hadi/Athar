@@ -36,6 +36,18 @@ const asOptionalNumber = (value) => {
 };
 
 const asArray = (value, fallback = []) => (Array.isArray(value) && value.length > 0 ? value : fallback);
+const uniqueValues = (values = []) => [...new Set(values.filter(hasValue))];
+
+export const getProductImageUrls = (product = {}) => {
+  const imageCandidates = uniqueValues([
+    ...(Array.isArray(product?.images) ? product.images : []),
+    product?.image,
+  ]);
+
+  return uniqueValues(imageCandidates.map(resolveApiAssetUrl));
+};
+
+export const getProductMainImageUrl = (product = {}) => getProductImageUrls(product)[0] ?? '';
 
 export const normalizeProduct = (product, fallbackProduct = null) => {
   const fallback = fallbackProduct ?? {};
@@ -94,7 +106,10 @@ export const normalizeProduct = (product, fallbackProduct = null) => {
     motifCode: pickValue(product?.motifCode, fallback.motifCode, motifDefaults.motifCode, ''),
     patternStoryId: pickValue(product?.patternStoryId, product?.patternStory?.id, fallback.patternStoryId, ''),
     patternStory: product?.patternStory ?? fallback.patternStory ?? null,
-    images: asArray(product?.images, asArray(fallback.images, [])).map(resolveApiAssetUrl),
+    images: getProductImageUrls({
+      images: asArray(product?.images, asArray(fallback.images, [])),
+      image: product?.image ?? fallback.image,
+    }),
     createdAt: pickValue(product?.createdAt, fallback.createdAt, null),
     updatedAt: pickValue(product?.updatedAt, fallback.updatedAt, null),
   };
