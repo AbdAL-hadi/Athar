@@ -36,15 +36,14 @@ const asOptionalNumber = (value) => {
 };
 
 const asArray = (value, fallback = []) => (Array.isArray(value) && value.length > 0 ? value : fallback);
-const uniqueValues = (values = []) => [...new Set(values.filter(hasValue))];
 
 export const getProductImageUrls = (product = {}) => {
-  const imageCandidates = uniqueValues([
-    ...(Array.isArray(product?.images) ? product.images : []),
-    product?.image,
-  ]);
+  const imageCandidates =
+    Array.isArray(product?.images) && product.images.length > 0
+      ? product.images
+      : [product?.image];
 
-  return uniqueValues(imageCandidates.map(resolveApiAssetUrl));
+  return imageCandidates.filter(hasValue).map(resolveApiAssetUrl).filter(hasValue);
 };
 
 export const getProductMainImageUrl = (product = {}) => getProductImageUrls(product)[0] ?? '';

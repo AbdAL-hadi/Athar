@@ -8,7 +8,7 @@ import PriceText from '../components/PriceText';
 import QuantitySelector from '../components/QuantitySelector';
 import SectionTitle from '../components/SectionTitle';
 import Toast from '../components/Toast';
-import { apiRequest } from '../utils/api';
+import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { getTrackableProductId, trackBehavior } from '../utils/behaviorTracking';
 import { formatCurrency } from '../utils/format';
 import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance } from '../utils/loyaltyPoints';
@@ -25,7 +25,7 @@ const getDefaultMedia = (product) => {
     };
   }
 
-  return { type: 'image', src: '', alt: '' };
+  return { type: 'image', src: resolveApiAssetUrl('design/logo.jpeg'), alt: product?.name || 'Athar product' };
 };
 
 const PRODUCT_COMMENT_MAX_LENGTH = 500;
