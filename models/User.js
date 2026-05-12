@@ -102,6 +102,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    demoSeed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     firstOrderRewardGranted: {
       type: Boolean,
       default: false,

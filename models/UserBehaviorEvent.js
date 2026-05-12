@@ -80,6 +80,11 @@ const userBehaviorEventSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    demoSeed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

@@ -41,6 +41,11 @@ const inventoryMovementSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    demoSeed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

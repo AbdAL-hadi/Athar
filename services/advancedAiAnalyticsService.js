@@ -362,6 +362,16 @@ const getCompactBusinessContext = async (range = '7d') => {
     getAiToolAnalytics(dateRange),
     getRiskAlerts({ range }),
   ]);
+  const pressureItems = (warehouse.warehouses || []).flatMap((item) => item.stockPressureItems || []);
+  const warehousePressureCount = pressureItems.length;
+  const criticalPressureCount = pressureItems.filter((item) => item.pressureLevel === 'critical').length;
+  const topRisk = risks[0] || null;
+  const inventoryStatusText =
+    criticalPressureCount > 0
+      ? 'Critical warehouse pressure detected.'
+      : warehousePressureCount > 0
+        ? 'Warehouse pressure detected.'
+        : 'No warehouse pressure detected.';
 
   return {
     range: normalizeRange(range),
@@ -373,7 +383,13 @@ const getCompactBusinessContext = async (range = '7d') => {
     topCity: overview.topCity?.cityLabel || null,
     topProduct: overview.topProduct?.title || null,
     topCategory: overview.topCategory?.category || null,
-    warehousePressureCount: (warehouse.warehouses || []).reduce((sum, item) => sum + Number(item.stockPressureItems?.length || 0), 0),
+    warehousePressureCount,
+    criticalPressureCount,
+    riskAlertsCount: risks.length,
+    hasWarehousePressure: warehousePressureCount > 0,
+    hasCriticalRisk: criticalPressureCount > 0 || risks.some((risk) => risk.severity === 'critical'),
+    topRiskTitle: topRisk?.title || null,
+    inventoryStatusText,
     criticalRisksCount: risks.filter((risk) => risk.severity === 'critical').length,
     topSearches: (search.topSearchQueries || []).slice(0, 5).map((item) => item.query),
     tryOnCount: aiTools.tryOnCount || 0,
@@ -382,7 +398,27 @@ const getCompactBusinessContext = async (range = '7d') => {
 };
 
 export const buildFallbackBusinessSummary = (context = {}) =>
-  `During this period, Athar recorded ${context.totalEvents || 0} tracked events. The strongest activity came from ${context.topCity || 'available customer activity'}, with ${context.topProduct || 'no single leading product'} as the top product and ${context.topCategory || 'no leading category'} as the leading category. Current conversion is ${context.conversionRate || 0}%. Review warehouse pressure, risk alerts, and product demand before planning stock transfers or campaigns.`;
+  `During this period, Athar recorded ${context.totalEvents || 0} tracked events. The strongest activity came from ${context.topCity || 'available customer activity'}, with ${context.topProduct || 'no single leading product'} as the top product and ${context.topCategory || 'no leading category'} as the leading category. ${context.inventoryStatusText || 'No warehouse pressure detected.'} Current conversion is ${context.conversionRate || 0}%. ${context.topRiskTitle ? `Top risk alert: ${context.topRiskTitle}. ` : ''}Review demand and marketing opportunities before planning campaigns.`;
+
+const validateBusinessSummary = (summary = '', context = {}) => {
+  const text = String(summary || '').trim();
+  const inventoryStatusText = String(context.inventoryStatusText || '').trim();
+  const lowerText = text.toLowerCase();
+
+  if (!text || (inventoryStatusText && !text.includes(inventoryStatusText))) {
+    return null;
+  }
+
+  if (!context.hasCriticalRisk && /\bcritical\b/i.test(text)) {
+    return null;
+  }
+
+  if (context.criticalPressureCount > 0 && /no\s+warehouse\s+pressure/i.test(lowerText)) {
+    return null;
+  }
+
+  return text;
+};
 
 export const getBusinessSummary = async ({ range = '7d', forceRegenerate = false } = {}) => {
   const safeRange = normalizeRange(range);
@@ -402,7 +438,7 @@ export const getBusinessSummary = async ({ range = '7d', forceRegenerate = false
     }
   }
 
-  const aiSummary = await generateBusinessSummary(context);
+  const aiSummary = validateBusinessSummary(await generateBusinessSummary(context), context);
   const output = {
     summary: aiSummary || buildFallbackBusinessSummary(context),
   };
@@ -425,13 +461,212 @@ export const getBusinessSummary = async ({ range = '7d', forceRegenerate = false
   };
 };
 
+const campaignCategoryLabels = {
+  Bags: 'Bag',
+  Rings: 'Ring',
+  Wallets: 'Wallet',
+  Watches: 'Watch',
+  Bracelets: 'Bracelet',
+  Accessories: 'Accessory',
+};
+
+const campaignCategoryTypeRules = {
+  Bags: {
+    disallowed: ['ring', 'rings', 'watch', 'watches', 'wallet', 'wallets', 'bracelet', 'bracelets', 'jewelry', 'jewellery', 'necklace', 'necklaces', 'sunglasses'],
+  },
+  Rings: {
+    disallowed: ['bag', 'bags', 'tote', 'handbag', 'watch', 'watches', 'wallet', 'wallets', 'bracelet', 'bracelets', 'sunglasses'],
+  },
+  Wallets: {
+    disallowed: ['bag', 'bags', 'tote', 'handbag', 'ring', 'rings', 'watch', 'watches', 'bracelet', 'bracelets', 'sunglasses'],
+  },
+  Watches: {
+    disallowed: ['bag', 'bags', 'tote', 'handbag', 'ring', 'rings', 'wallet', 'wallets', 'bracelet', 'bracelets', 'sunglasses'],
+  },
+  Bracelets: {
+    disallowed: ['bag', 'bags', 'tote', 'handbag', 'ring', 'rings', 'watch', 'watches', 'wallet', 'wallets', 'sunglasses'],
+  },
+};
+
+const normalizeCampaignText = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const hasWholeWord = (text, term) => new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+
+const getFeaturedItemsText = (candidate = {}) =>
+  `${candidate.productTitle || 'Athar product'} — ${candidate.productCategory || candidate.category || 'Product'}`;
+
+const fallbackCampaignFromCandidate = (candidate = {}, index = 0) => {
+  const cityLabel = candidate.cityLabel || candidate.city || 'Athar';
+  const productCategory = candidate.productCategory || candidate.category || 'Accessories';
+  const categoryLabel = campaignCategoryLabels[productCategory] || productCategory.replace(/s$/i, '') || 'Product';
+  const productTitle = candidate.productTitle || 'Athar favorites';
+
+  return {
+    title: `${cityLabel} ${categoryLabel} Favorites`,
+    target: `Customers in ${cityLabel}`,
+    featuredItems: getFeaturedItemsText({ productTitle, productCategory }),
+    message: `Explore the ${categoryLabel.toLowerCase()} styles customers in ${cityLabel} are viewing and saving most.`,
+    cta: `Shop ${productCategory}`,
+    reason: candidate.reasonData?.demandScore
+      ? `Based on a demand score of ${candidate.reasonData.demandScore} for ${productTitle} in ${cityLabel}.`
+      : `Based on recent tracked activity for ${productTitle}.`,
+  };
+};
+
+const campaignHasCategoryMismatch = (campaign = {}, candidate = {}) => {
+  const productCategory = candidate.productCategory || candidate.category || '';
+  const rules = campaignCategoryTypeRules[productCategory];
+
+  if (!rules) {
+    return false;
+  }
+
+  const productTitle = normalizeCampaignText(candidate.productTitle || '');
+  let text = normalizeCampaignText(
+    [
+      campaign.title,
+      campaign.target,
+      campaign.message,
+      campaign.cta,
+      campaign.reason,
+    ].join(' '),
+  );
+
+  if (productTitle) {
+    text = text.replace(productTitle, ' ');
+  }
+
+  return rules.disallowed.some((term) => hasWholeWord(text, term));
+};
+
+const validateCampaigns = (aiCampaigns, context = {}) => {
+  const candidates = Array.isArray(context.campaignCandidates) ? context.campaignCandidates.slice(0, 3) : [];
+  const fallbackList = fallbackCampaigns(context);
+  const normalizedAiCampaigns = Array.isArray(aiCampaigns) ? aiCampaigns.slice(0, 3) : [];
+  let validAiCount = 0;
+
+  const campaigns = (candidates.length ? candidates : fallbackList).slice(0, 3).map((candidateOrFallback, index) => {
+    const candidate = candidates[index] || null;
+    const fallback = candidate ? fallbackCampaignFromCandidate(candidate, index) : fallbackList[index];
+    const aiCampaign = normalizedAiCampaigns[index];
+
+    if (!aiCampaign || !candidate || campaignHasCategoryMismatch(aiCampaign, candidate)) {
+      return fallback;
+    }
+
+    validAiCount += 1;
+    return {
+      title: aiCampaign.title || fallback.title,
+      target: aiCampaign.target || fallback.target,
+      featuredItems: getFeaturedItemsText(candidate),
+      message: aiCampaign.message || fallback.message,
+      cta: aiCampaign.cta || fallback.cta,
+      reason: aiCampaign.reason || fallback.reason,
+    };
+  });
+
+  return {
+    campaigns,
+    usedAI: validAiCount > 0,
+    fallback: validAiCount < campaigns.length,
+  };
+};
+
+const getCampaignCandidates = async (range = '7d') => {
+  const { match } = getAdvancedDateRange(range);
+  const [productRows, searchRows] = await Promise.all([
+    UserBehaviorEvent.aggregate([
+      { $match: { ...match, product: { $ne: null }, userCity: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: { city: '$userCity', product: '$product' },
+          productTitle: { $last: '$productTitle' },
+          productCategory: { $last: '$productCategory' },
+          demandScore: { $sum: eventWeightExpression },
+          views: eventCountField('product_view'),
+          addToCart: eventCountField('add_to_cart'),
+          favorites: eventCountField('favorite_add'),
+          purchases: eventCountField('purchase'),
+          tryOns: eventCountField('try_on_generate'),
+        },
+      },
+      { $sort: { demandScore: -1, views: -1 } },
+      { $limit: 30 },
+    ]),
+    UserBehaviorEvent.aggregate([
+      { $match: { ...match, eventType: 'search', userCity: { $nin: [null, ''] }, searchQuery: { $nin: [null, ''] } } },
+      { $group: { _id: { city: '$userCity', query: '$searchQuery' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+  const productLookup = await getProductLookup(productRows.map((row) => row._id.product));
+  const topSearchByCity = new Map();
+
+  searchRows.forEach((row) => {
+    const city = normalizeCityValue(row._id.city);
+    if (!topSearchByCity.has(city)) topSearchByCity.set(city, row._id.query);
+  });
+
+  const candidates = [];
+  const usedCities = new Set();
+  const usedCandidateKeys = new Set();
+  const addCandidate = (row) => {
+    const city = normalizeCityValue(row._id.city);
+    const productId = String(row._id.product);
+    const candidateKey = `${city}:${productId}`;
+    const product = productLookup.get(productId);
+    const productCategory = product?.category || row.productCategory || '';
+    const productTitle = product?.title || row.productTitle || '';
+
+    if (!city || !productTitle || !productCategory || usedCandidateKeys.has(candidateKey)) return false;
+
+    usedCandidateKeys.add(candidateKey);
+    candidates.push({
+      city,
+      cityLabel: getCityLabel(city),
+      category: productCategory,
+      productTitle,
+      productCategory,
+      topSearchQuery: topSearchByCity.get(city) || '',
+      reasonData: {
+        demandScore: Number(row.demandScore || 0),
+        views: Number(row.views || 0),
+        addToCart: Number(row.addToCart || 0),
+        favorites: Number(row.favorites || 0),
+        purchases: Number(row.purchases || 0),
+        tryOns: Number(row.tryOns || 0),
+      },
+    });
+    return true;
+  };
+
+  productRows.forEach((row) => {
+    const city = normalizeCityValue(row._id.city);
+    if (candidates.length >= 3 || usedCities.has(city)) return;
+    if (addCandidate(row)) usedCities.add(city);
+  });
+
+  productRows.forEach((row) => {
+    if (candidates.length >= 3) return;
+    addCandidate(row);
+  });
+
+  return candidates.slice(0, 3);
+};
+
 const getCampaignContext = async (range = '7d') => {
   const dateRange = getAnalyticsDateRange({ range: normalizeRange(range) });
-  const [overview, search, opportunities, cityIdeas] = await Promise.all([
+  const [overview, search, opportunities, cityIdeas, campaignCandidates] = await Promise.all([
     getOverviewAnalytics(dateRange),
     getSearchAnalytics(dateRange),
     getMarketingOpportunities({ range }),
     getCityPersonalizationIdeas({ range }),
+    getCampaignCandidates(range),
   ]);
 
   return {
@@ -453,10 +688,17 @@ const getCampaignContext = async (range = '7d') => {
       topCategory: item.topCategory,
       topProduct: item.topProduct,
     })),
+    campaignCandidates,
   };
 };
 
 const fallbackCampaigns = (context = {}) => {
+  const candidates = Array.isArray(context.campaignCandidates) ? context.campaignCandidates.slice(0, 3) : [];
+
+  if (candidates.length > 0) {
+    return candidates.map(fallbackCampaignFromCandidate);
+  }
+
   const city = context.topCity || 'Athar';
   const category = context.topCategory || 'Accessories';
   const product = context.topProduct || 'Athar favorites';
@@ -465,15 +707,15 @@ const fallbackCampaigns = (context = {}) => {
     {
       title: `${city} Favorites`,
       target: `Customers in ${city}`,
-      featuredItems: product,
-      message: `Explore the pieces customers in ${city} are viewing and saving most.`,
-      cta: `Shop ${city} Picks`,
+      featuredItems: `${product} — ${category}`,
+      message: `Explore the ${String(category).toLowerCase()} styles customers in ${city} are viewing and saving most.`,
+      cta: `Shop ${category}`,
       reason: `Based on recent activity from ${city}.`,
     },
     {
       title: `${category} Spotlight`,
       target: `Customers interested in ${category}`,
-      featuredItems: category,
+      featuredItems: `${product} — ${category}`,
       message: `Bring heritage-inspired detail into everyday styling with standout ${category.toLowerCase()}.`,
       cta: `Explore ${category}`,
       reason: `Based on category demand signals in this period.`,
@@ -508,21 +750,22 @@ export const getCampaignSuggestions = async ({ range = '7d', forceRegenerate = f
   }
 
   const aiCampaigns = await generateCampaignSuggestions(context);
-  const campaigns = Array.isArray(aiCampaigns) && aiCampaigns.length > 0 ? aiCampaigns.slice(0, 3) : fallbackCampaigns(context);
+  const validation = validateCampaigns(aiCampaigns, context);
+  const campaigns = validation.campaigns;
   const stored = await storeInsight({
     type: 'campaign_suggestions',
     range: safeRange,
     fingerprint,
     payloadSummary: context,
     output: { campaigns },
-    usedAI: Array.isArray(aiCampaigns) && aiCampaigns.length > 0,
-    fallback: !(Array.isArray(aiCampaigns) && aiCampaigns.length > 0),
+    usedAI: validation.usedAI,
+    fallback: validation.fallback,
   });
 
   return {
     campaigns,
-    usedAI: Array.isArray(aiCampaigns) && aiCampaigns.length > 0,
-    fallback: !(Array.isArray(aiCampaigns) && aiCampaigns.length > 0),
+    usedAI: validation.usedAI,
+    fallback: validation.fallback,
     cached: false,
     generatedAt: stored.updatedAt || stored.createdAt,
   };

@@ -121,6 +121,11 @@ const inventoryRecommendationSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    demoSeed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
