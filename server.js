@@ -5,10 +5,14 @@ import path from 'node:path';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import adminAdvancedAiRoutes from './routes/adminAdvancedAiRoutes.js';
 import adminAiAssistRoutes from './routes/adminAiAssistRoutes.js';
 import adminAnalyticsRoutes from './routes/adminAnalyticsRoutes.js';
 import adminBehaviorRoutes from './routes/adminBehaviorRoutes.js';
 import adminCommentRoutes from './routes/adminCommentRoutes.js';
+import adminInventoryRecommendationRoutes, {
+  adminInventoryMovementRoutes,
+} from './routes/adminInventoryRecommendationRoutes.js';
 import adminWarehouseRoutes from './routes/adminWarehouseRoutes.js';
 import aiTryOnRoutes from './routes/aiTryOnRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
@@ -36,9 +40,12 @@ app.get('/', (_req, res) => {
 });
 
 app.use('/api/assets', assetRoutes);
+app.use('/api/admin/advanced-ai', adminAdvancedAiRoutes);
 app.use('/api/admin/ai-assist', adminAiAssistRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/admin/behavior', adminBehaviorRoutes);
+app.use('/api/admin/inventory-recommendations', adminInventoryRecommendationRoutes);
+app.use('/api/admin/inventory-movements', adminInventoryMovementRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/behavior', behaviorRoutes);
 app.use('/api/admin', adminRoutes);
