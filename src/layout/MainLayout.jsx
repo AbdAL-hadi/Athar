@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
+import CustomerChatbot from '../components/CustomerChatbot';
 
 const MainLayout = ({ cartCount, authUser, authLoading, onLogout, onUpdateProfile }) => {
   return (
@@ -10,8 +11,10 @@ const MainLayout = ({ cartCount, authUser, authLoading, onLogout, onUpdateProfil
         <Outlet context={{ onUpdateProfile }} />
       </main>
       <Footer />
+      <CustomerChatbot />
     </div>
   );
 };
 
 export default MainLayout;
+
