@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
-import { getCityLabel, normalizeCityValue } from '../constants/palestinianCities.js';
+import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../constants/palestinianCities.js';
 import AiGeneratedInsight from '../models/AiGeneratedInsight.js';
 import Product from '../models/Product.js';
 import UserBehaviorEvent from '../models/UserBehaviorEvent.js';
@@ -500,11 +500,97 @@ const hasWholeWord = (text, term) => new RegExp(`\\b${term.replace(/[.*+?^${}()|
 const getFeaturedItemsText = (candidate = {}) =>
   `${candidate.productTitle || 'Athar product'} — ${candidate.productCategory || candidate.category || 'Product'}`;
 
+const formatMetricPercent = (value) => `${round(Number(value || 0) * 100)}%`;
+
+const compactMetrics = (metrics = {}) =>
+  Object.fromEntries(
+    Object.entries(metrics).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  );
+
 const fallbackCampaignFromCandidate = (candidate = {}, index = 0) => {
   const cityLabel = candidate.cityLabel || candidate.city || 'Athar';
   const productCategory = candidate.productCategory || candidate.category || 'Accessories';
   const categoryLabel = campaignCategoryLabels[productCategory] || productCategory.replace(/s$/i, '') || 'Product';
   const productTitle = candidate.productTitle || 'Athar favorites';
+  const campaignType = candidate.campaignType || 'HIGH_DEMAND_EXPANSION';
+  const metrics = candidate.metrics || candidate.reasonData || {};
+
+  if (campaignType === 'LOW_CONVERSION_PRODUCT') {
+    return {
+      title: `Recover Interest: ${productTitle}`,
+      target: 'Customers who viewed or added this product',
+      featuredItems: getFeaturedItemsText({ productTitle, productCategory }),
+      message: `${productTitle} receives attention but purchases are lagging. Use stronger visuals, offer messaging, or urgency to convert existing interest.`,
+      cta: `Complete Your ${categoryLabel}`,
+      reason: `This product has ${metrics.views || 0} views and ${metrics.purchases || 0} purchases, a ${formatMetricPercent(metrics.conversionRate)} conversion rate.`,
+      campaignType,
+      severity: candidate.severity || 'high',
+      metrics,
+    };
+  }
+
+  if (campaignType === 'CART_ABANDONMENT_RECOVERY') {
+    return {
+      title: `Recover Carts: ${productTitle}`,
+      target: 'Customers who added this product to cart',
+      featuredItems: getFeaturedItemsText({ productTitle, productCategory }),
+      message: `${productTitle} is reaching carts but not enough completed orders. Run a recovery campaign with reassurance, shipping clarity, or a limited offer.`,
+      cta: 'Return to Your Cart',
+      reason: `The product has ${metrics.addToCart || 0} add-to-cart events and ${metrics.purchases || 0} purchases in this range.`,
+      campaignType,
+      severity: candidate.severity || 'critical',
+      metrics,
+    };
+  }
+
+  if (campaignType === 'COLD_CITY_ACTIVATION') {
+    return {
+      title: `Activate ${cityLabel}: ${productCategory} Awareness Campaign`,
+      target: `Customers in ${cityLabel}`,
+      featuredItems: productCategory,
+      message: `${cityLabel} has weak recent activity compared with other cities. Promote selected ${productCategory.toLowerCase()} with a first-order or discovery offer to build demand.`,
+      cta: `Discover Athar ${productCategory}`,
+      reason: Number(metrics.cityEvents || 0) === 0
+        ? `${cityLabel} has no tracked activity in this range, so this is an activation opportunity rather than proven low demand.`
+        : `${cityLabel} shows weak recent engagement and ${metrics.cityPurchases || 0} purchases, so this campaign is designed to create new demand.`,
+      campaignType,
+      severity: candidate.severity || 'medium',
+      metrics,
+    };
+  }
+
+  if (campaignType === 'UNDERPERFORMING_CITY_CATEGORY') {
+    return {
+      title: `Lift ${cityLabel}: ${productCategory} Demand`,
+      target: `Customers in ${cityLabel}`,
+      featuredItems: productCategory,
+      message: `${productCategory} performs better overall than it does in ${cityLabel}. Use a localized campaign to improve category visibility and demand.`,
+      cta: `Shop ${cityLabel} ${productCategory}`,
+      reason: `${productCategory} has stronger global demand than its recent ${cityLabel} activity, indicating a city/category underperformance opportunity.`,
+      campaignType,
+      severity: candidate.severity || 'medium',
+      metrics,
+    };
+  }
+
+  if (campaignType === 'STOCK_WITH_LOW_DEMAND' || campaignType === 'LOW_DEMAND_PRODUCT') {
+    const isStockCampaign = campaignType === 'STOCK_WITH_LOW_DEMAND';
+    return {
+      title: isStockCampaign ? `Move Available Stock: ${productTitle}` : `Build Demand: ${productTitle}`,
+      target: isStockCampaign ? 'Low-engagement city audiences' : `Customers interested in ${productCategory}`,
+      featuredItems: getFeaturedItemsText({ productTitle, productCategory }),
+      message: isStockCampaign
+        ? `${productTitle} has available stock but weak recent demand. Promote it where ${productCategory.toLowerCase()} engagement is low to increase visibility.`
+        : `${productTitle} is active but receiving limited attention. Run a visibility campaign to test demand before calling it a conversion issue.`,
+      cta: `Shop Athar ${productCategory}`,
+      reason: isStockCampaign
+        ? `Available stock (${metrics.stock || 0}) is not matched by enough recent demand, so this campaign aims to improve visibility and sell-through.`
+        : 'Recent views, cart activity, and purchases are all low, which points to low visibility rather than proven poor conversion.',
+      campaignType,
+      severity: candidate.severity || 'medium',
+      metrics,
+    };
+  }
 
   return {
     title: `${cityLabel} ${categoryLabel} Favorites`,
@@ -515,6 +601,9 @@ const fallbackCampaignFromCandidate = (candidate = {}, index = 0) => {
     reason: candidate.reasonData?.demandScore
       ? `Based on a demand score of ${candidate.reasonData.demandScore} for ${productTitle} in ${cityLabel}.`
       : `Based on recent tracked activity for ${productTitle}.`,
+    campaignType,
+    severity: candidate.severity || 'low',
+    metrics,
   };
 };
 
@@ -563,10 +652,13 @@ const validateCampaigns = (aiCampaigns, context = {}) => {
     return {
       title: aiCampaign.title || fallback.title,
       target: aiCampaign.target || fallback.target,
-      featuredItems: getFeaturedItemsText(candidate),
+      featuredItems: candidate.productTitle ? getFeaturedItemsText(candidate) : candidate.productCategory || candidate.category || fallback.featuredItems,
       message: aiCampaign.message || fallback.message,
       cta: aiCampaign.cta || fallback.cta,
       reason: aiCampaign.reason || fallback.reason,
+      campaignType: candidate.campaignType || fallback.campaignType,
+      severity: candidate.severity || fallback.severity,
+      metrics: candidate.metrics || fallback.metrics,
     };
   });
 
@@ -577,7 +669,7 @@ const validateCampaigns = (aiCampaigns, context = {}) => {
   };
 };
 
-const getCampaignCandidates = async (range = '7d') => {
+const buildHighDemandExpansionCandidates = async (range = '7d', limit = 3) => {
   const { match } = getAdvancedDateRange(range);
   const [productRows, searchRows] = await Promise.all([
     UserBehaviorEvent.aggregate([
@@ -647,16 +739,291 @@ const getCampaignCandidates = async (range = '7d') => {
 
   productRows.forEach((row) => {
     const city = normalizeCityValue(row._id.city);
-    if (candidates.length >= 3 || usedCities.has(city)) return;
+    if (candidates.length >= limit || usedCities.has(city)) return;
     if (addCandidate(row)) usedCities.add(city);
   });
 
   productRows.forEach((row) => {
-    if (candidates.length >= 3) return;
+    if (candidates.length >= limit) return;
     addCandidate(row);
   });
 
-  return candidates.slice(0, 3);
+  return candidates.slice(0, limit).map((candidate) => ({
+    ...candidate,
+    campaignType: 'HIGH_DEMAND_EXPANSION',
+    severity: 'low',
+    priorityScore: Number(candidate.reasonData?.demandScore || 0),
+    metrics: candidate.reasonData,
+  }));
+};
+
+const getCampaignCandidates = async (range = '7d') => {
+  const { match } = getAdvancedDateRange(range);
+  const [productRows, cityRows, cityCategoryRows, productsWithStock, highDemandCandidates] = await Promise.all([
+    getProductBehaviorRows(range),
+    UserBehaviorEvent.aggregate([
+      { $match: { ...match, userCity: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: '$userCity',
+          cityEvents: { $sum: 1 },
+          views: eventCountField('product_view'),
+          addToCart: eventCountField('add_to_cart'),
+          purchases: eventCountField('purchase'),
+          demandScore: { $sum: eventWeightExpression },
+        },
+      },
+    ]),
+    UserBehaviorEvent.aggregate([
+      { $match: { ...match, userCity: { $nin: [null, ''] }, productCategory: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: { city: '$userCity', category: '$productCategory' },
+          cityCategoryEvents: { $sum: 1 },
+          views: eventCountField('product_view'),
+          addToCart: eventCountField('add_to_cart'),
+          purchases: eventCountField('purchase'),
+          demandScore: { $sum: eventWeightExpression },
+        },
+      },
+    ]),
+    Product.find({ stock: { $gt: 0 } }).select('title slug category stock').sort({ stock: -1, title: 1 }).limit(200).lean(),
+    buildHighDemandExpansionCandidates(range, 3),
+  ]);
+
+  const productLookup = await getProductLookup([
+    ...productRows.map((row) => row._id),
+    ...productsWithStock.map((product) => product._id),
+  ]);
+  const opportunities = [];
+  const addOpportunity = (opportunity) => {
+    const key = [
+      opportunity.campaignType,
+      opportunity.productId || opportunity.productTitle || '',
+      opportunity.city || '',
+      opportunity.category || opportunity.productCategory || '',
+    ].join(':');
+
+    if (opportunities.some((item) => item.key === key)) return;
+    opportunities.push({ ...opportunity, key });
+  };
+  const productMetricsById = new Map();
+
+  productRows.forEach((row) => {
+    const productId = String(row._id);
+    const product = productLookup.get(productId);
+    const views = Number(row.views || 0);
+    const addToCart = Number(row.addToCart || 0);
+    const purchases = Number(row.purchases || 0);
+    const demandScore = Number(row.demandScore || 0);
+    const conversionRate = views > 0 ? purchases / views : 0;
+    const cartConversionRate = addToCart > 0 ? purchases / addToCart : 0;
+    const productTitle = product?.title || row.productTitle || 'Unknown product';
+    const productCategory = product?.category || row.category || 'Accessories';
+    const stock = Number(product?.stock || 0);
+    const base = {
+      productId,
+      productTitle,
+      productCategory,
+      category: productCategory,
+      slug: product?.slug || '',
+    };
+    const metrics = compactMetrics({
+      views,
+      addToCart,
+      purchases,
+      tryOns: Number(row.tryOns || 0),
+      demandScore,
+      conversionRate,
+      cartConversionRate,
+      stock,
+    });
+
+    productMetricsById.set(productId, metrics);
+
+    if (views >= 10 && purchases <= 1 && conversionRate <= 0.08) {
+      addOpportunity({
+        ...base,
+        campaignType: 'LOW_CONVERSION_PRODUCT',
+        severity: purchases === 0 ? 'critical' : 'high',
+        priorityScore: 500 + views * 5 + addToCart * 12 - purchases * 50,
+        metrics,
+      });
+    }
+
+    if (addToCart >= 4 && cartConversionRate <= 0.25) {
+      addOpportunity({
+        ...base,
+        campaignType: 'CART_ABANDONMENT_RECOVERY',
+        severity: purchases === 0 ? 'critical' : 'high',
+        priorityScore: 650 + addToCart * 18 - purchases * 35,
+        metrics,
+      });
+    }
+
+    if (stock > 0 && demandScore <= 4 && views <= 5 && purchases === 0) {
+      addOpportunity({
+        ...base,
+        campaignType: 'STOCK_WITH_LOW_DEMAND',
+        severity: stock >= 10 ? 'high' : 'medium',
+        priorityScore: 250 + stock * 6 - demandScore,
+        metrics,
+      });
+    }
+
+    if (views <= 2 && addToCart === 0 && purchases === 0) {
+      addOpportunity({
+        ...base,
+        campaignType: 'LOW_DEMAND_PRODUCT',
+        severity: 'medium',
+        priorityScore: 180 + Math.max(stock, 1) * 3,
+        metrics,
+      });
+    }
+  });
+
+  productsWithStock.forEach((product) => {
+    const productId = String(product._id);
+    if (productMetricsById.has(productId)) return;
+
+    addOpportunity({
+      productId,
+      productTitle: product.title,
+      productCategory: product.category,
+      category: product.category,
+      slug: product.slug || '',
+      campaignType: 'STOCK_WITH_LOW_DEMAND',
+      severity: Number(product.stock || 0) >= 10 ? 'high' : 'medium',
+      priorityScore: 280 + Number(product.stock || 0) * 6,
+      metrics: compactMetrics({
+        views: 0,
+        addToCart: 0,
+        purchases: 0,
+        demandScore: 0,
+        conversionRate: 0,
+        stock: Number(product.stock || 0),
+      }),
+    });
+  });
+
+  const normalizedCityRows = cityRows.map((row) => ({
+    city: normalizeCityValue(row._id),
+    cityLabel: getCityLabel(row._id),
+    cityEvents: Number(row.cityEvents || 0),
+    views: Number(row.views || 0),
+    addToCart: Number(row.addToCart || 0),
+    purchases: Number(row.purchases || 0),
+    demandScore: Number(row.demandScore || 0),
+  }));
+  const cityMetrics = new Map(normalizedCityRows.map((row) => [row.city, row]));
+  const activeCityRows = normalizedCityRows.filter((row) => row.cityEvents > 0);
+  const averageCityEvents = activeCityRows.length
+    ? activeCityRows.reduce((sum, row) => sum + row.cityEvents, 0) / activeCityRows.length
+    : 0;
+  const topCategory =
+    [...productRows]
+      .sort((a, b) => Number(b.demandScore || 0) - Number(a.demandScore || 0))
+      .map((row) => row.category)
+      .find(Boolean) || productsWithStock[0]?.category || 'Accessories';
+
+  PALESTINIAN_CITIES.forEach((cityConfig) => {
+    const metrics = cityMetrics.get(cityConfig.value) || {
+      city: cityConfig.value,
+      cityLabel: cityConfig.label,
+      cityEvents: 0,
+      views: 0,
+      addToCart: 0,
+      purchases: 0,
+      demandScore: 0,
+    };
+    const isCold =
+      metrics.cityEvents === 0 ||
+      metrics.purchases === 0 ||
+      (averageCityEvents > 0 && metrics.cityEvents <= averageCityEvents * 0.35);
+
+    if (!isCold) return;
+
+    addOpportunity({
+      city: cityConfig.value,
+      cityLabel: cityConfig.label,
+      category: topCategory,
+      productCategory: topCategory,
+      campaignType: 'COLD_CITY_ACTIVATION',
+      severity: metrics.cityEvents === 0 ? 'high' : 'medium',
+      priorityScore: 420 + Math.max(averageCityEvents - metrics.cityEvents, 0) + (metrics.purchases === 0 ? 40 : 0),
+      metrics: compactMetrics({
+        cityEvents: metrics.cityEvents,
+        cityPurchases: metrics.purchases,
+        cityViews: metrics.views,
+        cityAddToCart: metrics.addToCart,
+        averageCityEvents: round(averageCityEvents),
+      }),
+    });
+  });
+
+  const categoryTotals = new Map();
+  cityCategoryRows.forEach((row) => {
+    const category = row._id.category;
+    categoryTotals.set(category, (categoryTotals.get(category) || 0) + Number(row.demandScore || 0));
+  });
+
+  cityCategoryRows.forEach((row) => {
+    const city = normalizeCityValue(row._id.city);
+    const category = row._id.category;
+    const globalDemandScore = Number(categoryTotals.get(category) || 0);
+    const cityCategoryScore = Number(row.demandScore || 0);
+    const cityCategoryShare = globalDemandScore > 0 ? cityCategoryScore / globalDemandScore : 0;
+
+    if (globalDemandScore < 20 || cityCategoryScore > 5 || cityCategoryShare > 0.12) return;
+
+    addOpportunity({
+      city,
+      cityLabel: getCityLabel(city),
+      category,
+      productCategory: category,
+      campaignType: 'UNDERPERFORMING_CITY_CATEGORY',
+      severity: 'medium',
+      priorityScore: 320 + globalDemandScore - cityCategoryScore * 6,
+      metrics: compactMetrics({
+        cityCategoryDemandScore: cityCategoryScore,
+        globalCategoryDemandScore: globalDemandScore,
+        cityCategoryShare,
+        views: Number(row.views || 0),
+        addToCart: Number(row.addToCart || 0),
+        purchases: Number(row.purchases || 0),
+      }),
+    });
+  });
+
+  const campaignPriorityBucket = (candidate = {}) => {
+    if (
+      candidate.severity === 'critical' &&
+      ['CART_ABANDONMENT_RECOVERY', 'LOW_CONVERSION_PRODUCT'].includes(candidate.campaignType)
+    ) {
+      return 1;
+    }
+
+    if (['COLD_CITY_ACTIVATION', 'UNDERPERFORMING_CITY_CATEGORY'].includes(candidate.campaignType)) return 2;
+    if (['CART_ABANDONMENT_RECOVERY', 'LOW_CONVERSION_PRODUCT'].includes(candidate.campaignType)) return 3;
+    if (['STOCK_WITH_LOW_DEMAND', 'LOW_DEMAND_PRODUCT'].includes(candidate.campaignType)) return 4;
+    return 5;
+  };
+  const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
+  const recoveryCandidates = opportunities
+    .sort(
+      (a, b) =>
+        campaignPriorityBucket(a) - campaignPriorityBucket(b) ||
+        severityRank[b.severity] - severityRank[a.severity] ||
+        b.priorityScore - a.priorityScore,
+    )
+    .slice(0, 3)
+    .map(({ key: _key, ...candidate }) => candidate);
+
+  if (recoveryCandidates.length >= 3) {
+    return recoveryCandidates;
+  }
+
+  return [...recoveryCandidates, ...highDemandCandidates].slice(0, 3);
 };
 
 const getCampaignContext = async (range = '7d') => {

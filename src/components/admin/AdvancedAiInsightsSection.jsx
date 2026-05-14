@@ -4,6 +4,7 @@ import { apiRequest } from '../../utils/api';
 
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
+const formatRate = (value) => `${(Number(value || 0) * 100).toFixed(1)}%`;
 
 const severityClass = (severity = '') => {
   const normalized = String(severity).toLowerCase();
@@ -19,6 +20,55 @@ const Badge = ({ children }) => (
     {children}
   </span>
 );
+
+const CampaignTypeBadge = ({ type }) => {
+  if (!type) return null;
+
+  return (
+    <span className="inline-flex rounded-full border border-line bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
+      {String(type).replace(/_/g, ' ')}
+    </span>
+  );
+};
+
+const campaignMetricLabels = {
+  views: 'Views',
+  addToCart: 'Cart adds',
+  purchases: 'Purchases',
+  tryOns: 'Try-ons',
+  demandScore: 'Demand',
+  conversionRate: 'Conversion',
+  cartConversionRate: 'Cart conversion',
+  stock: 'Stock',
+  cityEvents: 'City events',
+  cityPurchases: 'City purchases',
+  cityViews: 'City views',
+  cityAddToCart: 'City cart adds',
+  averageCityEvents: 'Avg city events',
+  cityCategoryDemandScore: 'City/category demand',
+  globalCategoryDemandScore: 'Global category demand',
+  cityCategoryShare: 'City/category share',
+};
+
+const formatCampaignMetric = (key, value) => {
+  if (key.toLowerCase().includes('rate') || key.toLowerCase().includes('share')) return formatRate(value);
+  return formatNumber(value);
+};
+
+const CampaignMetrics = ({ metrics }) => {
+  const entries = Object.entries(metrics || {}).filter(([, value]) => value !== undefined && value !== null && value !== '');
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {entries.slice(0, 6).map(([key, value]) => (
+        <span key={key} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-ink-soft">
+          {campaignMetricLabels[key] || key}: {formatCampaignMetric(key, value)}
+        </span>
+      ))}
+    </div>
+  );
+};
 
 const EmptyState = ({ children }) => (
   <div className="rounded-[22px] bg-[#fffaf8] px-5 py-6 text-sm leading-6 text-ink-soft">{children}</div>
@@ -255,7 +305,7 @@ const AdvancedAiInsightsSection = ({ authToken, range }) => {
 
           <Panel
             title="AI Campaign Suggestions"
-            description="Maximum 3 campaigns, generated only by explicit admin action."
+            description="Suggested campaigns to activate weak cities, recover low-converting products, and improve demand where performance is low."
             actions={
               <div className="flex flex-wrap gap-2">
                 <button
@@ -283,18 +333,29 @@ const AdvancedAiInsightsSection = ({ authToken, range }) => {
               <div className="space-y-3">
                 {campaignSuggestions.campaigns.map((campaign) => (
                   <article key={`${campaign.title}-${campaign.cta}`} className="rounded-[20px] bg-[#fffaf8] px-4 py-4 text-sm">
-                    <h4 className="font-bold text-ink">{campaign.title}</h4>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="font-bold text-ink">{campaign.title}</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <CampaignTypeBadge type={campaign.campaignType} />
+                        {campaign.severity ? <Badge>{campaign.severity}</Badge> : null}
+                      </div>
+                    </div>
                     <p className="mt-1 text-ink-soft">{campaign.message}</p>
                     <p className="mt-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">{campaign.target}</p>
                     <p className="mt-2 text-ink-soft">Featured: {campaign.featuredItems}</p>
                     <p className="text-ink-soft">CTA: {campaign.cta}</p>
                     <p className="text-ink-soft">Reason: {campaign.reason}</p>
+                    <CampaignMetrics metrics={campaign.metrics} />
                   </article>
                 ))}
                 <AiOutputMeta output={campaignSuggestions} />
               </div>
             ) : (
-              <EmptyState>Click Generate Campaign Suggestions to draft campaign ideas from aggregate data.</EmptyState>
+              <EmptyState>
+                {campaignSuggestions
+                  ? 'No recovery opportunities found for the selected range. Try a longer date range or generate high-demand expansion campaigns.'
+                  : 'Click Generate Campaign Suggestions to draft recovery and activation campaigns from aggregate data.'}
+              </EmptyState>
             )}
           </Panel>
         </div>
