@@ -12,6 +12,7 @@ const EVENT_TYPES = new Set([
   'search',
   'visual_search',
   'try_on_generate',
+  'checkout_started',
   'purchase',
   'review_create',
 ]);

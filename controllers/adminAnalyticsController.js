@@ -1,6 +1,7 @@
 import {
   getAiToolAnalytics,
   getCityDemandAnalytics,
+  getCustomerBehaviorFunnelAnalytics,
   getDateRange,
   getOverviewAnalytics,
   getProductDemandAnalytics,
@@ -55,3 +56,6 @@ export const getAdminAnalyticsSearches = (req, res) =>
 
 export const getAdminAnalyticsAiTools = (req, res) =>
   sendAnalytics(req, res, getAiToolAnalytics, 'Failed to fetch AI tool usage analytics.');
+
+export const getAdminAnalyticsCustomerFunnel = (req, res) =>
+  sendAnalytics(req, res, getCustomerBehaviorFunnelAnalytics, 'Failed to fetch customer behavior funnel analytics.');

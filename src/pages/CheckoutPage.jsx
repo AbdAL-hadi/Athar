@@ -7,7 +7,7 @@ import Toast from '../components/Toast';
 import { isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
 import { getActiveAuthToken, getAuthTokenSource } from '../utils/authSession';
-import { getOrCreateSessionId } from '../utils/behaviorTracking';
+import { getOrCreateSessionId, trackBehavior } from '../utils/behaviorTracking';
 import { getCartSubtotal, SHIPPING_FEE } from '../utils/cart';
 import { formatCurrency } from '../utils/format';
 import {
@@ -58,6 +58,25 @@ const CheckoutPage = ({
       ? crypto.randomUUID()
       : `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   );
+  const hasTrackedCheckoutStartRef = useRef(false);
+
+  useEffect(() => {
+    if (isSuccessRoute || hasTrackedCheckoutStartRef.current || items.length === 0) {
+      return;
+    }
+
+    hasTrackedCheckoutStartRef.current = true;
+    trackBehavior({
+      eventType: 'checkout_started',
+      quantity: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      sourcePage: '/checkout',
+      metadata: {
+        itemCount: items.length,
+        subtotal,
+        hasAuthUser: Boolean(authUser),
+      },
+    });
+  }, [authUser, isSuccessRoute, items, subtotal]);
 
   useEffect(() => {
     if (authUser) {

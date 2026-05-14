@@ -72,6 +72,67 @@ const buildCategoryBreakdown = (productSummaries) => {
     .sort((left, right) => right.revenue - left.revenue);
 };
 
+// Groups every order by workflow status for dashboard status charts.
+const buildOrderStatusBreakdown = (orders) => {
+  const statusTotals = new Map();
+
+  orders.forEach((order) => {
+    const status = order.status || 'Unknown';
+    statusTotals.set(status, (statusTotals.get(status) || 0) + 1);
+  });
+
+  return Array.from(statusTotals.entries())
+    .map(([status, count]) => ({ status, count }))
+    .sort((left, right) => right.count - left.count);
+};
+
+// Sums current stock by product category so inventory charts include products with no sales yet.
+const buildInventoryByCategory = (productSummaries) => {
+  const categoryTotals = new Map();
+
+  productSummaries.forEach((product) => {
+    const category = product.category || 'Uncategorized';
+    categoryTotals.set(category, (categoryTotals.get(category) || 0) + Number(product.currentStock || 0));
+  });
+
+  return Array.from(categoryTotals.entries())
+    .map(([category, stock]) => ({ category, stock }))
+    .sort((left, right) => right.stock - left.stock);
+};
+
+// Summarizes all confirmed commercial activity for analytics KPI cards.
+const buildCommerceSummary = (orders, productSummaries, customerSummaries) => {
+  const confirmedOrders = orders.filter((order) => ['Confirmed', 'Shipped', 'Delivered'].includes(order.status));
+  const totalRevenue = confirmedOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const totalSales = confirmedOrders.reduce(
+    (sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0),
+    0,
+  );
+  const lowStockProducts = productSummaries.filter((product) =>
+    ['Low', 'Critical', 'Out of Stock'].includes(product.inventoryStatus),
+  );
+  const topProduct = productSummaries.find((product) => Number(product.unitsSold || 0) > 0) || productSummaries[0] || null;
+
+  return {
+    totalSales,
+    totalOrders: confirmedOrders.length,
+    totalRevenue: Number(totalRevenue.toFixed(2)),
+    activeCustomers: customerSummaries.filter((customer) => Number(customer.totalOrders || 0) > 0).length,
+    lowStockProducts: lowStockProducts.length,
+    topProduct: topProduct
+      ? {
+          productId: topProduct.productId,
+          productName: topProduct.productName,
+          category: topProduct.category,
+          unitsSold: topProduct.unitsSold,
+          revenueGenerated: topProduct.revenueGenerated,
+          currentStock: topProduct.currentStock,
+          inventoryStatus: topProduct.inventoryStatus,
+        }
+      : null,
+  };
+};
+
 // Detects a weekly sales spike that should surface as the top AI insight.
 const getWeeklyTrendInsight = (productSummaries, orders, products) => {
   const now = new Date();
@@ -245,6 +306,9 @@ export const getAdminDashboardSnapshot = async () => {
     customerSummaries,
   });
   const categoryBreakdown = buildCategoryBreakdown(productSummaries);
+  const orderStatusBreakdown = buildOrderStatusBreakdown(snapshot.orders);
+  const inventoryByCategory = buildInventoryByCategory(productSummaries);
+  const commerceSummary = buildCommerceSummary(snapshot.orders, productSummaries, customerSummaries);
   const exportMeta = await getSalesExportMetadata();
   const confirmedOrders = snapshot.orders.filter((order) => ['Confirmed', 'Shipped', 'Delivered'].includes(order.status));
   const currentDate = new Date();
@@ -266,6 +330,7 @@ export const getAdminDashboardSnapshot = async () => {
 
   return {
     insight,
+    summary: commerceSummary,
     kpis: [
       {
         id: 'revenue',
@@ -306,6 +371,8 @@ export const getAdminDashboardSnapshot = async () => {
       sales7Days: buildSalesSeries(dailySummaries, 7),
       sales30Days: buildSalesSeries(dailySummaries, 30),
       categoryBreakdown,
+      orderStatusBreakdown,
+      inventoryByCategory,
     },
     topProducts: productSummaries.slice(0, 8),
     alerts,

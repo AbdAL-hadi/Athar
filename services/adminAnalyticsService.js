@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 import UserBehaviorEvent from '../models/UserBehaviorEvent.js';
 import Warehouse from '../models/Warehouse.js';
 import WarehouseStock from '../models/WarehouseStock.js';
+import { buildImageAssetUrlFromReference } from './assets/imageAssetService.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -11,6 +12,7 @@ const EVENT_WEIGHTS = {
   product_view: 1,
   favorite_add: 3,
   add_to_cart: 5,
+  checkout_started: 7,
   purchase: 10,
   review_create: 2,
   try_on_generate: 4,
@@ -97,6 +99,11 @@ const getStatusForProduct = ({ views = 0, purchases = 0, demandScore = 0, totalS
   return 'Normal';
 };
 
+const serializeImageReferences = (references = []) =>
+  Array.isArray(references)
+    ? references.map((reference) => buildImageAssetUrlFromReference(reference)).filter(Boolean)
+    : [];
+
 const getPressureLevel = (demandScore, quantity) => {
   if (demandScore >= 20 && quantity <= 1) return 'critical';
   if (demandScore >= 10 && quantity <= 3) return 'high';
@@ -110,10 +117,169 @@ const eventCountField = (eventType) => ({
   },
 });
 
+const CUSTOMER_FUNNEL_STEPS = [
+  {
+    key: 'productViews',
+    eventType: 'product_view',
+    label: 'Product Views',
+    insightLabel: 'view products',
+    missingEventFallback: false,
+  },
+  {
+    key: 'favorites',
+    eventType: 'favorite_add',
+    label: 'Favorites',
+    insightLabel: 'save favorites',
+    missingEventFallback: false,
+  },
+  {
+    key: 'addToCart',
+    eventType: 'add_to_cart',
+    label: 'Add to Cart',
+    insightLabel: 'add items to cart',
+    missingEventFallback: false,
+  },
+  {
+    key: 'checkoutStarted',
+    eventType: 'checkout_started',
+    label: 'Checkout Started',
+    insightLabel: 'start checkout',
+    missingEventFallback: true,
+  },
+  {
+    key: 'orderCompleted',
+    eventType: 'purchase',
+    label: 'Order Completed',
+    insightLabel: 'complete orders',
+    missingEventFallback: false,
+  },
+];
+
+const safeRate = (numerator, denominator) => {
+  const safeDenominator = Number(denominator || 0);
+
+  if (safeDenominator <= 0) {
+    return 0;
+  }
+
+  return roundPercent((Number(numerator || 0) / safeDenominator) * 100);
+};
+
+const getDropOffTitle = (fromStep, toStep) => {
+  if (fromStep.eventType === 'product_view' && toStep.eventType === 'favorite_add') {
+    return 'Many users view products but do not save favorites';
+  }
+
+  if (fromStep.eventType === 'favorite_add' && toStep.eventType === 'add_to_cart') {
+    return 'Favorites are high but cart intent is lower';
+  }
+
+  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'checkout_started') {
+    return 'Many users add to cart but do not start checkout';
+  }
+
+  if (fromStep.eventType === 'checkout_started' && toStep.eventType === 'purchase') {
+    return 'Checkout starts are not becoming completed orders';
+  }
+
+  return `${fromStep.label} to ${toStep.label} drop-off`;
+};
+
+const getDropOffAction = (fromStep, toStep) => {
+  if (fromStep.eventType === 'product_view' && toStep.eventType === 'favorite_add') {
+    return 'Improve product photos, titles, trust cues, and above-the-fold product details.';
+  }
+
+  if (fromStep.eventType === 'favorite_add' && toStep.eventType === 'add_to_cart') {
+    return 'Use wishlist reminders, availability messaging, and clearer product options to turn saved interest into cart intent.';
+  }
+
+  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'checkout_started') {
+    return 'Review cart clarity, delivery cost visibility, login friction, and checkout call-to-action placement.';
+  }
+
+  if (fromStep.eventType === 'checkout_started' && toStep.eventType === 'purchase') {
+    return 'Review payment, address validation, delivery choices, and final order confidence signals.';
+  }
+
+  return 'Review this journey step for friction and unclear customer motivation.';
+};
+
+export const getCustomerBehaviorFunnelAnalytics = async (dateRange) => {
+  const match = createDateMatch(dateRange);
+  const countRows = await UserBehaviorEvent.aggregate([
+    { $match: { ...match, eventType: { $in: CUSTOMER_FUNNEL_STEPS.map((step) => step.eventType) } } },
+    { $group: { _id: '$eventType', count: { $sum: 1 } } },
+  ]);
+  const counts = countRows.reduce((lookup, row) => {
+    lookup[row._id] = Number(row.count || 0);
+    return lookup;
+  }, {});
+
+  const steps = CUSTOMER_FUNNEL_STEPS.map((step, index) => {
+    const count = Number(counts[step.eventType] || 0);
+    const previousCount = index > 0 ? Number(counts[CUSTOMER_FUNNEL_STEPS[index - 1].eventType] || 0) : count;
+    const percentageFromPrevious = index === 0 ? 100 : safeRate(count, previousCount);
+    const dropOffCount = index === 0 ? 0 : Math.max(previousCount - count, 0);
+    const dropOffRate = index === 0 ? 0 : safeRate(dropOffCount, previousCount);
+
+    return {
+      ...step,
+      count,
+      previousStepKey: index > 0 ? CUSTOMER_FUNNEL_STEPS[index - 1].key : null,
+      previousCount,
+      percentageFromPrevious,
+      dropOffCount,
+      dropOffRate,
+      tracked: true,
+      note: count === 0 && step.missingEventFallback ? 'This step is supported now, but older ranges may have no checkout-start events.' : '',
+    };
+  });
+
+  const transitions = steps.slice(1).map((step, index) => {
+    const previousStep = steps[index];
+    return {
+      key: `${previousStep.key}-to-${step.key}`,
+      fromStepKey: previousStep.key,
+      toStepKey: step.key,
+      fromLabel: previousStep.label,
+      toLabel: step.label,
+      fromCount: previousStep.count,
+      toCount: step.count,
+      retainedRate: step.percentageFromPrevious,
+      dropOffCount: step.dropOffCount,
+      dropOffRate: step.dropOffRate,
+      tracked: step.tracked,
+      title: getDropOffTitle(previousStep, step),
+      explanation:
+        previousStep.count > 0
+          ? `${step.label} kept ${formatNumberForAnalytics(step.count)} of ${formatNumberForAnalytics(previousStep.count)} ${previousStep.insightLabel} signal${previousStep.count === 1 ? '' : 's'}.`
+          : `No ${previousStep.label.toLowerCase()} signals were tracked in this range, so this transition cannot show meaningful drop-off yet.`,
+      suggestedAction: getDropOffAction(previousStep, step),
+    };
+  });
+
+  const insights = transitions
+    .filter((transition) => transition.fromCount > 0)
+    .sort((left, right) => right.dropOffRate - left.dropOffRate || right.dropOffCount - left.dropOffCount)
+    .slice(0, 3);
+
+  return {
+    steps,
+    transitions,
+    insights,
+    hasData: steps.some((step) => step.count > 0),
+    calculationNote:
+      'Percentage from previous step = current step count divided by previous step count. Drop-off rate = max(previous count - current count, 0) divided by previous step count.',
+  };
+};
+
+const formatNumberForAnalytics = (value) => Number(value || 0).toLocaleString();
+
 export const getOverviewAnalytics = async (dateRange) => {
   const match = createDateMatch(dateRange);
 
-  const [typeCounts, topCities, topProducts, topCategories, activeCities] = await Promise.all([
+  const [typeCounts, topCities, topProducts, topCategories, activeCities, activeUsers, activeSessions] = await Promise.all([
     UserBehaviorEvent.aggregate([
       { $match: match },
       { $group: { _id: '$eventType', count: { $sum: 1 } } },
@@ -137,6 +303,8 @@ export const getOverviewAnalytics = async (dateRange) => {
       { $limit: 1 },
     ]),
     UserBehaviorEvent.distinct('userCity', { ...match, userCity: { $nin: [null, ''] } }),
+    UserBehaviorEvent.distinct('user', { ...match, user: { $ne: null } }),
+    UserBehaviorEvent.distinct('sessionId', { ...match, sessionId: { $nin: [null, ''] } }),
   ]);
 
   const counts = typeCounts.reduce((lookup, item) => {
@@ -152,12 +320,15 @@ export const getOverviewAnalytics = async (dateRange) => {
     productViews,
     addToCartCount: counts.add_to_cart || 0,
     favoritesCount: counts.favorite_add || 0,
+    checkoutStartedCount: counts.checkout_started || 0,
     purchasesCount,
     searchesCount: counts.search || 0,
     visualSearchCount: counts.visual_search || 0,
     tryOnCount: counts.try_on_generate || 0,
     reviewsCount: counts.review_create || 0,
     estimatedConversionRate: productViews > 0 ? roundPercent((purchasesCount / productViews) * 100) : 0,
+    activeCustomersCount: activeUsers.length,
+    activeSessionsCount: activeSessions.length,
     activeCitiesCount: activeCities.length,
     topCity: topCities[0]?._id
       ? { city: safeCity(topCities[0]._id), cityLabel: getCityLabel(topCities[0]._id), count: topCities[0].count }
@@ -193,7 +364,7 @@ export const getProductDemandAnalytics = async (dateRange) => {
 
   const productIds = productRows.map((row) => row._id).filter((id) => mongoose.isValidObjectId(id));
   const [products, stockRows] = await Promise.all([
-    Product.find({ _id: { $in: productIds } }).select('title category price stock slug').lean(),
+    Product.find({ _id: { $in: productIds } }).select('title category price stock slug images inventoryStatus lowStockThreshold').lean(),
     WarehouseStock.find({ product: { $in: productIds } }).populate('warehouse', 'name city cityLabel').lean(),
   ]);
 
@@ -224,6 +395,7 @@ export const getProductDemandAnalytics = async (dateRange) => {
       productCategory: product?.category || row.productCategory || '',
       productPrice: Number(product?.price ?? row.productPrice ?? 0),
       slug: product?.slug || '',
+      images: serializeImageReferences(product?.images),
       views: row.views || 0,
       addToCart: row.addToCart || 0,
       favorites: row.favorites || 0,
@@ -234,6 +406,8 @@ export const getProductDemandAnalytics = async (dateRange) => {
       demandScore: row.demandScore || 0,
       conversionRate,
       totalStock,
+      lowStockThreshold: Number(product?.lowStockThreshold ?? 3),
+      inventoryStatus: product?.inventoryStatus || '',
       warehouseStockSummary,
       status: getStatusForProduct({ views: row.views, purchases: row.purchases, demandScore: row.demandScore, totalStock }),
     };
