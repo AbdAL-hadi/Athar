@@ -59,6 +59,18 @@ const CheckoutPage = ({
       : `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   );
   const hasTrackedCheckoutStartRef = useRef(false);
+  const subtotal = useMemo(() => getCartSubtotal(items), [items]);
+  const currentBalance = useMemo(() => getCurrentAtharPointsBalance(authUser), [authUser]);
+  const shippingTotal = items.length > 0 ? SHIPPING_FEE : 0;
+  const estimatedCheckoutPoints = Math.floor(subtotal + shippingTotal);
+  const projectedBalanceBeforeRedemption = currentBalance + estimatedCheckoutPoints;
+  const rewardDiscountAvailable = Boolean(authUser) && projectedBalanceBeforeRedemption >= REWARD_DISCOUNT_POINTS_COST;
+  const rewardPointsNeeded = Math.max(0, REWARD_DISCOUNT_POINTS_COST - projectedBalanceBeforeRedemption);
+  const shouldApplyRewardDiscount = useRewardDiscount && rewardDiscountAvailable;
+  const discountAmount = shouldApplyRewardDiscount ? subtotal * (REWARD_DISCOUNT_PERCENT / 100) : 0;
+  const finalTotal = Math.max(0, subtotal + shippingTotal - discountAmount);
+  const cartPoints = estimatedCheckoutPoints;
+  const projectedBalanceAfterReward = Math.max(0, projectedBalanceBeforeRedemption - (shouldApplyRewardDiscount ? REWARD_DISCOUNT_POINTS_COST : 0));
 
   useEffect(() => {
     if (isSuccessRoute || hasTrackedCheckoutStartRef.current || items.length === 0) {
@@ -124,19 +136,6 @@ const CheckoutPage = ({
       isCancelled = true;
     };
   }, [authToken, isSuccessRoute, loyaltyAward?.pointsEarned, orderNumberFromUrl]);
-
-  const subtotal = useMemo(() => getCartSubtotal(items), [items]);
-  const currentBalance = useMemo(() => getCurrentAtharPointsBalance(authUser), [authUser]);
-  const shippingTotal = items.length > 0 ? SHIPPING_FEE : 0;
-  const estimatedCheckoutPoints = Math.floor(subtotal + shippingTotal);
-  const projectedBalanceBeforeRedemption = currentBalance + estimatedCheckoutPoints;
-  const rewardDiscountAvailable = Boolean(authUser) && projectedBalanceBeforeRedemption >= REWARD_DISCOUNT_POINTS_COST;
-  const rewardPointsNeeded = Math.max(0, REWARD_DISCOUNT_POINTS_COST - projectedBalanceBeforeRedemption);
-  const shouldApplyRewardDiscount = useRewardDiscount && rewardDiscountAvailable;
-  const discountAmount = shouldApplyRewardDiscount ? subtotal * (REWARD_DISCOUNT_PERCENT / 100) : 0;
-  const finalTotal = Math.max(0, subtotal + shippingTotal - discountAmount);
-  const cartPoints = estimatedCheckoutPoints;
-  const projectedBalanceAfterReward = Math.max(0, projectedBalanceBeforeRedemption - (shouldApplyRewardDiscount ? REWARD_DISCOUNT_POINTS_COST : 0));
 
   useEffect(() => {
     if (useRewardDiscount && !rewardDiscountAvailable) {

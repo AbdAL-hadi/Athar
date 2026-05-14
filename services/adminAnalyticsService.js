@@ -136,15 +136,8 @@ const CUSTOMER_FUNNEL_STEPS = [
     key: 'addToCart',
     eventType: 'add_to_cart',
     label: 'Add to Cart',
-    insightLabel: 'add items to cart',
+    insightLabel: 'add-to-cart',
     missingEventFallback: false,
-  },
-  {
-    key: 'checkoutStarted',
-    eventType: 'checkout_started',
-    label: 'Checkout Started',
-    insightLabel: 'start checkout',
-    missingEventFallback: true,
   },
   {
     key: 'orderCompleted',
@@ -174,12 +167,8 @@ const getDropOffTitle = (fromStep, toStep) => {
     return 'Favorites are high but cart intent is lower';
   }
 
-  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'checkout_started') {
-    return 'Many users add to cart but do not start checkout';
-  }
-
-  if (fromStep.eventType === 'checkout_started' && toStep.eventType === 'purchase') {
-    return 'Checkout starts are not becoming completed orders';
+  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'purchase') {
+    return 'Many users add to cart but do not complete orders';
   }
 
   return `${fromStep.label} to ${toStep.label} drop-off`;
@@ -194,12 +183,8 @@ const getDropOffAction = (fromStep, toStep) => {
     return 'Use wishlist reminders, availability messaging, and clearer product options to turn saved interest into cart intent.';
   }
 
-  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'checkout_started') {
-    return 'Review cart clarity, delivery cost visibility, login friction, and checkout call-to-action placement.';
-  }
-
-  if (fromStep.eventType === 'checkout_started' && toStep.eventType === 'purchase') {
-    return 'Review payment, address validation, delivery choices, and final order confidence signals.';
+  if (fromStep.eventType === 'add_to_cart' && toStep.eventType === 'purchase') {
+    return 'Review cart clarity, delivery cost visibility, login friction, payment flow, and final order call-to-action.';
   }
 
   return 'Review this journey step for friction and unclear customer motivation.';
@@ -232,7 +217,7 @@ export const getCustomerBehaviorFunnelAnalytics = async (dateRange) => {
       dropOffCount,
       dropOffRate,
       tracked: true,
-      note: count === 0 && step.missingEventFallback ? 'This step is supported now, but older ranges may have no checkout-start events.' : '',
+      note: '',
     };
   });
 

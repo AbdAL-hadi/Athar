@@ -1,23 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import AdminNavigation from '../components/admin/AdminNavigation';
-import AdvancedAiInsightsSection from '../components/admin/AdvancedAiInsightsSection';
-import AtharAiRecommendationsSection from '../components/admin/AtharAiRecommendationsSection';
+import {
+  AiInsightsWorkspace,
+  DemandForecastPanel,
+  MarketingIntelligencePipeline,
+  useAdvancedAiInsightsData,
+} from '../components/admin/AdvancedAiInsightsSection';
 import CustomerBehaviorFunnelSection from '../components/admin/CustomerBehaviorFunnelSection';
 import SectionTitle from '../components/SectionTitle';
 import { PALESTINIAN_CITIES, getCityLabel, normalizeCityValue } from '../data/palestinianCities';
@@ -57,11 +46,6 @@ const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 
-const chartPalette = ['#8f5f45', '#b88746', '#54715f', '#d7a996', '#9bb6d3', '#d8d4a5', '#c68f7d'];
-
-const hasChartData = (items, keys = ['value']) =>
-  Array.isArray(items) && items.some((item) => keys.some((key) => Number(item?.[key] || 0) > 0));
-
 const productSortOptions = [
   { value: 'sales', label: 'Top Sales' },
   { value: 'views', label: 'Top Views' },
@@ -71,15 +55,12 @@ const productSortOptions = [
 ];
 
 const dashboardSections = [
-  { id: 'kpis', label: 'KPIs' },
-  { id: 'athar-ai', label: 'Athar AI' },
-  { id: 'charts', label: 'Performance' },
-  { id: 'customer-behavior', label: 'Funnel' },
-  { id: 'top-products', label: 'Products' },
-  { id: 'low-stock-products', label: 'Stock' },
-  { id: 'cities', label: 'Cities' },
-  { id: 'warehouses', label: 'Warehouses' },
-  { id: 'recommendations', label: 'AI Restock' },
+  { id: 'overview', label: 'Overview' },
+  { id: 'funnel', label: 'Funnel' },
+  { id: 'demand', label: 'Demand' },
+  { id: 'marketing', label: 'Marketing' },
+  { id: 'inventory', label: 'Inventory' },
+  { id: 'ai-insights', label: 'AI Insights' },
 ];
 
 const getRecommendationId = (recommendation) => recommendation?._id || recommendation?.id;
@@ -264,6 +245,35 @@ const DataTable = ({ columns, children }) => (
   </div>
 );
 
+const TabButton = ({ active, children, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`min-h-10 rounded-full border px-4 py-2 text-sm font-bold transition ${
+      active ? 'border-ink bg-ink text-white shadow-card' : 'border-line bg-white text-ink-soft hover:bg-blush/60 hover:text-ink'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const DetailPanel = ({ title, description = '', children, defaultOpen = false }) => (
+  <details className="rounded-[24px] border border-line bg-white p-5" open={defaultOpen}>
+    <summary className="cursor-pointer list-none">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-display text-3xl text-ink">{title}</h3>
+          {description ? <p className="mt-1 text-sm leading-6 text-ink-soft">{description}</p> : null}
+        </div>
+        <span className="rounded-full border border-line bg-[#fffaf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
+          Open
+        </span>
+      </div>
+    </summary>
+    <div className="mt-5">{children}</div>
+  </details>
+);
+
 const ProgressRow = ({ label, value, max, meta = '' }) => {
   const percentage = Math.min((Number(value || 0) / Math.max(Number(max || 0), 1)) * 100, 100);
 
@@ -292,76 +302,6 @@ const AnalyticsError = ({ message }) =>
       {message}
     </div>
   ) : null;
-
-const ChartCard = ({ title, description, isLoading, isEmpty, emptyMessage, children }) => (
-  <article className="rounded-[28px] border border-line/80 bg-white p-5 shadow-card">
-    <div className="mb-5">
-      <h3 className="font-display text-3xl text-ink">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">{description}</p>
-    </div>
-    {isLoading ? (
-      <LoadingBlock label={`Loading ${title} chart...`} />
-    ) : isEmpty ? (
-      <EmptyState>{emptyMessage}</EmptyState>
-    ) : (
-      <div className="h-72 min-w-0 sm:h-80">{children}</div>
-    )}
-  </article>
-);
-
-const ChartTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm shadow-card">
-      {label ? <p className="mb-2 font-semibold text-ink">{label}</p> : null}
-      <div className="space-y-1">
-        {payload.map((entry) => (
-          <p key={`${entry.dataKey}-${entry.name}`} className="text-ink-soft">
-            <span className="font-semibold text-ink">{entry.name || entry.dataKey}:</span>{' '}
-            {entry.dataKey === 'revenue' ? formatCurrency(entry.value) : formatNumber(entry.value)}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const UserBehaviorFunnel = ({ data }) => {
-  const maxValue = Math.max(...data.map((item) => Number(item.value || 0)), 1);
-
-  return (
-    <div className="space-y-3">
-      {data.map((item, index) => {
-        const width = Math.max((Number(item.value || 0) / maxValue) * 100, item.value > 0 ? 12 : 4);
-        const conversion =
-          index === 0
-            ? 'Entry point'
-            : `${formatPercent((Number(item.value || 0) / Math.max(Number(data[index - 1]?.value || 0), 1)) * 100)} from previous`;
-
-        return (
-          <div key={item.label} className="rounded-[18px] border border-line/80 bg-[#fffaf8] px-4 py-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-semibold text-ink">{item.label}</span>
-              <span className="text-ink-soft">{formatNumber(item.value)}</span>
-            </div>
-            <div className="mt-3 h-8 rounded-full bg-[#f0e3dc]" title={`${item.label}: ${formatNumber(item.value)} (${conversion})`}>
-              <div
-                className="flex h-full items-center rounded-full bg-gradient-to-r from-[#8f5f45] via-[#b88746] to-[#54715f] px-3 text-xs font-bold text-white"
-                style={{ width: `${width}%` }}
-              >
-                {conversion}
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-ink-soft">{conversion}</p>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
 
 const ProductImagePlaceholder = () => (
   <div className="flex h-full min-h-[220px] w-full items-center justify-center bg-[#f8f2ee]">
@@ -576,6 +516,8 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
   const [city, setCity] = useState('');
   const [productSort, setProductSort] = useState('sales');
   const [productCategoryFilter, setProductCategoryFilter] = useState('');
+  const [activeDemandTab, setActiveDemandTab] = useState('products');
+  const [activeInventoryTab, setActiveInventoryTab] = useState('stock');
   const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
   const [analytics, setAnalytics] = useState({
     overview: null,
@@ -601,6 +543,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
   const [dashboardSnapshot, setDashboardSnapshot] = useState(null);
   const [dashboardError, setDashboardError] = useState('');
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+  const advancedAi = useAdvancedAiInsightsData(authToken, range);
 
   useEffect(() => {
     if (authLoading) {
@@ -920,100 +863,24 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
 
   const overviewCards = useMemo(() => {
     const overview = analytics.overview || {};
+    const urgentAlerts =
+      Number(analytics.warehouses?.summary?.criticalStockPressure || 0) ||
+      Number(analytics.warehouses?.summary?.lowStockItems || 0) ||
+      0;
     return [
       { label: 'Product Views', value: formatNumber(overview.productViews), helper: `${formatNumber(overview.totalEvents)} total events` },
       { label: 'Add to Cart', value: formatNumber(overview.addToCartCount), helper: 'Cart intent signals' },
-      { label: 'Purchases', value: formatNumber(overview.purchasesCount), helper: `${formatPercent(overview.estimatedConversionRate)} conversion` },
+      { label: 'Purchases', value: formatNumber(overview.purchasesCount), helper: 'Completed purchase signals' },
+      { label: 'Conversion Rate', value: formatPercent(overview.estimatedConversionRate), helper: 'Views to purchases' },
       { label: 'Top City', value: overview.topCity?.cityLabel || 'None', helper: overview.topCity ? `${overview.topCity.count} events` : 'No city activity yet' },
       { label: 'Top Product', value: overview.topProduct?.title || 'None', helper: overview.topProduct ? `${overview.topProduct.count} signals` : 'No product signals yet' },
-      { label: 'Try-On Uses', value: formatNumber(overview.tryOnCount), helper: 'AI try-on events' },
-      { label: 'Visual Searches', value: formatNumber(overview.visualSearchCount), helper: 'Visual search events' },
-      { label: 'Searches', value: formatNumber(overview.searchesCount), helper: overview.topCategory?.category ? `Top category: ${overview.topCategory.category}` : 'No search data yet' },
+      { label: 'Urgent Alerts', value: formatNumber(urgentAlerts), helper: 'Stock and warehouse pressure' },
     ];
-  }, [analytics.overview]);
+  }, [analytics.overview, analytics.warehouses]);
 
   const topProductMaxDemand = useMemo(
     () => Math.max(...(analytics.products || []).slice(0, 5).map((product) => Number(product.demandScore || 0)), 1),
     [analytics.products],
-  );
-
-  const salesOverTimeData = useMemo(() => {
-    const dashboardSeries = range === 'today' || range === '7d'
-      ? dashboardSnapshot?.charts?.sales7Days
-      : dashboardSnapshot?.charts?.sales30Days;
-
-    return (dashboardSeries || []).map((point) => ({
-      ...point,
-      revenue: Number(point.revenue || 0),
-      orders: Number(point.orders || 0),
-    }));
-  }, [dashboardSnapshot, range]);
-
-  const orderStatusData = useMemo(
-    () =>
-      (dashboardSnapshot?.charts?.orderStatusBreakdown || []).map((item) => ({
-        name: item.status || 'Unknown',
-        value: Number(item.count || 0),
-      })),
-    [dashboardSnapshot],
-  );
-
-  const topProductsBySalesData = useMemo(() => {
-    const dashboardProducts = dashboardSnapshot?.topProducts || [];
-
-    if (dashboardProducts.length > 0) {
-      return dashboardProducts.slice(0, 8).map((product) => ({
-        name: product.productName,
-        sales: Number(product.unitsSold || 0),
-        revenue: Number(product.revenueGenerated || 0),
-      }));
-    }
-
-    return (analytics.products || []).slice(0, 8).map((product) => ({
-      name: product.productTitle,
-      sales: Number(product.purchases || 0),
-      revenue: Number(product.productPrice || 0) * Number(product.purchases || 0),
-    }));
-  }, [analytics.products, dashboardSnapshot]);
-
-  const behaviorFunnelData = useMemo(() => {
-    const overview = analytics.overview || {};
-    return [
-      { label: 'Product views', value: Number(overview.productViews || 0) },
-      { label: 'Add to cart', value: Number(overview.addToCartCount || 0) },
-      { label: 'Purchases', value: Number(overview.purchasesCount || 0) },
-      { label: 'Reviews', value: Number(overview.reviewsCount || 0) },
-    ];
-  }, [analytics.overview]);
-
-  const inventoryByCategoryData = useMemo(() => {
-    const dashboardInventory = dashboardSnapshot?.charts?.inventoryByCategory || [];
-
-    if (dashboardInventory.length > 0) {
-      return dashboardInventory.map((item) => ({
-        category: item.category || 'Uncategorized',
-        stock: Number(item.stock || 0),
-      }));
-    }
-
-    const stockByCategory = (analytics.products || []).reduce((lookup, product) => {
-      const category = product.productCategory || 'Uncategorized';
-      lookup.set(category, (lookup.get(category) || 0) + Number(product.totalStock || 0));
-      return lookup;
-    }, new Map());
-
-    return Array.from(stockByCategory.entries()).map(([category, stock]) => ({ category, stock }));
-  }, [analytics.products, dashboardSnapshot]);
-
-  const inventoryByWarehouseData = useMemo(
-    () =>
-      (analytics.warehouses?.warehouses || []).map((warehouse) => ({
-        warehouse: warehouse.cityLabel || warehouse.warehouseName || 'Warehouse',
-        stock: Number(warehouse.totalStock || 0),
-        lowStock: Number(warehouse.lowStockProducts || 0),
-        outOfStock: Number(warehouse.outOfStockProducts || 0),
-      })),
-    [analytics.warehouses],
   );
 
   const productCategories = useMemo(
@@ -1152,7 +1019,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
             <span className="heritage-pill">Commerce intelligence</span>
             <SectionTitle
               title="Admin Analytics"
-              description="A modern commerce dashboard for revenue, order flow, customer behavior, product demand, and warehouse pressure."
+              description="A decision dashboard for store performance, funnel drop-off, demand, marketing actions, inventory moves, and optional AI explanations."
             />
           </div>
           <AdminNavigation />
@@ -1170,182 +1037,52 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
       <AnalyticsError message={analyticsErrors.general} />
       <AnalyticsError message={dashboardError} />
 
-      <section id="kpis" className="grid scroll-mt-[180px] gap-4 sm:grid-cols-2 lg:scroll-mt-[150px] xl:grid-cols-3 2xl:grid-cols-6">
+      <SectionCard id="overview" title="Executive Overview" description="Quick read on store health, conversion, and top demand signals.">
         {isAnalyticsLoading || isDashboardLoading ? (
-          Array.from({ length: 6 }, (_, index) => <LoadingBlock key={index} label="Loading KPI data..." />)
-        ) : (
-          commerceKpis.map((card) => <DashboardKpiCard key={card.title} {...card} />)
-        )}
-      </section>
-
-      <AtharAiRecommendationsSection
-        analytics={analytics}
-        dashboardSnapshot={dashboardSnapshot}
-        isLoading={isAnalyticsLoading || isDashboardLoading}
-        onRefresh={() => setAnalyticsRefreshKey((value) => value + 1)}
-      />
-
-      <CustomerBehaviorFunnelSection
-        funnel={analytics.customerFunnel}
-        isLoading={isAnalyticsLoading}
-        errorMessage={analyticsErrors.customerFunnel}
-      />
-
-      <SectionCard id="charts" title="Performance Charts" description="Visual reporting for revenue, orders, products, behavior, and inventory health.">
-        <div className="grid gap-5 xl:grid-cols-2">
-          <ChartCard
-            title="Sales Over Time"
-            description="Revenue and order volume from confirmed sales, shown over the selected dashboard window."
-            isLoading={isDashboardLoading}
-            isEmpty={!hasChartData(salesOverTimeData, ['revenue', 'orders'])}
-            emptyMessage="No sales timeline data is available yet."
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={salesOverTimeData} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
-                <CartesianGrid stroke="#efe3dc" strokeDasharray="4 4" />
-                <XAxis dataKey="label" stroke="#a38373" tickLine={false} axisLine={false} />
-                <YAxis yAxisId="revenue" stroke="#a38373" tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} width={44} />
-                <YAxis yAxisId="orders" orientation="right" stroke="#a38373" tickLine={false} axisLine={false} width={36} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Line yAxisId="revenue" type="monotone" dataKey="revenue" name="Revenue" stroke="#8f5f45" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                <Line yAxisId="orders" type="monotone" dataKey="orders" name="Orders" stroke="#54715f" strokeWidth={3} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Orders by Status"
-            description="All orders grouped by their current workflow status."
-            isLoading={isDashboardLoading}
-            isEmpty={!hasChartData(orderStatusData)}
-            emptyMessage="No order status data is available yet."
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Pie
-                  data={orderStatusData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="52%"
-                  outerRadius="78%"
-                  paddingAngle={3}
-                  stroke="#fffaf8"
-                  strokeWidth={3}
-                >
-                  {orderStatusData.map((entry, index) => (
-                    <Cell key={entry.name} fill={chartPalette[index % chartPalette.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Top Products by Sales"
-            description="Best-selling products by units sold, with revenue available in the tooltip."
-            isLoading={isDashboardLoading && isAnalyticsLoading}
-            isEmpty={!hasChartData(topProductsBySalesData, ['sales', 'revenue'])}
-            emptyMessage="No product sales data is available yet."
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProductsBySalesData} layout="vertical" margin={{ top: 8, right: 18, bottom: 8, left: 20 }}>
-                <CartesianGrid stroke="#efe3dc" strokeDasharray="4 4" horizontal={false} />
-                <XAxis type="number" stroke="#a38373" tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#a38373" tickLine={false} axisLine={false} width={110} tick={{ fontSize: 11 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Bar dataKey="sales" name="Units sold" fill="#b88746" radius={[0, 10, 10, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="User Behavior Funnel"
-            description="Tracked customer steps from product discovery through purchase and review."
-            isLoading={isAnalyticsLoading}
-            isEmpty={!hasChartData(behaviorFunnelData)}
-            emptyMessage="No behavior funnel data is available yet."
-          >
-            <UserBehaviorFunnel data={behaviorFunnelData} />
-          </ChartCard>
-
-          <ChartCard
-            title="Inventory by Category"
-            description="Current stock grouped by product category, including products that have not sold yet."
-            isLoading={isDashboardLoading && isAnalyticsLoading}
-            isEmpty={!hasChartData(inventoryByCategoryData, ['stock'])}
-            emptyMessage="No inventory category data is available yet."
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={inventoryByCategoryData} margin={{ top: 8, right: 18, bottom: 28, left: 0 }}>
-                <CartesianGrid stroke="#efe3dc" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="category" stroke="#a38373" tickLine={false} axisLine={false} interval={0} angle={-18} textAnchor="end" height={56} tick={{ fontSize: 11 }} />
-                <YAxis stroke="#a38373" tickLine={false} axisLine={false} width={44} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Bar dataKey="stock" name="Current stock" fill="#54715f" radius={[10, 10, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Inventory by Warehouse"
-            description="Available units by warehouse, with low-stock and out-of-stock item pressure."
-            isLoading={isAnalyticsLoading}
-            isEmpty={!hasChartData(inventoryByWarehouseData, ['stock', 'lowStock', 'outOfStock'])}
-            emptyMessage="No warehouse inventory data is available yet."
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={inventoryByWarehouseData} margin={{ top: 8, right: 18, bottom: 28, left: 0 }}>
-                <CartesianGrid stroke="#efe3dc" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="warehouse" stroke="#a38373" tickLine={false} axisLine={false} interval={0} angle={-18} textAnchor="end" height={56} tick={{ fontSize: 11 }} />
-                <YAxis stroke="#a38373" tickLine={false} axisLine={false} width={44} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Bar dataKey="stock" name="Current stock" fill="#8f5f45" radius={[10, 10, 0, 0]} />
-                <Bar dataKey="lowStock" name="Low-stock products" fill="#d7a996" radius={[10, 10, 0, 0]} />
-                <Bar dataKey="outOfStock" name="Out of stock" fill="#9bb6d3" radius={[10, 10, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </div>
-      </SectionCard>
-
-      <SectionCard id="overview" title="Commerce Overview" description="A quick read on store performance for the selected range, blending sales data with behavior signals.">
-        {isAnalyticsLoading ? (
-          <EmptyState>Loading overview analytics...</EmptyState>
-        ) : analytics.overview?.totalEvents > 0 ? (
-          <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {overviewCards.slice(0, 4).map((card) => (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => <LoadingBlock key={index} label="Loading executive overview..." />)}
+          </div>
+        ) : analytics.overview?.totalEvents > 0 || commerceKpis.some((card) => Number(String(card.value).replace(/[^0-9.-]/g, '')) > 0) ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {overviewCards.map((card) => (
                 <MetricCard key={card.label} {...card} />
               ))}
             </div>
-            <div className="rounded-[24px] border border-line bg-white p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-display text-3xl text-ink">Demand Leaders</h3>
-                  <p className="mt-2 text-sm leading-6 text-ink-soft">Top products by weighted demand score, useful for merchandising and restock planning.</p>
+
+            <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-[24px] border border-line bg-[#fffaf8] p-5">
+                <h3 className="font-display text-3xl text-ink">Commerce Pulse</h3>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {commerceKpis.slice(0, 4).map((card) => (
+                    <DashboardKpiCard key={card.title} {...card} />
+                  ))}
                 </div>
-                <span className="heritage-pill whitespace-nowrap">{timeRanges.find((option) => option.value === range)?.label || 'Range'}</span>
               </div>
-              <div className="mt-5 space-y-3">
-                {(analytics.products || []).slice(0, 5).length > 0 ? (
-                  (analytics.products || []).slice(0, 5).map((product) => (
-                    <ProgressRow
-                      key={product.productId}
-                      label={product.productTitle}
-                      value={product.demandScore}
-                      max={topProductMaxDemand}
-                      meta={`${formatNumber(product.demandScore)} score`}
-                    />
-                  ))
-                ) : (
-                  <EmptyState>No product demand rows yet.</EmptyState>
-                )}
+
+              <div className="rounded-[24px] border border-line bg-white p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-display text-3xl text-ink">Demand Leaders</h3>
+                    <p className="mt-2 text-sm leading-6 text-ink-soft">Top products by weighted demand score. Open Demand for the full table.</p>
+                  </div>
+                  <span className="heritage-pill whitespace-nowrap">{timeRanges.find((option) => option.value === range)?.label || 'Range'}</span>
+                </div>
+                <div className="mt-5 space-y-3">
+                  {(analytics.products || []).slice(0, 5).length > 0 ? (
+                    (analytics.products || []).slice(0, 5).map((product) => (
+                      <ProgressRow
+                        key={product.productId}
+                        label={product.productTitle}
+                        value={product.demandScore}
+                        max={topProductMaxDemand}
+                        meta={`${formatNumber(product.demandScore)} score`}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState>No product demand rows yet.</EmptyState>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1354,11 +1091,26 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         )}
       </SectionCard>
 
+      <CustomerBehaviorFunnelSection
+        id="funnel"
+        funnel={analytics.customerFunnel}
+        isLoading={isAnalyticsLoading}
+        errorMessage={analyticsErrors.customerFunnel}
+      />
+
       <SectionCard
-        id="top-products"
-        title="Top Performing Products"
-        description="Product-level cards with catalog imagery and behavior metrics from the selected analytics range."
+        id="demand"
+        title="Demand Intelligence"
+        description="Explore product, city, category, and search demand signals."
       >
+        <div className="mb-5 flex flex-wrap gap-2">
+          <TabButton active={activeDemandTab === 'products'} onClick={() => setActiveDemandTab('products')}>Products</TabButton>
+          <TabButton active={activeDemandTab === 'cities'} onClick={() => setActiveDemandTab('cities')}>Cities</TabButton>
+          <TabButton active={activeDemandTab === 'search'} onClick={() => setActiveDemandTab('search')}>Search Demand</TabButton>
+        </div>
+
+        {activeDemandTab === 'products' ? (
+          <>
         <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 md:grid-cols-[220px_220px_1fr]">
           <label>
             <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Sort by</span>
@@ -1417,13 +1169,165 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         ) : (
           <EmptyState>No product performance data matches this filter yet.</EmptyState>
         )}
+
+        <div className="mt-6">
+          <h3 className="font-display text-3xl text-ink">Detailed Product Demand</h3>
+          <p className="mt-2 text-sm leading-6 text-ink-soft">
+            Full demand ranking with views, cart intent, purchases, conversion, stock, and status.
+          </p>
+          <div className="mt-4">
+            {isAnalyticsLoading ? (
+              <EmptyState>Loading product demand...</EmptyState>
+            ) : analytics.products?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                      <th className="px-4 py-3">Product</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Views</th>
+                      <th className="px-4 py-3">Cart Adds</th>
+                      <th className="px-4 py-3">Purchases</th>
+                      <th className="px-4 py-3">Demand Score</th>
+                      <th className="px-4 py-3">Conversion</th>
+                      <th className="px-4 py-3">Total Stock</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.products.map((product) => (
+                      <tr key={product.productId} className="border-b border-line/60 align-top text-ink">
+                        <td className="px-4 py-4 font-semibold">{product.productTitle}</td>
+                        <td className="px-4 py-4">{product.productCategory || '-'}</td>
+                        <td className="px-4 py-4">{formatNumber(product.views)}</td>
+                        <td className="px-4 py-4">{formatNumber(product.addToCart)}</td>
+                        <td className="px-4 py-4">{formatNumber(product.purchases)}</td>
+                        <td className="px-4 py-4 font-bold">{formatNumber(product.demandScore)}</td>
+                        <td className="px-4 py-4">{formatPercent(product.conversionRate)}</td>
+                        <td className="px-4 py-4">{formatNumber(product.totalStock)}</td>
+                        <td className="px-4 py-4"><StatusBadge>{product.status}</StatusBadge></td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <Link className="text-sm font-semibold text-[#8f5f45] underline" to={`/products/${product.slug || product.productId}`}>
+                              View
+                            </Link>
+                            <Link className="text-sm font-semibold text-[#8f5f45] underline" to="/admin/inventory">
+                              Edit Stock
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState>No product demand signals yet. Open products, add items to cart, or place orders to start collecting data.</EmptyState>
+            )}
+          </div>
+        </div>
+          </>
+        ) : null}
+
+        {activeDemandTab === 'cities' ? (
+          <div>
+            <p className="mb-4 text-sm leading-6 text-ink-soft">{cityInsight}</p>
+            {isAnalyticsLoading ? (
+              <EmptyState>Loading city demand...</EmptyState>
+            ) : analytics.cities?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                      <th className="px-4 py-3">City</th>
+                      <th className="px-4 py-3">Total Activity</th>
+                      <th className="px-4 py-3">Top Category</th>
+                      <th className="px-4 py-3">Top Product</th>
+                      <th className="px-4 py-3">Purchases</th>
+                      <th className="px-4 py-3">Demand Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.cities.map((cityRow) => (
+                      <tr key={cityRow.city || 'unknown'} className="border-b border-line/60 text-ink">
+                        <td className="px-4 py-4 font-semibold">{cityRow.cityLabel}</td>
+                        <td className="px-4 py-4">{formatNumber(cityRow.totalEvents)}</td>
+                        <td className="px-4 py-4">{cityRow.topCategories?.[0]?.category || '-'}</td>
+                        <td className="px-4 py-4">{cityRow.topProducts?.[0]?.productTitle || '-'}</td>
+                        <td className="px-4 py-4">{formatNumber(cityRow.purchases)}</td>
+                        <td className="px-4 py-4 font-bold">{formatNumber(cityRow.demandScore)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState>No city activity yet. Make sure users have a selected city.</EmptyState>
+            )}
+          </div>
+        ) : null}
+
+        {activeDemandTab === 'search' ? (
+          <div>
+            {isAnalyticsLoading ? (
+              <EmptyState>Loading search trends...</EmptyState>
+            ) : analytics.searches?.topSearchQueries?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                      <th className="px-4 py-3">Search Query</th>
+                      <th className="px-4 py-3">Count</th>
+                      <th className="px-4 py-3">Top City</th>
+                      <th className="px-4 py-3">Avg Results</th>
+                      <th className="px-4 py-3">Insight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.searches.topSearchQueries.map((query) => (
+                      <tr key={query.query} className="border-b border-line/60 text-ink">
+                        <td className="px-4 py-4 font-semibold">{query.query}</td>
+                        <td className="px-4 py-4">{formatNumber(query.count)}</td>
+                        <td className="px-4 py-4">{query.topCity?.cityLabel || '-'}</td>
+                        <td className="px-4 py-4">{query.resultsCountAverage ?? '-'}</td>
+                        <td className="px-4 py-4 text-ink-soft">
+                          {query.hasZeroResultSearches ? 'Customers are searching for this, but no products were found.' : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState>No searches tracked yet.</EmptyState>
+            )}
+          </div>
+        ) : null}
       </SectionCard>
 
       <SectionCard
-        id="low-stock-products"
-        title="Low Stock Products"
-        description="Products closest to stockout, shown with imagery, warehouse availability, and rule-based restock suggestions."
+        id="marketing"
+        title="Marketing Intelligence"
+        description="Detected marketing opportunities with optional AI-generated campaign plans."
       >
+        <MarketingIntelligencePipeline advancedAi={advancedAi} />
+      </SectionCard>
+
+      <SectionCard
+        id="inventory"
+        title="Inventory Intelligence"
+        description="Stock pressure, warehouse distribution, restock recommendations, and demand forecast."
+      >
+        <div className="mb-5 flex flex-wrap gap-2">
+          <TabButton active={activeInventoryTab === 'stock'} onClick={() => setActiveInventoryTab('stock')}>Stock Pressure</TabButton>
+          <TabButton active={activeInventoryTab === 'warehouses'} onClick={() => setActiveInventoryTab('warehouses')}>Warehouse Distribution</TabButton>
+          <TabButton active={activeInventoryTab === 'recommendations'} onClick={() => setActiveInventoryTab('recommendations')}>AI Restock</TabButton>
+          <TabButton active={activeInventoryTab === 'forecast'} onClick={() => setActiveInventoryTab('forecast')}>Demand Forecast</TabButton>
+        </div>
+
+        {activeInventoryTab === 'stock' ? (
+          <>
         {analyticsErrors.products ? <AnalyticsError message={analyticsErrors.products} /> : null}
 
         {isAnalyticsLoading ? (
@@ -1441,374 +1345,264 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         ) : (
           <EmptyState>No low-stock products are visible for this range. Inventory looks healthy right now.</EmptyState>
         )}
-      </SectionCard>
+          </>
+        ) : null}
 
-      <SectionCard id="products" title="Product Demand" description="Rule-based demand ranking from views, favorites, cart adds, purchases, reviews, and AI tool events.">
-        {isAnalyticsLoading ? (
-          <EmptyState>Loading product demand...</EmptyState>
-        ) : analytics.products?.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Views</th>
-                  <th className="px-4 py-3">Cart Adds</th>
-                  <th className="px-4 py-3">Purchases</th>
-                  <th className="px-4 py-3">Demand Score</th>
-                  <th className="px-4 py-3">Conversion</th>
-                  <th className="px-4 py-3">Total Stock</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.products.map((product) => (
-                  <tr key={product.productId} className="border-b border-line/60 align-top text-ink">
-                    <td className="px-4 py-4 font-semibold">{product.productTitle}</td>
-                    <td className="px-4 py-4">{product.productCategory || '-'}</td>
-                    <td className="px-4 py-4">{formatNumber(product.views)}</td>
-                    <td className="px-4 py-4">{formatNumber(product.addToCart)}</td>
-                    <td className="px-4 py-4">{formatNumber(product.purchases)}</td>
-                    <td className="px-4 py-4 font-bold">{formatNumber(product.demandScore)}</td>
-                    <td className="px-4 py-4">{formatPercent(product.conversionRate)}</td>
-                    <td className="px-4 py-4">{formatNumber(product.totalStock)}</td>
-                    <td className="px-4 py-4"><StatusBadge>{product.status}</StatusBadge></td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Link className="text-sm font-semibold text-[#8f5f45] underline" to={`/products/${product.slug || product.productId}`}>
-                          View
-                        </Link>
-                        <Link className="text-sm font-semibold text-[#8f5f45] underline" to="/admin/inventory">
-                          Edit Stock
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState>No product demand signals yet. Open products, add items to cart, or place orders to start collecting data.</EmptyState>
-        )}
-      </SectionCard>
-
-      <SectionCard id="cities" title="City Demand" description={cityInsight}>
-        {isAnalyticsLoading ? (
-          <EmptyState>Loading city demand...</EmptyState>
-        ) : analytics.cities?.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                  <th className="px-4 py-3">City</th>
-                  <th className="px-4 py-3">Total Activity</th>
-                  <th className="px-4 py-3">Top Category</th>
-                  <th className="px-4 py-3">Top Product</th>
-                  <th className="px-4 py-3">Purchases</th>
-                  <th className="px-4 py-3">Demand Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.cities.map((cityRow) => (
-                  <tr key={cityRow.city || 'unknown'} className="border-b border-line/60 text-ink">
-                    <td className="px-4 py-4 font-semibold">{cityRow.cityLabel}</td>
-                    <td className="px-4 py-4">{formatNumber(cityRow.totalEvents)}</td>
-                    <td className="px-4 py-4">{cityRow.topCategories?.[0]?.category || '-'}</td>
-                    <td className="px-4 py-4">{cityRow.topProducts?.[0]?.productTitle || '-'}</td>
-                    <td className="px-4 py-4">{formatNumber(cityRow.purchases)}</td>
-                    <td className="px-4 py-4 font-bold">{formatNumber(cityRow.demandScore)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState>No city activity yet. Make sure users have a selected city.</EmptyState>
-        )}
-      </SectionCard>
-
-      <SectionCard id="warehouses" title="Warehouse Intelligence" description="Demand by city connected to each warehouse's local product stock. Use recommendations when pressure needs a manual transfer decision.">
-        {isAnalyticsLoading ? (
-          <EmptyState>Loading warehouse intelligence...</EmptyState>
-        ) : analytics.warehouses ? (
+        {activeInventoryTab === 'warehouses' ? (
           <>
-            <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="Total Warehouse Stock" value={formatNumber(analytics.warehouses.summary?.totalWarehouseStock)} helper="Across all warehouses" />
-              <MetricCard label="Low Stock Items" value={formatNumber(analytics.warehouses.summary?.lowStockItems)} helper="Per-warehouse low inventory" />
-              <MetricCard label="Critical Pressure" value={formatNumber(analytics.warehouses.summary?.criticalStockPressure)} helper="High demand with very low city stock" />
-              <MetricCard label="Top Demand City" value={analytics.warehouses.summary?.topDemandCity?.cityLabel || 'None'} helper="Based on city demand score" />
-            </div>
+            {isAnalyticsLoading ? (
+              <EmptyState>Loading warehouse intelligence...</EmptyState>
+            ) : analytics.warehouses ? (
+              <>
+                <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard label="Total Warehouse Stock" value={formatNumber(analytics.warehouses.summary?.totalWarehouseStock)} helper="Across all warehouses" />
+                  <MetricCard label="Low Stock Items" value={formatNumber(analytics.warehouses.summary?.lowStockItems)} helper="Per-warehouse low inventory" />
+                  <MetricCard label="Critical Pressure" value={formatNumber(analytics.warehouses.summary?.criticalStockPressure)} helper="High demand with very low city stock" />
+                  <MetricCard label="Top Demand City" value={analytics.warehouses.summary?.topDemandCity?.cityLabel || 'None'} helper="Based on city demand score" />
+                </div>
 
-            <div className="mb-5 flex flex-col gap-3 rounded-[24px] border border-line bg-[#fffaf8] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm leading-6 text-ink-soft">
-                Turn current warehouse pressure into reviewable stock transfer recommendations. Admin approval is still required before stock changes.
-              </p>
-              <a
-                href="#recommendations"
-                onClick={handleGenerateRecommendations}
-                className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-bold text-white transition hover:bg-rose"
-              >
-                Generate Recommendations
-              </a>
-            </div>
+                <div className="mb-5 flex flex-col gap-3 rounded-[24px] border border-line bg-[#fffaf8] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm leading-6 text-ink-soft">
+                    Turn current warehouse pressure into reviewable stock transfer recommendations. Admin approval is still required before stock changes.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveInventoryTab('recommendations');
+                      void handleGenerateRecommendations();
+                    }}
+                    className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 py-2 text-sm font-bold text-white transition hover:bg-rose"
+                  >
+                    Generate Recommendations
+                  </button>
+                </div>
 
-            {pressureRows.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                      <th className="px-4 py-3">Warehouse</th>
-                      <th className="px-4 py-3">Product</th>
-                      <th className="px-4 py-3">City Demand Score</th>
-                      <th className="px-4 py-3">City Stock</th>
-                      <th className="px-4 py-3">Total Stock</th>
-                      <th className="px-4 py-3">Pressure</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pressureRows.map((item) => (
-                      <tr key={`${item.warehouseId}-${item.productId}`} className="border-b border-line/60 text-ink">
-                        <td className="px-4 py-4">
-                          <span className="font-semibold">{item.warehouseName}</span>
-                          <span className="block text-xs text-ink-soft">{item.cityLabel}</span>
-                        </td>
-                        <td className="px-4 py-4">{item.productTitle}</td>
-                        <td className="px-4 py-4 font-bold">{formatNumber(item.cityDemandScore)}</td>
-                        <td className="px-4 py-4">{formatNumber(item.warehouseQuantity)}</td>
-                        <td className="px-4 py-4">{formatNumber(item.totalStockAcrossWarehouses)}</td>
-                        <td className="px-4 py-4"><StatusBadge>{item.pressureLevel}</StatusBadge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                {pressureRows.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                          <th className="px-4 py-3">Warehouse</th>
+                          <th className="px-4 py-3">Product</th>
+                          <th className="px-4 py-3">City Demand Score</th>
+                          <th className="px-4 py-3">City Stock</th>
+                          <th className="px-4 py-3">Total Stock</th>
+                          <th className="px-4 py-3">Pressure</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pressureRows.map((item) => (
+                          <tr key={`${item.warehouseId}-${item.productId}`} className="border-b border-line/60 text-ink">
+                            <td className="px-4 py-4">
+                              <span className="font-semibold">{item.warehouseName}</span>
+                              <span className="block text-xs text-ink-soft">{item.cityLabel}</span>
+                            </td>
+                            <td className="px-4 py-4">{item.productTitle}</td>
+                            <td className="px-4 py-4 font-bold">{formatNumber(item.cityDemandScore)}</td>
+                            <td className="px-4 py-4">{formatNumber(item.warehouseQuantity)}</td>
+                            <td className="px-4 py-4">{formatNumber(item.totalStockAcrossWarehouses)}</td>
+                            <td className="px-4 py-4"><StatusBadge>{item.pressureLevel}</StatusBadge></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState>No warehouse pressure detected yet.</EmptyState>
+                )}
+              </>
             ) : (
               <EmptyState>No warehouse pressure detected yet.</EmptyState>
             )}
           </>
-        ) : (
-          <EmptyState>No warehouse pressure detected yet.</EmptyState>
-        )}
-      </SectionCard>
-
-      <SectionCard id="recommendations" title="AI Inventory Recommendations" description="Rule-based transfer recommendations generated from tracked demand and warehouse stock. Gemini only writes optional explanation text.">
-        <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 lg:grid-cols-[220px_1fr_auto] lg:items-end">
-          <label>
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Recommendation range</span>
-            <select
-              value={range}
-              onChange={(event) => setRange(event.target.value)}
-              className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
-            >
-              {timeRanges.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="text-sm leading-6 text-ink-soft">
-            AI explanation is based on tracked demand and warehouse stock. Admin approval is required before stock changes.
-          </p>
-          <button
-            type="button"
-            onClick={handleGenerateRecommendations}
-            disabled={isGeneratingRecommendations}
-            className="min-h-12 rounded-full bg-ink px-5 py-3 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isGeneratingRecommendations ? 'Generating...' : 'Generate AI Inventory Recommendations'}
-          </button>
-        </div>
-
-        {recommendationsError ? <AnalyticsError message={recommendationsError} /> : null}
-        {recommendationsMessage ? (
-          <div className="mb-5 rounded-[24px] border border-[#d7e6d1] bg-[#f4fbf1] px-5 py-4 text-sm text-[#426b42]">
-            {recommendationsMessage}
-          </div>
         ) : null}
 
-        {isRecommendationsLoading ? (
-          <EmptyState>Loading inventory recommendations...</EmptyState>
-        ) : recommendations.length > 0 ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {recommendations.map((recommendation) => {
-              const recommendationId = getRecommendationId(recommendation);
-              const explanation = recommendation.aiExplanation || recommendation.reason || '';
-              const actionPrefix = (action) => `${action}:${recommendationId}`;
-              const isPending = recommendation.status === 'pending';
-              const isApproved = recommendation.status === 'approved';
-              const canApply = isPending || isApproved;
-              const canReject = isPending || isApproved;
-
-              return (
-                <article key={recommendationId} className="rounded-[24px] border border-line bg-white p-5 shadow-card">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">
-                        {recommendation.productCategory || recommendation.product?.category || 'Product'}
-                      </p>
-                      <h3 className="mt-2 font-display text-3xl leading-tight text-ink">
-                        {getProductTitle(recommendation.product, recommendation.productTitle)}
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge>{recommendation.pressureLevel}</StatusBadge>
-                      <StatusBadge>{recommendation.status}</StatusBadge>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 text-sm text-ink sm:grid-cols-2">
-                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
-                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Demand City</span>
-                      <span className="mt-1 block font-semibold">{recommendation.demandCityLabel || getCityLabel(recommendation.demandCity)}</span>
-                    </div>
-                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
-                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Confidence</span>
-                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.confidence)}%</span>
-                    </div>
-                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
-                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Current City Stock</span>
-                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.destinationStock)} units</span>
-                    </div>
-                    <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
-                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Source Stock</span>
-                      <span className="mt-1 block font-semibold">{formatNumber(recommendation.sourceStock)} units</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-[18px] border border-line px-4 py-4 text-sm leading-6 text-ink">
-                    <span className="font-bold">Move {formatNumber(recommendation.suggestedQuantity)} units</span> from{' '}
-                    {getWarehouseName(recommendation.fromWarehouse, recommendation.fromWarehouseName)} to{' '}
-                    {getWarehouseName(recommendation.toWarehouse, recommendation.toWarehouseName)}.
-                  </div>
-
-                  {explanation ? (
-                    <div className="mt-4 rounded-[18px] bg-[#f7f1eb] px-4 py-4 text-sm leading-6 text-ink-soft">
-                      {explanation}
-                      {!recommendation.aiExplanation ? (
-                        <span className="mt-2 block text-xs font-bold uppercase tracking-[0.14em] text-muted">
-                          Template explanation used
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {canApply || canReject ? (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {isPending ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRecommendationAction(recommendationId, 'approve')}
-                          disabled={Boolean(activeRecommendationAction)}
-                          className="rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-blush/60 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {activeRecommendationAction === actionPrefix('approve') ? 'Approving...' : 'Approve'}
-                        </button>
-                      ) : null}
-                      {canReject ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRecommendationAction(recommendationId, 'reject')}
-                          disabled={Boolean(activeRecommendationAction)}
-                          className="rounded-full border border-[#e7c8c8] bg-white px-4 py-2 text-sm font-bold text-[#8c6546] transition hover:bg-[#fff4f1] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {activeRecommendationAction === actionPrefix('reject') ? 'Rejecting...' : 'Reject'}
-                        </button>
-                      ) : null}
-                      {canApply ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRecommendationAction(recommendationId, 'apply')}
-                          disabled={Boolean(activeRecommendationAction)}
-                          className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {activeRecommendationAction === actionPrefix('apply') ? 'Applying...' : 'Apply Transfer'}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState>No inventory recommendations found for this range.</EmptyState>
-        )}
-
-        <div className="mt-8">
-          <h3 className="font-display text-3xl text-ink">Movement History</h3>
-          <div className="mt-4 overflow-x-auto rounded-[24px] border border-line">
-            {movements.length > 0 ? (
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">From</th>
-                    <th className="px-4 py-3">To</th>
-                    <th className="px-4 py-3">Quantity</th>
-                    <th className="px-4 py-3">Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.map((movement) => (
-                    <tr key={movement._id || movement.id} className="border-b border-line/60 align-top text-ink">
-                      <td className="whitespace-nowrap px-4 py-4">{movement.createdAt ? new Date(movement.createdAt).toLocaleString() : '-'}</td>
-                      <td className="px-4 py-4 font-semibold">{getProductTitle(movement.product)}</td>
-                      <td className="px-4 py-4">{getWarehouseName(movement.fromWarehouse)}</td>
-                      <td className="px-4 py-4">{getWarehouseName(movement.toWarehouse)}</td>
-                      <td className="px-4 py-4 font-bold">{formatNumber(movement.quantity)}</td>
-                      <td className="px-4 py-4 text-ink-soft">{movement.reason || '-'}</td>
-                    </tr>
+        {activeInventoryTab === 'recommendations' ? (
+          <>
+            <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 lg:grid-cols-[220px_1fr_auto] lg:items-end">
+              <label>
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Recommendation range</span>
+                <select
+                  value={range}
+                  onChange={(event) => setRange(event.target.value)}
+                  className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
+                >
+                  {timeRanges.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </label>
+              <p className="text-sm leading-6 text-ink-soft">
+                AI explanation is based on tracked demand and warehouse stock. Admin approval is required before stock changes.
+              </p>
+              <button
+                type="button"
+                onClick={handleGenerateRecommendations}
+                disabled={isGeneratingRecommendations}
+                className="min-h-12 rounded-full bg-ink px-5 py-3 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isGeneratingRecommendations ? 'Generating...' : 'Generate AI Inventory Recommendations'}
+              </button>
+            </div>
+
+            {recommendationsError ? <AnalyticsError message={recommendationsError} /> : null}
+            {recommendationsMessage ? (
+              <div className="mb-5 rounded-[24px] border border-[#d7e6d1] bg-[#f4fbf1] px-5 py-4 text-sm text-[#426b42]">
+                {recommendationsMessage}
+              </div>
+            ) : null}
+
+            {isRecommendationsLoading ? (
+              <EmptyState>Loading inventory recommendations...</EmptyState>
+            ) : recommendations.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {recommendations.map((recommendation) => {
+                  const recommendationId = getRecommendationId(recommendation);
+                  const explanation = recommendation.aiExplanation || recommendation.reason || '';
+                  const actionPrefix = (action) => `${action}:${recommendationId}`;
+                  const isPending = recommendation.status === 'pending';
+                  const isApproved = recommendation.status === 'approved';
+                  const canApply = isPending || isApproved;
+                  const canReject = isPending || isApproved;
+
+                  return (
+                    <article key={recommendationId} className="rounded-[24px] border border-line bg-white p-5 shadow-card">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">
+                            {recommendation.productCategory || recommendation.product?.category || 'Product'}
+                          </p>
+                          <h3 className="mt-2 font-display text-3xl leading-tight text-ink">
+                            {getProductTitle(recommendation.product, recommendation.productTitle)}
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <StatusBadge>{recommendation.pressureLevel}</StatusBadge>
+                          <StatusBadge>{recommendation.status}</StatusBadge>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 text-sm text-ink sm:grid-cols-2">
+                        <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Demand City</span>
+                          <span className="mt-1 block font-semibold">{recommendation.demandCityLabel || getCityLabel(recommendation.demandCity)}</span>
+                        </div>
+                        <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Confidence</span>
+                          <span className="mt-1 block font-semibold">{formatNumber(recommendation.confidence)}%</span>
+                        </div>
+                        <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Current City Stock</span>
+                          <span className="mt-1 block font-semibold">{formatNumber(recommendation.destinationStock)} units</span>
+                        </div>
+                        <div className="rounded-[18px] bg-[#fffaf8] px-4 py-3">
+                          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-muted">Source Stock</span>
+                          <span className="mt-1 block font-semibold">{formatNumber(recommendation.sourceStock)} units</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-[18px] border border-line px-4 py-4 text-sm leading-6 text-ink">
+                        <span className="font-bold">Move {formatNumber(recommendation.suggestedQuantity)} units</span> from{' '}
+                        {getWarehouseName(recommendation.fromWarehouse, recommendation.fromWarehouseName)} to{' '}
+                        {getWarehouseName(recommendation.toWarehouse, recommendation.toWarehouseName)}.
+                      </div>
+
+                      {explanation ? (
+                        <div className="mt-4 rounded-[18px] bg-[#f7f1eb] px-4 py-4 text-sm leading-6 text-ink-soft">
+                          {explanation}
+                          {!recommendation.aiExplanation ? (
+                            <span className="mt-2 block text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                              Template explanation used
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {canApply || canReject ? (
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          {isPending ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRecommendationAction(recommendationId, 'approve')}
+                              disabled={Boolean(activeRecommendationAction)}
+                              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-blush/60 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {activeRecommendationAction === actionPrefix('approve') ? 'Approving...' : 'Approve'}
+                            </button>
+                          ) : null}
+                          {canReject ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRecommendationAction(recommendationId, 'reject')}
+                              disabled={Boolean(activeRecommendationAction)}
+                              className="rounded-full border border-[#e7c8c8] bg-white px-4 py-2 text-sm font-bold text-[#8c6546] transition hover:bg-[#fff4f1] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {activeRecommendationAction === actionPrefix('reject') ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          ) : null}
+                          {canApply ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRecommendationAction(recommendationId, 'apply')}
+                              disabled={Boolean(activeRecommendationAction)}
+                              className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {activeRecommendationAction === actionPrefix('apply') ? 'Applying...' : 'Apply Transfer'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
             ) : (
-              <div className="px-5 py-6 text-sm text-ink-soft">No stock transfers have been applied yet.</div>
+              <EmptyState>No inventory recommendations found for this range.</EmptyState>
             )}
-          </div>
-        </div>
+
+            <div className="mt-8">
+              <h3 className="font-display text-3xl text-ink">Movement History</h3>
+              <div className="mt-4 overflow-x-auto rounded-[24px] border border-line">
+                {movements.length > 0 ? (
+                  <table className="min-w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Product</th>
+                        <th className="px-4 py-3">From</th>
+                        <th className="px-4 py-3">To</th>
+                        <th className="px-4 py-3">Quantity</th>
+                        <th className="px-4 py-3">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {movements.map((movement) => (
+                        <tr key={movement._id || movement.id} className="border-b border-line/60 align-top text-ink">
+                          <td className="whitespace-nowrap px-4 py-4">{movement.createdAt ? new Date(movement.createdAt).toLocaleString() : '-'}</td>
+                          <td className="px-4 py-4 font-semibold">{getProductTitle(movement.product)}</td>
+                          <td className="px-4 py-4">{getWarehouseName(movement.fromWarehouse)}</td>
+                          <td className="px-4 py-4">{getWarehouseName(movement.toWarehouse)}</td>
+                          <td className="px-4 py-4 font-bold">{formatNumber(movement.quantity)}</td>
+                          <td className="px-4 py-4 text-ink-soft">{movement.reason || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="px-5 py-6 text-sm text-ink-soft">No stock transfers have been applied yet.</div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {activeInventoryTab === 'forecast' ? <DemandForecastPanel advancedAi={advancedAi} /> : null}
       </SectionCard>
 
-      <SectionCard id="searches" title="Search Trends" description="Search terms help reveal product and marketing gaps. Zero-result searches are highlighted when result metadata exists.">
-        {isAnalyticsLoading ? (
-          <EmptyState>Loading search trends...</EmptyState>
-        ) : analytics.searches?.topSearchQueries?.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                  <th className="px-4 py-3">Search Query</th>
-                  <th className="px-4 py-3">Count</th>
-                  <th className="px-4 py-3">Top City</th>
-                  <th className="px-4 py-3">Avg Results</th>
-                  <th className="px-4 py-3">Insight</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.searches.topSearchQueries.map((query) => (
-                  <tr key={query.query} className="border-b border-line/60 text-ink">
-                    <td className="px-4 py-4 font-semibold">{query.query}</td>
-                    <td className="px-4 py-4">{formatNumber(query.count)}</td>
-                    <td className="px-4 py-4">{query.topCity?.cityLabel || '-'}</td>
-                    <td className="px-4 py-4">{query.resultsCountAverage ?? '-'}</td>
-                    <td className="px-4 py-4 text-ink-soft">
-                      {query.hasZeroResultSearches ? 'Customers are searching for this, but no products were found.' : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState>No searches tracked yet.</EmptyState>
-        )}
-      </SectionCard>
-
-      <SectionCard id="ai-tools" title="AI Tool Usage" description="Usage counters for Visual Search and Try-On. No user images or generated images are shown here.">
+      <SectionCard id="ai-insights" title="AI Insights" description="Optional AI summaries and business explanations generated from analytics data.">
+        <DetailPanel title="AI Tool Usage" description="Usage counters for Visual Search and Try-On. No user images or generated images are shown here.">
         {isAnalyticsLoading ? (
           <EmptyState>Loading AI tool usage...</EmptyState>
         ) : analytics.aiTools && (analytics.aiTools.visualSearchCount > 0 || analytics.aiTools.tryOnCount > 0) ? (
@@ -1858,9 +1652,10 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         ) : (
           <EmptyState>No AI tool usage tracked yet.</EmptyState>
         )}
-      </SectionCard>
+        </DetailPanel>
 
-      <SectionCard id="events" title="Behavior Events" description="Latest clean demand signals from Phase 2 tracking. Filters share the selected dashboard time range.">
+        <div className="mt-5">
+          <DetailPanel title="Behavior Events" description="Latest clean demand signals from Phase 2 tracking. Filters share the selected dashboard time range.">
         <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 md:grid-cols-[220px_220px_1fr]">
           <label>
             <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Event type</span>
@@ -1934,11 +1729,19 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         ) : (
           <EmptyState>No behavior events found yet.</EmptyState>
         )}
-      </SectionCard>
+          </DetailPanel>
+        </div>
 
-      <AdvancedAiInsightsSection authToken={authToken} range={range} />
+        <div className="mt-5">
+          <DetailPanel title="Optional AI Summaries" description="Business summaries and secondary AI-only explanations kept collapsed until needed.">
+            <AiInsightsWorkspace advancedAi={advancedAi} />
+          </DetailPanel>
+        </div>
+      </SectionCard>
     </div>
   );
 };
 
 export default AdminBehaviorAnalyticsPage;
+
+
