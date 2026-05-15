@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Bar,
   BarChart,
@@ -181,6 +182,7 @@ const productMatchesFilters = (product, filters) => {
 };
 
 const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, onRangeChange }) => {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState({ category: '', warehouseId: '', status: '' });
   const filteredProducts = useMemo(
     () => (analysis?.products || []).filter((product) => productMatchesFilters(product, filters)),
@@ -241,14 +243,14 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
     <section id="inventory-analysis" className="rounded-[32px] border border-line/80 bg-white p-5 shadow-card sm:p-6">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Stock health</p>
-          <h2 className="mt-2 font-display text-4xl text-ink">Inventory Analysis</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">{t('inventory.stockHealth', 'Stock health')}</p>
+          <h2 className="mt-2 font-display text-4xl text-ink">{t('inventory.title', 'Inventory Analysis')}</h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-soft">
-            Visual stock health, warehouse distribution, movement trends, and restock priorities for business decisions.
+            {t('inventory.description', 'Visual stock health, warehouse distribution, movement trends, and restock priorities for business decisions.')}
           </p>
         </div>
         <label className="min-w-[220px]">
-          <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Time range</span>
+          <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('admin.timeRange', 'Time range')}</span>
           <select
             value={range}
             onChange={(event) => onRangeChange(event.target.value)}
@@ -256,7 +258,7 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
           >
             {timeRanges.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+              {t(option.labelKey, option.label)}
               </option>
             ))}
           </select>
@@ -276,23 +278,23 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
       ) : (
         <>
           <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-            <MetricCard label="Total Stock" value={formatNumber(analysis.summary?.totalStock)} helper="All product units" />
-            <MetricCard label="Products" value={formatNumber(analysis.summary?.productCount)} helper="Catalog items" />
-            <MetricCard label="Warehouses" value={formatNumber(analysis.summary?.warehouseCount)} helper="Stock locations" />
-            <MetricCard label="Low Stock" value={formatNumber(analysis.summary?.lowStockCount)} helper="At threshold" />
-            <MetricCard label="Out of Stock" value={formatNumber(analysis.summary?.outOfStockCount)} helper="Needs action" />
-            <MetricCard label="Restock Soon" value={formatNumber(analysis.summary?.restockSoonCount)} helper="Velocity pressure" />
+            <MetricCard label={t('inventory.totalStock', 'Total Stock')} value={formatNumber(analysis.summary?.totalStock)} helper="All product units" />
+            <MetricCard label={t('inventory.products', 'Products')} value={formatNumber(analysis.summary?.productCount)} helper="Catalog items" />
+            <MetricCard label={t('inventory.warehouses', 'Warehouses')} value={formatNumber(analysis.summary?.warehouseCount)} helper="Stock locations" />
+            <MetricCard label={t('inventory.lowStock', 'Low Stock')} value={formatNumber(analysis.summary?.lowStockCount)} helper="At threshold" />
+            <MetricCard label={t('inventory.outOfStock', 'Out of Stock')} value={formatNumber(analysis.summary?.outOfStockCount)} helper="Needs action" />
+            <MetricCard label={t('inventory.restockSoon', 'Restock Soon')} value={formatNumber(analysis.summary?.restockSoonCount)} helper="Velocity pressure" />
           </div>
 
           <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 md:grid-cols-3">
             <label>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Category</span>
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('common.category', 'Category')}</span>
               <select
                 value={filters.category}
                 onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}
                 className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
               >
-                <option value="">All categories</option>
+                <option value="">{t('inventory.allCategories', 'All categories')}</option>
                 {(analysis.filters?.categories || []).map((category) => (
                   <option key={category} value={category}>
                     {category}
@@ -301,13 +303,13 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
               </select>
             </label>
             <label>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Warehouse</span>
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('admin.warehouseIntelligence', 'Warehouse Intelligence')}</span>
               <select
                 value={filters.warehouseId}
                 onChange={(event) => setFilters((current) => ({ ...current, warehouseId: event.target.value }))}
                 className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
               >
-                <option value="">All warehouses</option>
+                <option value="">{t('inventory.allWarehouses', 'All warehouses')}</option>
                 {(analysis.filters?.warehouses || []).map((warehouse) => (
                   <option key={warehouse.warehouseId} value={warehouse.warehouseId}>
                     {warehouse.cityLabel || warehouse.warehouseName}
@@ -316,13 +318,13 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
               </select>
             </label>
             <label>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Stock status</span>
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('common.status', 'Status')}</span>
               <select
                 value={filters.status}
                 onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
                 className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
               >
-                <option value="">All statuses</option>
+                <option value="">{t('inventory.allStatuses', 'All statuses')}</option>
                 {(analysis.filters?.stockStatuses || []).map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -335,7 +337,7 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
 
           <div className="grid gap-5 xl:grid-cols-2">
             <ChartPanel
-              title="Stock by Category"
+              title={t('inventory.stockByCategory', 'Stock by Category')}
               description="Current stock grouped by product category after filters."
               isEmpty={stockByCategory.length === 0}
               emptyMessage="No category stock matches these filters."
@@ -352,7 +354,7 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
             </ChartPanel>
 
             <ChartPanel
-              title="Stock by Warehouse"
+              title={t('inventory.stockByWarehouse', 'Stock by Warehouse')}
               description="Available units by warehouse, with low-stock item count available in tooltips."
               isEmpty={stockByWarehouse.length === 0}
               emptyMessage="No warehouse stock matches these filters."
@@ -406,7 +408,7 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
           </div>
 
           <div className="mt-7">
-            <h3 className="font-display text-3xl text-ink">Low-Stock Product Cards</h3>
+            <h3 className="font-display text-3xl text-ink">{t('inventory.lowStockProducts', 'Low-Stock Product Cards')}</h3>
             <p className="mt-2 text-sm leading-6 text-ink-soft">
               Restock priorities with images, warehouse distribution, reorder guidance, and recent sales velocity.
             </p>
@@ -424,7 +426,7 @@ const InventoryAnalysisSection = ({ analysis, isLoading, errorMessage, range, on
           </div>
 
           <div className="mt-7">
-            <h3 className="font-display text-3xl text-ink">High-Demand Products</h3>
+            <h3 className="font-display text-3xl text-ink">{t('inventory.highDemandProducts', 'High-Demand Products')}</h3>
             <p className="mt-2 text-sm leading-6 text-ink-soft">
               Products moving fastest in the selected time range, useful for deciding what to reorder or feature.
             </p>

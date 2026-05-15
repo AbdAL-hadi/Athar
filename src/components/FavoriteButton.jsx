@@ -1,6 +1,8 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 const FavoriteButton = ({ active = false, onClick, className = '' }) => {
+  const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const handleClick = (event) => {
     event.preventDefault();
@@ -12,7 +14,7 @@ const FavoriteButton = ({ active = false, onClick, className = '' }) => {
     <motion.button
       type="button"
       onClick={handleClick}
-      aria-label={active ? 'Remove from favorites' : 'Add to favorites'}
+      aria-label={active ? t('favorites.remove', 'Remove from favorites') : t('favorites.add', 'Add to favorites')}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.08 }}
       whileTap={prefersReducedMotion ? undefined : { scale: 0.92 }}
       animate={active && !prefersReducedMotion ? { scale: [1, 1.16, 1] } : { scale: 1 }}

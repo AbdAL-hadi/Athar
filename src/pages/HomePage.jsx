@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
@@ -64,11 +65,11 @@ const StarRating = ({ value = 5, onChange, disabled = false, sizeClass = 'text-l
   );
 };
 
-const FeedbackCard = ({ item }) => {
+const FeedbackCard = ({ item, t }) => {
   const initial = item?.name?.charAt(0)?.toUpperCase() || 'A';
   const rating = Math.min(5, Math.max(1, Math.round(Number(item?.rating) || 5)));
   const createdAtLabel = item?.createdAt
-    ? new Date(item.createdAt).toLocaleDateString('en-US', {
+    ? new Date(item.createdAt).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -101,13 +102,13 @@ const FeedbackCard = ({ item }) => {
       </div>
 
       <div className="mt-5 flex flex-1 flex-col">
-        <p className="text-lg font-semibold text-ink">Athar experience</p>
+        <p className="text-lg font-semibold text-ink">{t('home.atharExperience', 'Athar experience')}</p>
         <p className="mt-4 flex-1 text-base leading-8 text-ink-soft">{item.message}</p>
 
         <div className="mt-8 border-t border-line pt-4">
-          <p className="text-sm font-semibold text-ink">Athar Storefront</p>
+          <p className="text-sm font-semibold text-ink">{t('home.atharStorefront', 'Athar Storefront')}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">
-            Site review
+            {t('home.siteReview', 'Site review')}
           </p>
         </div>
       </div>
@@ -117,6 +118,7 @@ const FeedbackCard = ({ item }) => {
 
 const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken, onAddToCart }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const categoriesRowRef = useRef(null);
   const feedbackListRef = useRef(null);
@@ -192,7 +194,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
         if (!isCancelled) {
           setFeedbackItems([]);
           setFeedbackLoadError(
-            'We could not load community reviews right now.',
+            t('home.reviewsLoadError', 'We could not load community reviews right now.'),
           );
         }
       } finally {
@@ -220,7 +222,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     setFeedbackSuccess('');
 
     if (!authUser) {
-      setFeedbackError('Please log in to write a review.');
+      setFeedbackError(t('home.loginReviewError', 'Please log in to write a review.'));
       navigate('/auth');
       return;
     }
@@ -228,7 +230,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     const activeToken = getActiveAuthToken(authToken);
 
     if (!activeToken) {
-      setFeedbackError('Please log in to write a review.');
+      setFeedbackError(t('home.loginReviewError', 'Please log in to write a review.'));
       navigate('/auth');
       return;
     }
@@ -236,7 +238,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     const normalizedMessage = feedbackForm.replace(/\s+/g, ' ').trim();
 
     if (normalizedMessage.length < 10) {
-      setFeedbackError('Please write at least 10 characters before saving your review.');
+      setFeedbackError(t('home.reviewMinLengthError', 'Please write at least 10 characters before saving your review.'));
       return;
     }
 
@@ -261,11 +263,11 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
       }
 
       if (savedFeedback?.status === 'pending') {
-        setFeedbackSuccess('Your review is under review and will appear after approval.');
+        setFeedbackSuccess(t('home.reviewPending', 'Your review is under review and will appear after approval.'));
       } else if (savedFeedback?.status === 'rejected') {
-        setFeedbackSuccess('Your review was not published because it may violate community guidelines.');
+        setFeedbackSuccess(t('home.reviewRejected', 'Your review was not published because it may violate community guidelines.'));
       } else {
-        setFeedbackSuccess(response?.message || 'Your review has been saved.');
+        setFeedbackSuccess(response?.message || t('home.reviewSaved', 'Your review has been saved.'));
       }
       setFeedbackForm(savedFeedback?.message ?? normalizedMessage);
     } catch (error) {
@@ -275,7 +277,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
       }
 
       setFeedbackError(
-        'We could not save your review right now.',
+        t('home.reviewSaveError', 'We could not save your review right now.'),
       );
     } finally {
       setFeedbackSubmitting(false);
@@ -287,7 +289,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
       <section className="relative left-1/2 right-1/2 -mx-[50vw] min-h-[680px] w-screen overflow-hidden bg-[#251913] py-16 sm:py-20 lg:flex lg:min-h-[calc(100vh-92px)] lg:items-center lg:py-24">
         <img
           src={resolveApiAssetUrl('products/homeshorouq.jpeg')}
-          alt="Athar Palestinian heritage accessories"
+          alt={t('home.heroImageAlt', 'Athar Palestinian heritage accessories')}
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(34,22,17,0.78)_0%,rgba(54,36,28,0.55)_42%,rgba(34,22,17,0.16)_100%)]" />
@@ -298,14 +300,14 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
               <Reveal delay={0.12} immediate>
 <h1 className="max-w-[560px] overflow-hidden font-display text-[2.75rem] font-semibold leading-[1.16] text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.36)] sm:text-[3.35rem] lg:text-[4rem] xl:text-[4.4rem]">
   <span className="block">
-    A touch of heritage<span className="font-bold tracking-[0.01em] text-white"></span>
+    {t('home.heroTitleLine1', 'A touch of heritage')}<span className="font-bold tracking-[0.01em] text-white"></span>
   </span>
-  <span className="block">made to shine</span>
+  <span className="block">{t('home.heroTitleLine2', 'made to shine')}</span>
 </h1>
               </Reveal>
               <Reveal delay={0.22} immediate>
                 <p className="mt-6 max-w-[500px] text-base font-semibold leading-8 text-white/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.42)]">
-                  At Athar, we create handcrafted accessories that blend timeless heritage with modern elegance through refined copper details and artistic embroidery.
+                  {t('home.heroDescription', 'At Athar, we create handcrafted accessories that blend timeless heritage with modern elegance through refined copper details and artistic embroidery.')}
                 </p>
               </Reveal>
               <Reveal delay={0.34} immediate>
@@ -315,7 +317,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                       to="/products"
                       className="inline-flex min-w-[160px] items-center justify-center bg-white px-6 py-3 text-base font-semibold text-ink shadow-[0_18px_40px_rgba(0,0,0,0.28)] transition hover:bg-cream"
                     >
-                      View Collection
+                      {t('home.viewCollection', 'View Collection')}
                     </Link>
                   </motion.div>
                   <motion.div {...ctaMotionProps}>
@@ -323,7 +325,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                       to="/about"
                       className="inline-flex min-w-[160px] items-center justify-center border border-white/70 bg-white/14 px-6 py-3 text-base font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm transition hover:bg-white/22"
                     >
-                      Discover Athar
+                      {t('home.discoverAthar', 'Discover Athar')}
                     </Link>
                   </motion.div>
                 </div>
@@ -348,13 +350,13 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
               <Reveal className="flex-1">
                 <div className="flex-1">
                   <p className="mb-3 text-sm font-bold uppercase tracking-[0.22em] text-rose">
-                    View all
+                    {t('home.viewAll', 'View all')}
                   </p>
                   <h2 className="mb-4 font-display text-5xl font-bold text-ink sm:text-6xl">
-                    Featured Pieces
+                    {t('home.featuredPieces', 'Featured Pieces')}
                   </h2>
                   <p className="max-w-2xl text-lg font-medium leading-8 text-ink-soft">
-                    A first selection from the collection, styled around the visual language of the Athar storefront. Discover our handpicked favorites.
+                    {t('home.featuredDescription', 'A first selection from the collection, styled around the visual language of the Athar storefront. Discover our handpicked favorites.')}
                   </p>
                 </div>
               </Reveal>
@@ -364,7 +366,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                     to="/products"
                     className="inline-flex items-center gap-2 rounded-full bg-rose px-6 py-3 font-semibold text-white transition hover:bg-rose/90 hover:shadow-lg"
                   >
-                    See full catalog -
+                    {t('home.seeFullCatalog', 'See full catalog')} -
                   </Link>
                 </motion.div>
               </Reveal>
@@ -385,7 +387,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                     />
                     {index < 2 ? (
                       <div className="absolute right-4 top-4 inline-block rounded-full bg-gradient-to-r from-rose to-pink-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg">
-                        Popular
+                        {t('home.popular', 'Popular')}
                       </div>
                     ) : null}
                   </div>
@@ -396,7 +398,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
 
           <Reveal className="mt-16 text-center" delay={0.08}>
             <p className="text-lg font-medium text-ink-soft">
-              Curated with care • Premium quality • Customer favorites
+              {t('home.curatedLine', 'Curated with care ? Premium quality ? Customer favorites')}
             </p>
           </Reveal>
         </div>
@@ -409,7 +411,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               onSubmit={handleSearch}
-              placeholder="Search for accessories"
+              placeholder={t('home.searchPlaceholder', 'Search for accessories')}
               buttonVariant="secondary"
               inputClassName="bg-white"
               buttonClassName="bg-white"
@@ -421,17 +423,17 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
       <section className="section-shell">
         <Reveal>
           <SectionTitle
-            title="Sections"
-            description="Image-led category discovery designed to stay simple, elegant, and easy to scan."
+            title={t('home.sections', 'Sections')}
+            description={t('home.sectionsDescription', 'Image-led category discovery designed to stay simple, elegant, and easy to scan.')}
           />
         </Reveal>
 
         <div className="mt-8 space-y-4">
           <Reveal className="flex items-center justify-end gap-3">
-            <button type="button" onClick={() => scrollCategories('left')} className="icon-button" aria-label="Scroll sections left">
+            <button type="button" onClick={() => scrollCategories('left')} className="icon-button" aria-label={t('home.scrollSectionsLeft', 'Scroll sections left')}>
               <ArrowIcon direction="left" />
             </button>
-            <button type="button" onClick={() => scrollCategories('right')} className="icon-button" aria-label="Scroll sections right">
+            <button type="button" onClick={() => scrollCategories('right')} className="icon-button" aria-label={t('home.scrollSectionsRight', 'Scroll sections right')}>
               <ArrowIcon direction="right" />
             </button>
           </Reveal>
@@ -449,7 +451,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                 >
                   <img src={category.image} alt={category.name} className="aspect-[4/4.5] w-full rounded-[22px] object-cover" />
                   <div className="mt-4 flex items-center justify-between gap-3 px-2 pb-2">
-                    <span className="font-display text-2xl text-ink">{category.name}</span>
+                    <span className="font-display text-2xl text-ink">{t(`categories.${category.name}`, category.name)}</span>
                     <span className="rounded-full bg-blush px-3 py-1 text-xs font-semibold text-ink-soft">{category.count}</span>
                   </div>
                 </Link>
@@ -464,7 +466,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
           <motion.div className="overflow-hidden" {...heroVisualMotionProps}>
             <img
               src={resolveApiAssetUrl('products/freegift.jpg')}
-              alt="Free gift with every order"
+              alt={t('home.freeGiftAlt', 'Free gift with every order')}
               className="w-full object-cover"
             />
           </motion.div>
@@ -475,22 +477,22 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
         <div className="section-shell">
           <Reveal>
             <div className="rounded-[36px] bg-white/60 p-6 text-center shadow-soft backdrop-blur sm:p-8">
-              <p className="text-sm uppercase tracking-[0.22em] text-ink-soft">Announcement Board</p>
+              <p className="text-sm uppercase tracking-[0.22em] text-ink-soft">{t('home.announcement', 'Announcement Board')}</p>
               <h2 className="mt-5 font-display text-4xl font-bold text-ink sm:text-5xl">
-                A new heritage capsule is now available.
+                {t('home.capsuleTitle', 'A new heritage capsule is now available.')}
               </h2>
               <p className="mx-auto mt-5 max-w-3xl text-lg leading-9 text-ink-soft">
-                Discover limited handcrafted accessories inspired by Palestinian symbolism, soft packaging rituals, and warm copper finishes curated for gifting and everyday styling.
+                {t('home.capsuleDescription', 'Discover limited handcrafted accessories inspired by Palestinian symbolism, soft packaging rituals, and warm copper finishes curated for gifting and everyday styling.')}
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <motion.div {...ctaMotionProps}>
                   <Link to="/products" className="inline-flex items-center justify-center rounded-sm bg-white px-8 py-4 font-display text-2xl text-ink shadow-card transition hover:bg-cream">
-                    Explore the drop
+                    {t('home.exploreDrop', 'Explore the drop')}
                   </Link>
                 </motion.div>
                 <motion.div {...ctaMotionProps}>
                   <Link to="/about" className="inline-flex items-center justify-center rounded-sm border border-white/50 bg-white/40 px-8 py-4 text-base font-semibold text-ink transition hover:bg-white/70">
-                    Learn more
+                    {t('home.learnMore', 'Learn more')}
                   </Link>
                 </motion.div>
               </div>
@@ -504,12 +506,12 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
           <Reveal>
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#8f5f45]">Reviews</p>
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#8f5f45]">{t('home.reviews', 'Reviews')}</p>
                 <h2 className="mt-3 text-5xl font-bold leading-tight text-ink sm:text-6xl">
-                  Happy Customers
+                  {t('home.happyCustomers', 'Happy Customers')}
                 </h2>
                 <p className="mt-4 max-w-2xl text-base leading-8 text-ink-soft">
-                  Rate your Athar experience and share a note. New reviews appear here for everyone after saving.
+                  {t('home.reviewsDescription', 'Rate your Athar experience and share a note. New reviews appear here for everyone after saving.')}
                 </p>
               </div>
 
@@ -519,7 +521,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                     type="button"
                     onClick={() => feedbackListRef.current?.scrollBy({ left: -420, behavior: 'smooth' })}
                     className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-[#d8c7ba] hover:bg-[#fbf4ef]"
-                    aria-label="Previous reviews"
+                    aria-label={t('home.previousReviews', 'Previous reviews')}
                   >
                     <ArrowIcon direction="left" />
                   </button>
@@ -529,7 +531,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                     type="button"
                     onClick={() => feedbackListRef.current?.scrollBy({ left: 420, behavior: 'smooth' })}
                     className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-[#d8c7ba] hover:bg-[#fbf4ef]"
-                    aria-label="Next reviews"
+                    aria-label={t('home.nextReviews', 'Next reviews')}
                   >
                     <ArrowIcon />
                   </button>
@@ -544,32 +546,32 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                 <h3 className="text-2xl font-bold text-ink">
                   {authUser
                     ? currentUserFeedback
-                      ? 'Update your review'
-                      : 'Share your review'
-                    : 'Log in to review'}
+                      ? t('home.updateYourReview', 'Update your review')
+                      : t('home.shareYourReview', 'Share your review')
+                    : t('home.loginToReview', 'Log in to review')}
                 </h3>
                 <p className="mt-2 text-sm leading-7 text-ink-soft">
                   {authUser
-                    ? 'Choose your rating and write a short comment about your experience with Athar.'
-                    : 'Visitors can read reviews. Customers can log in to add a public rating and comment.'}
+                    ? t('home.reviewFormDescription', 'Choose your rating and write a short comment about your experience with Athar.')
+                    : t('home.reviewGuestDescription', 'Visitors can read reviews. Customers can log in to add a public rating and comment.')}
                 </p>
 
                 {!authUser ? (
                   <div className="mt-6 rounded-[6px] border border-line bg-[#fffaf8] px-5 py-5">
-                    <p className="text-base font-semibold text-ink">Please log in to write a review.</p>
+                    <p className="text-base font-semibold text-ink">{t('home.loginReviewError', 'Please log in to write a review.')}</p>
                     <p className="mt-2 text-sm leading-6 text-ink-soft">
-                      Your rating and comment will show in this section for everyone.
+                      {t('home.reviewPublicNote', 'Your rating and comment will show in this section for everyone.')}
                     </p>
                     <motion.div {...ctaMotionProps}>
                       <Link to="/auth" className="button-primary mt-5 inline-flex">
-                        Log in to review
+                        {t('home.loginToReview', 'Log in to review')}
                       </Link>
                     </motion.div>
                   </div>
                 ) : (
                   <form className="mt-6 space-y-4" onSubmit={handleSubmitFeedback}>
                     <div>
-                      <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] text-muted">Your rating</p>
+                      <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] text-muted">{t('home.yourRating', 'Your rating')}</p>
                       <StarRating
                         value={feedbackRating}
                         onChange={setFeedbackRating}
@@ -581,7 +583,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                     <textarea
                       value={feedbackForm}
                       onChange={(event) => setFeedbackForm(event.target.value)}
-                      placeholder="Write your review here..."
+                      placeholder={t('home.reviewPlaceholder', 'Write your review here...')}
                       rows={6}
                       className="w-full rounded-[6px] border border-line bg-[#f8f4f0] px-5 py-4 text-base leading-7 text-ink outline-none transition focus:border-[#b88746] focus:bg-white"
                       disabled={feedbackSubmitting}
@@ -601,7 +603,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="max-w-[220px] text-xs leading-5 text-muted">
-                        {feedbackSuccess || 'Saved reviews appear publicly in Happy Customers.'}
+                        {feedbackSuccess || t('home.savedReviewsPublic', 'Saved reviews appear publicly in Happy Customers.')}
                       </p>
                       <motion.div {...ctaMotionProps}>
                         <button
@@ -610,10 +612,10 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
                           className="button-primary"
                         >
                           {feedbackSubmitting
-                            ? 'Saving...'
+                            ? t('common.saving', 'Saving...')
                             : currentUserFeedback
-                              ? 'Update review'
-                              : 'Add review'}
+                              ? t('home.updateReview', 'Update review')
+                              : t('home.addReview', 'Add review')}
                         </button>
                       </motion.div>
                     </div>
@@ -629,7 +631,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
             >
               {feedbackLoading ? (
                 <div className="min-w-[360px] rounded-[6px] border border-line/70 bg-white px-5 py-8 text-center text-base text-ink-soft">
-                  Loading reviews...
+                  {t('home.loadingReviews', 'Loading reviews...')}
                 </div>
               ) : null}
 
@@ -641,14 +643,14 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
 
               {!feedbackLoading && !feedbackLoadError && feedbackItems.length === 0 ? (
                 <div className="min-w-[360px] rounded-[6px] border border-line/70 bg-white px-5 py-8 text-center text-base text-ink-soft">
-                  No reviews yet.
+                  {t('home.noReviewsYet', 'No reviews yet.')}
                 </div>
               ) : null}
 
               {!feedbackLoading && !feedbackLoadError
                 ? feedbackItems.map((item) => (
                     <StaggerItem key={item.id} className="w-[360px] min-w-[360px] lg:w-[420px] lg:min-w-[420px]">
-                      <FeedbackCard item={item} />
+                      <FeedbackCard item={item} t={t} />
                     </StaggerItem>
                   ))
                 : null}
@@ -661,12 +663,12 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
         <Reveal>
           <div className="flex flex-col items-center justify-between gap-4 rounded-[32px] border border-line bg-white px-6 py-8 text-center shadow-card sm:flex-row sm:text-left">
             <div>
-              <h2 className="font-display text-4xl text-ink">Ready to start shopping?</h2>
-              <p className="mt-2 text-base text-ink-soft">The page layer is connected through search, cart, checkout, and order tracking.</p>
+              <h2 className="font-display text-4xl text-ink">{t('home.readyTitle', 'Ready to start shopping?')}</h2>
+              <p className="mt-2 text-base text-ink-soft">{t('home.readyDescription', 'The page layer is connected through search, cart, checkout, and order tracking.')}</p>
             </div>
             <motion.div {...ctaMotionProps}>
               <Link to="/products" className="button-primary">
-                Start shopping
+                {t('home.startShopping', 'Start shopping')}
               </Link>
             </motion.div>
           </div>

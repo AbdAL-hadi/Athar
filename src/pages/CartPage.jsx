@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import CartItem from '../components/CartItem';
 import SectionTitle from '../components/SectionTitle';
 import { formatCurrency } from '../utils/format';
@@ -7,6 +8,7 @@ import { calculateProductPoints, formatAtharPoints, getCurrentAtharPointsBalance
 import { findProductByReference } from '../utils/productCatalog';
 
 const CartPage = ({ items, products = [], authUser = null, onUpdateQuantity, onRemoveItem }) => {
+  const { t } = useTranslation();
   const subtotal = getCartSubtotal(items);
   const compareSubtotal = getCartCompareSubtotal(items);
   const grandTotal = getCartGrandTotal(items);
@@ -19,10 +21,10 @@ const CartPage = ({ items, products = [], authUser = null, onUpdateQuantity, onR
     return (
       <div className="section-shell pt-14">
         <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
-          <h1 className="font-display text-5xl text-ink">Your cart is empty.</h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">Add a few pieces first and the cart summary will appear here with live quantity controls.</p>
+          <h1 className="font-display text-5xl text-ink">{t('cart.emptyTitle', 'Your cart is empty.')}</h1>
+          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">{t('cart.emptyDescription', 'Add a few pieces first and the cart summary will appear here with live quantity controls.')}</p>
           <Link to="/products" className="button-primary mt-8">
-            Explore products
+            {t('cart.exploreProducts', 'Explore products')}
           </Link>
         </div>
       </div>
@@ -31,7 +33,7 @@ const CartPage = ({ items, products = [], authUser = null, onUpdateQuantity, onR
 
   return (
     <div className="section-shell space-y-8 pb-6 pt-8">
-      <SectionTitle title="Your cart" description="The existing cart behavior and local persistence remain intact while the page follows the lighter editorial reference." />
+      <SectionTitle title={t('cart.title', 'Your cart')} description={t('cart.description', 'The existing cart behavior and local persistence remain intact while the page follows the lighter editorial reference.')} />
 
       <section className="overflow-hidden rounded-[32px] bg-white shadow-soft">
         {items.map((item) => (
@@ -42,32 +44,32 @@ const CartPage = ({ items, products = [], authUser = null, onUpdateQuantity, onR
           <div className="space-y-4">
             {compareSubtotal > subtotal ? <p className="font-display text-4xl text-muted line-through">{formatCurrency(compareSubtotal)}</p> : null}
             <p className="font-display text-5xl text-ink">{formatCurrency(grandTotal)}</p>
-            <p className="text-base text-ink-soft">Includes shipping of {formatCurrency(SHIPPING_FEE)}</p>
+            <p className="text-base text-ink-soft">{t('cart.includesShipping', 'Includes shipping of {{amount}}', { amount: formatCurrency(SHIPPING_FEE) })}</p>
             {cartPoints > 0 ? (
               <div className="rounded-[24px] border border-[#dfbd79]/50 bg-[#fff7f0] px-5 py-4">
                 <p className="text-lg font-semibold text-ink">
-                  This cart will earn {formatAtharPoints(cartPoints)}.
+                  {t('cart.cartEarns', 'This cart will earn {{points}}.', { points: formatAtharPoints(cartPoints) })}
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.currentBalance', 'Current balance')}</p>
                     <p className="mt-2 text-base font-semibold text-ink">
-                      {authUser ? formatAtharPoints(currentBalance) : 'Log in to track'}
+                      {authUser ? formatAtharPoints(currentBalance) : t('cart.loginToTrack', 'Log in to track')}
                     </p>
                   </div>
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">This cart earns</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.thisCartEarns', 'This cart earns')}</p>
                     <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(cartPoints)}</p>
                   </div>
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After purchase</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.afterPurchase', 'After purchase')}</p>
                     <p className="mt-2 text-base font-semibold text-ink">
-                      {authUser ? formatAtharPoints(projectedBalance) : 'Saved after login'}
+                      {authUser ? formatAtharPoints(projectedBalance) : t('cart.savedAfterLogin', 'Saved after login')}
                     </p>
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-ink-soft">
-                  Points are added after checkout is completed successfully.
+                  {t('cart.pointsAfterCheckout', 'Points are added after checkout is completed successfully.')}
                 </p>
               </div>
             ) : null}
@@ -75,10 +77,10 @@ const CartPage = ({ items, products = [], authUser = null, onUpdateQuantity, onR
 
           <div className="flex flex-wrap gap-3">
             <Link to="/products" className="button-secondary">
-              Continue shopping
+              {t('common.continueShopping', 'Continue shopping')}
             </Link>
             <Link to="/checkout" className="button-primary min-w-[18rem] justify-center text-xl">
-              Confirm the order
+              {t('cart.confirmOrder', 'Confirm the order')}
             </Link>
           </div>
         </div>

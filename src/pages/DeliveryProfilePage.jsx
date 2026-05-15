@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { PALESTINIAN_CITIES, getCityLabel, isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest } from '../utils/api';
@@ -12,6 +13,7 @@ const emptyForm = {
 };
 
 const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -50,7 +52,7 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
         }
       } catch (loadError) {
         if (!isCancelled) {
-          setError(loadError?.message ?? 'Unable to load delivery profile.');
+          setError(loadError?.message ?? t('delivery.loadProfileError', 'Unable to load delivery profile.'));
         }
       } finally {
         if (!isCancelled) {
@@ -64,12 +66,12 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
     return () => {
       isCancelled = true;
     };
-  }, [authLoading, authToken, authUser]);
+  }, [authLoading, authToken, authUser, t]);
 
   if (authLoading || isLoading) {
     return (
       <div className="section-shell py-12">
-        <div className="rounded-[28px] bg-white px-6 py-8 text-center shadow-card">Loading delivery profile...</div>
+        <div className="rounded-[28px] bg-white px-6 py-8 text-center shadow-card">{t('delivery.loadingProfile', 'Loading delivery profile...')}</div>
       </div>
     );
   }
@@ -99,12 +101,12 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
     }
 
     if (!form.name.trim() || !form.phone.trim()) {
-      setError('Full name and phone number are required.');
+      setError(t('delivery.namePhoneRequired', 'Full name and phone number are required.'));
       return;
     }
 
     if (!isKnownCityValue(form.deliveryCity)) {
-      setError('Please choose a valid Palestinian city.');
+      setError(t('checkout.cityRequired', 'Please choose a valid Palestinian city.'));
       return;
     }
 
@@ -130,7 +132,7 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
         phone: updatedProfile?.phone ?? '',
         deliveryCity: normalizeCityValue(updatedProfile?.deliveryCity ?? ''),
       });
-      setMessage(response?.message ?? 'Delivery profile updated successfully.');
+      setMessage(response?.message ?? t('delivery.profileUpdated', 'Delivery profile updated successfully.'));
 
       if (authUser.role === 'delivery' && updatedProfile) {
         onUpdateProfile?.({
@@ -142,7 +144,7 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
         });
       }
     } catch (saveError) {
-      setError(saveError?.message ?? 'Unable to save delivery profile.');
+      setError(saveError?.message ?? t('delivery.saveProfileError', 'Unable to save delivery profile.'));
     } finally {
       setIsSaving(false);
     }
@@ -153,11 +155,11 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
       <div className="section-shell max-w-5xl py-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">Delivery account</p>
-            <h1 className="mt-2 font-display text-5xl text-ink">Delivery Profile</h1>
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-muted">{t('delivery.account', 'Delivery account')}</p>
+            <h1 className="mt-2 font-display text-5xl text-ink">{t('delivery.profile', 'Delivery Profile')}</h1>
           </div>
           <Link to="/delivery-dashboard" className="button-secondary">
-            Back to dashboard
+            {t('delivery.backToDashboard', 'Back to dashboard')}
           </Link>
         </div>
 
@@ -167,21 +169,21 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
               <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/35 bg-white/10 font-display text-4xl">
                 {(profile?.name || 'D').charAt(0).toUpperCase()}
               </div>
-              <h2 className="mt-6 font-display text-4xl">{profile?.name || 'Delivery'}</h2>
+              <h2 className="mt-6 font-display text-4xl">{profile?.name || t('delivery.deliveryRole', 'Delivery')}</h2>
               <p className="mt-2 text-white/75">{profile?.email || 'delivery@athar.com'}</p>
               <div className="mt-6 space-y-3 text-sm">
                 <p>
-                  <span className="text-white/60">Role:</span> Delivery
+                  <span className="text-white/60">{t('delivery.roleLabel', 'Role:')}</span> {t('delivery.deliveryRole', 'Delivery')}
                 </p>
                 <p>
-                  <span className="text-white/60">Delivery city:</span>{' '}
-                  {profile?.deliveryCity ? getCityLabel(profile.deliveryCity) : 'Not set'}
+                  <span className="text-white/60">{t('delivery.deliveryCityLabel', 'Delivery city:')}</span>{' '}
+                  {profile?.deliveryCity ? getCityLabel(profile.deliveryCity) : t('delivery.notSet', 'Not set')}
                 </p>
                 <p>
-                  <span className="text-white/60">Created:</span> {formatDate(profile?.createdAt)}
+                  <span className="text-white/60">{t('delivery.createdLabel', 'Created:')}</span> {formatDate(profile?.createdAt)}
                 </p>
                 <p>
-                  <span className="text-white/60">Last updated:</span> {formatDate(profile?.updatedAt)}
+                  <span className="text-white/60">{t('delivery.lastUpdatedLabel', 'Last updated:')}</span> {formatDate(profile?.updatedAt)}
                 </p>
               </div>
             </aside>
@@ -200,7 +202,7 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
               ) : null}
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Full name</span>
+                <span className="text-sm font-semibold text-ink">{t('checkout.fullName', 'Full name')}</span>
                 <input
                   className="field bg-white"
                   value={form.name}
@@ -209,12 +211,12 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
               </label>
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Email</span>
+                <span className="text-sm font-semibold text-ink">{t('auth.email', 'Email')}</span>
                 <input className="field bg-cream text-ink-soft" value={profile?.email ?? ''} readOnly />
               </label>
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Phone number</span>
+                <span className="text-sm font-semibold text-ink">{t('checkout.phoneNumber', 'Phone number')}</span>
                 <input
                   className="field bg-white"
                   value={form.phone}
@@ -223,13 +225,13 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
               </label>
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Delivery city</span>
+                <span className="text-sm font-semibold text-ink">{t('delivery.deliveryCity', 'Delivery city')}</span>
                 <select
                   className="field bg-white"
                   value={form.deliveryCity}
                   onChange={(event) => updateField('deliveryCity', event.target.value)}
                 >
-                  <option value="">Select delivery city</option>
+                  <option value="">{t('delivery.selectDeliveryCity', 'Select delivery city')}</option>
                   {PALESTINIAN_CITIES.map((city) => (
                     <option key={city.value} value={city.value}>
                       {city.label}
@@ -239,14 +241,14 @@ const DeliveryProfilePage = ({ authToken, authUser, authLoading, onUpdateProfile
               </label>
 
               <div className="rounded-[24px] border border-line bg-cream px-5 py-4">
-                <p className="text-sm font-semibold text-ink">Password</p>
+                <p className="text-sm font-semibold text-ink">{t('auth.password', 'Password')}</p>
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
-                  Passwords are never shown here. This project does not currently expose a safe password-change endpoint for delivery accounts.
+                  {t('delivery.passwordNote', 'Passwords are never shown here. This project does not currently expose a safe password-change endpoint for delivery accounts.')}
                 </p>
               </div>
 
               <button type="submit" disabled={isSaving} className="button-primary w-full disabled:opacity-60">
-                {isSaving ? 'Saving...' : 'Save delivery profile'}
+                {isSaving ? t('common.saving', 'Saving...') : t('delivery.saveProfile', 'Save delivery profile')}
               </button>
             </form>
           </div>

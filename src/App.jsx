@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { products as mockProducts } from './data/products';
 import AITryOnModal from './components/AITryOnModal';
@@ -35,6 +36,7 @@ import { getProductFavoriteReference, isProductFavorite, mergeCatalogProducts, n
 const fallbackProducts = normalizeProducts(mockProducts);
 
 const App = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [products, setProducts] = useState(fallbackProducts);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -58,7 +60,7 @@ const App = () => {
       setProducts(remoteProducts);
     } catch (error) {
       setProducts(fallbackProducts);
-      setProductsError(error.message || 'Unable to refresh the Athar collection right now.');
+      setProductsError(error.message || t('errors.refreshCollection', 'Unable to refresh the Athar collection right now.'));
     } finally {
       setProductsLoading(false);
     }
@@ -81,7 +83,7 @@ const App = () => {
       } catch (error) {
         if (!isCancelled) {
           setProducts(fallbackProducts);
-          setProductsError(error.message || 'Unable to refresh the Athar collection right now.');
+          setProductsError(error.message || t('errors.refreshCollection', 'Unable to refresh the Athar collection right now.'));
         }
       } finally {
         if (!isCancelled) {
@@ -170,7 +172,7 @@ const App = () => {
     const activeToken = getActiveAuthToken(authToken);
 
     if (!activeToken || !authUser) {
-      setCartAuthMessage('Please log in to add items to your cart.');
+      setCartAuthMessage(t('auth.pleaseLoginCart', 'Please log in to add items to your cart.'));
       navigate('/login');
       return false;
     }
@@ -386,7 +388,7 @@ const App = () => {
     <Toast
       open={Boolean(cartAuthMessage)}
       variant="error"
-      title="Login required"
+      title={t('nav.loginRequired', 'Login required')}
       message={cartAuthMessage}
       onClose={() => setCartAuthMessage('')}
     />

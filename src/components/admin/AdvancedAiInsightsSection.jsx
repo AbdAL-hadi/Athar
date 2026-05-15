@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../utils/api';
 
@@ -222,10 +223,11 @@ export const useAdvancedAiInsightsData = (authToken, range) => {
 };
 
 export const DemandForecastPanel = ({ advancedAi }) => {
+  const { t } = useTranslation();
   const { insights, isLoading } = advancedAi;
 
   return (
-    <Panel title="Demand Forecast" description="Near-term product demand by city, projected need, local stock, and shortage risk.">
+    <Panel title={t('admin.productDemand', 'Product Demand')} description="Near-term product demand by city, projected need, local stock, and shortage risk.">
       {isLoading ? (
         <EmptyState>Calculating forecast...</EmptyState>
       ) : insights.demandForecast.length > 0 ? (
@@ -265,6 +267,7 @@ export const DemandForecastPanel = ({ advancedAi }) => {
 };
 
 export const MarketingIntelligencePipeline = ({ advancedAi }) => {
+  const { t } = useTranslation();
   const {
     insights,
     errors,
@@ -292,7 +295,7 @@ export const MarketingIntelligencePipeline = ({ advancedAi }) => {
       ) : null}
 
       <div className="grid gap-3 text-sm font-bold text-ink-soft md:grid-cols-3">
-        {['Detected Opportunities', 'AI Marketing Plan', 'Campaign Suggestions'].map((step, index) => (
+        {[t('admin.detectedOpportunities', 'Detected Opportunities'), t('admin.aiMarketingPlan', 'AI Marketing Plan'), 'Campaign Suggestions'].map((step, index) => (
           <div key={step} className="rounded-[18px] border border-line bg-[#fffaf8] px-4 py-3">
             <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink text-xs text-white">{index + 1}</span>
             {step}
@@ -300,7 +303,7 @@ export const MarketingIntelligencePipeline = ({ advancedAi }) => {
         ))}
       </div>
 
-      <Panel title="Detected Opportunities" description="Rule-based opportunities from conversion, search gaps, city trends, stock position, and customer behavior.">
+      <Panel title={t('admin.detectedOpportunities', 'Detected Opportunities')} description="Rule-based opportunities from conversion, search gaps, city trends, stock position, and customer behavior.">
         {isLoading ? (
           <EmptyState>Detecting marketing opportunities...</EmptyState>
         ) : opportunities.length > 0 ? (
@@ -345,7 +348,7 @@ export const MarketingIntelligencePipeline = ({ advancedAi }) => {
       </Panel>
 
       <Panel
-        title="AI Marketing Plan"
+        title={t('admin.aiMarketingPlan', 'AI Marketing Plan')}
         description="Generated on demand from detected opportunities. It explains and prioritizes what to campaign on next."
         actions={
           <div className="flex flex-wrap gap-2">
@@ -425,6 +428,7 @@ export const MarketingIntelligencePipeline = ({ advancedAi }) => {
 };
 
 export const AiInsightsWorkspace = ({ advancedAi }) => {
+  const { t } = useTranslation();
   const {
     insights,
     errors,
@@ -485,9 +489,9 @@ export const AiInsightsWorkspace = ({ advancedAi }) => {
       </Panel>
 
       <details className="rounded-[24px] border border-line bg-white p-5">
-        <summary className="cursor-pointer font-display text-3xl text-ink">Advanced AI Details</summary>
+        <summary className="cursor-pointer font-display text-3xl text-ink">{t('admin.advancedAiDetails', 'Advanced AI Details')}</summary>
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
-          <Panel title="Product Content Audit" description="Rule-based product content score. No product content is changed automatically.">
+          <Panel title={t('admin.productContentAudit', 'Product Content Audit')} description="Rule-based product content score. No product content is changed automatically.">
             {isLoading ? (
               <EmptyState>Calculating content audit...</EmptyState>
             ) : insights.productContentAudit.length > 0 ? (
@@ -523,46 +527,6 @@ export const AiInsightsWorkspace = ({ advancedAi }) => {
             )}
           </Panel>
 
-          <Panel title="Risk Alerts" description="Rule-based operational risks from stock, demand, search, and AI tool health.">
-            {isLoading ? (
-              <EmptyState>Calculating risk alerts...</EmptyState>
-            ) : insights.riskAlerts.length > 0 ? (
-              <div className="max-h-[420px] space-y-3 overflow-auto pr-1">
-                {insights.riskAlerts.map((alert, index) => (
-                  <article key={`${alert.alertType}-${index}`} className="rounded-[20px] border border-line bg-[#fffaf8] px-4 py-4 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <h4 className="font-bold text-ink">{alert.title}</h4>
-                      <Badge>{alert.severity}</Badge>
-                    </div>
-                    <p className="mt-2 leading-6 text-ink-soft">{alert.description}</p>
-                    <p className="mt-2 font-semibold text-ink">{alert.recommendedAction}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState>No risk alerts detected for this range.</EmptyState>
-            )}
-          </Panel>
-
-          <Panel title="City Personalization Ideas" description="Rule-based city collection ideas from aggregate city behavior.">
-            {isLoading ? (
-              <EmptyState>Calculating city ideas...</EmptyState>
-            ) : insights.cityPersonalization.length > 0 ? (
-              <div className="space-y-3">
-                {insights.cityPersonalization.slice(0, 8).map((item) => (
-                  <article key={item.city} className="rounded-[20px] bg-[#fffaf8] px-4 py-4 text-sm">
-                    <h4 className="font-bold text-ink">{item.suggestedCollectionTitle}</h4>
-                    <p className="mt-1 text-ink-soft">{item.suggestedCopy}</p>
-                    <p className="mt-2 text-ink-soft">Top category: {item.topCategory || '-'}</p>
-                    <p className="text-ink-soft">Top product: {item.topProduct || '-'}</p>
-                    <p className="font-semibold text-ink">CTA: {item.suggestedCTA}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState>No city personalization ideas yet.</EmptyState>
-            )}
-          </Panel>
         </div>
       </details>
     </div>

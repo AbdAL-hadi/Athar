@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const slides = [
@@ -9,6 +10,7 @@ const slides = [
 ];
 
 const AboutPage = () => {
+  const { t } = useTranslation();
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
@@ -24,8 +26,8 @@ const AboutPage = () => {
       <div className="section-shell pb-12 pt-12">
         {/* Page Header */}
         <div className="mb-12 text-center">
-          <h1 className="font-display text-6xl font-bold text-ink mb-3">About Athar</h1>
-          <p className="text-2xl text-rose font-semibold">Palestinian Heritage & Modern Design</p>
+          <h1 className="font-display text-6xl font-bold text-ink mb-3">{t('about.title', 'About Athar')}</h1>
+          <p className="text-2xl text-rose font-semibold">{t('about.subtitle', 'Palestinian Heritage & Modern Design')}</p>
         </div>
 
         {/* Main Carousel Section */}
@@ -51,7 +53,7 @@ const AboutPage = () => {
                   className={`h-3 rounded-full transition ${
                     activeSlide === index ? 'bg-rose w-8' : 'bg-white/60 w-3 hover:bg-white'
                   }`}
-                  aria-label={`Go to slide ${index + 1}`}
+                  aria-label={t('about.goToSlide', 'Go to slide {{number}}', { number: index + 1 })}
                 />
               ))}
             </div>
@@ -61,26 +63,26 @@ const AboutPage = () => {
         {/* Story Paragraphs */}
         <div className="mx-auto max-w-4xl space-y-10">
           <section>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">Our Heritage</p>
-            <h2 className="mt-3 font-display text-4xl font-bold text-ink">Rooted in Palestinian craft</h2>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">{t('about.heritageEyebrow', 'Our Heritage')}</p>
+            <h2 className="mt-3 font-display text-4xl font-bold text-ink">{t('about.heritageTitle', 'Rooted in Palestinian craft')}</h2>
             <p className="mt-5 text-lg font-medium leading-9 text-ink-soft">
-              Athar is a brand inspired by the spirit of Palestine, blending copper, known for its positive symbolism, with Palestinian embroidery that tells the story of each region through its unique patterns.
+              {t('about.heritageDescription', 'Athar is a brand inspired by the spirit of Palestine, blending copper, known for its positive symbolism, with Palestinian embroidery that tells the story of each region through its unique patterns.')}
             </p>
           </section>
 
           <section>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">Our Mission</p>
-            <h2 className="mt-3 font-display text-4xl font-bold text-ink">Heritage shaped for today</h2>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">{t('about.missionEyebrow', 'Our Mission')}</p>
+            <h2 className="mt-3 font-display text-4xl font-bold text-ink">{t('about.missionTitle', 'Heritage shaped for today')}</h2>
             <p className="mt-5 text-lg font-medium leading-9 text-ink-soft">
-              At Athar, we strive to highlight the beauty of Palestinian identity through heritage-inspired accessories that blend the symbolism of copper with the authenticity of Palestinian embroidery in modern designs.
+              {t('about.missionDescription', 'At Athar, we strive to highlight the beauty of Palestinian identity through heritage-inspired accessories that blend the symbolism of copper with the authenticity of Palestinian embroidery in modern designs.')}
             </p>
           </section>
 
           <section>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">Why Choose Us</p>
-            <h2 className="mt-3 font-display text-4xl font-bold text-ink">Accessories with meaning</h2>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose">{t('about.whyEyebrow', 'Why Choose Us')}</p>
+            <h2 className="mt-3 font-display text-4xl font-bold text-ink">{t('about.whyTitle', 'Accessories with meaning')}</h2>
             <p className="mt-5 text-lg font-medium leading-9 text-ink-soft">
-              Customers choose Athar&apos;s products because they offer more than just an accessory; they express identity, carry cultural value, and are presented in modern designs that combine elegance with authenticity.
+              {t('about.whyDescription', "Customers choose Athar's products because they offer more than just an accessory; they express identity, carry cultural value, and are presented in modern designs that combine elegance with authenticity.")}
             </p>
           </section>
         </div>
@@ -91,7 +93,7 @@ const AboutPage = () => {
             to="/products" 
             className="inline-flex min-w-[18rem] items-center justify-center rounded-full bg-rose px-10 py-4 text-base font-bold text-white transition hover:bg-rose/90 hover:shadow-lg"
           >
-            Start Shopping Now
+            {t('about.startShopping', 'Start Shopping Now')}
           </Link>
         </div>
       </div>

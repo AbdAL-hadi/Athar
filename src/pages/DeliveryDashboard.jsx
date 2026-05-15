@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import PriceText from '../components/PriceText';
 import SectionTitle from '../components/SectionTitle';
@@ -22,16 +23,16 @@ const LogoutIcon = () => (
   </svg>
 );
 
-const getOrderIdentifier = (order) => order?.orderNumber ?? order?._id?.slice(-8)?.toUpperCase?.() ?? 'Pending';
+const getOrderIdentifier = (order, fallback = 'Pending') => order?.orderNumber ?? order?._id?.slice(-8)?.toUpperCase?.() ?? fallback;
 const getOrderCity = (order) => order?.shippingAddress?.city ?? order?.address?.city ?? order?.city ?? '';
-const getCustomerName = (order) => order?.address?.fullName || order?.user?.name || 'Not provided';
-const getCustomerPhone = (order) => order?.phone || order?.user?.phone || 'Not provided';
-const getOrderAddressLine = (order) => {
+const getCustomerName = (order, fallback = 'Not provided') => order?.address?.fullName || order?.user?.name || fallback;
+const getCustomerPhone = (order, fallback = 'Not provided') => order?.phone || order?.user?.phone || fallback;
+const getOrderAddressLine = (order, fallback = 'Not provided') => {
   const address = order?.address ?? order?.shippingAddress ?? {};
-  return [address.line1, getCityLabel(address.city), address.postalCode, address.country].filter(Boolean).join(', ') || 'Not provided';
+  return [address.line1, getCityLabel(address.city), address.postalCode, address.country].filter(Boolean).join(', ') || fallback;
 };
 
-const OrderActionButtons = ({ order, isProcessing, onMarkShipped, onMarkDelivered }) => {
+const OrderActionButtons = ({ order, isProcessing, onMarkShipped, onMarkDelivered, t }) => {
   if (['Pending', 'Confirmed'].includes(order.status)) {
     return (
       <button
@@ -40,7 +41,7 @@ const OrderActionButtons = ({ order, isProcessing, onMarkShipped, onMarkDelivere
         disabled={isProcessing}
         className="rounded-full bg-[#54715f] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#465f50] disabled:opacity-60"
       >
-        {isProcessing ? 'Processing...' : 'Mark as Shipped'}
+        {isProcessing ? t('delivery.processing', 'Processing...') : t('delivery.markAsShipped', 'Mark as Shipped')}
       </button>
     );
   }
@@ -53,19 +54,19 @@ const OrderActionButtons = ({ order, isProcessing, onMarkShipped, onMarkDelivere
         disabled={isProcessing}
         className="rounded-full bg-green-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
       >
-        {isProcessing ? 'Processing...' : 'Mark as Delivered'}
+        {isProcessing ? t('delivery.processing', 'Processing...') : t('delivery.markAsDelivered', 'Mark as Delivered')}
       </button>
     );
   }
 
   if (order.status === 'Delivered') {
-    return <span className="rounded-full bg-green-50 px-5 py-3 text-sm font-bold text-green-800">Delivered</span>;
+    return <span className="rounded-full bg-green-50 px-5 py-3 text-sm font-bold text-green-800">{t('orders.status.delivered', 'Delivered')}</span>;
   }
 
   return null;
 };
 
-const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShipped, onMarkDelivered }) => {
+const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShipped, onMarkDelivered, t }) => {
   const orderTotal = getOrderTotal(order);
   const rewardTitle = getOrderRewardTitle(order);
   const discountAmount = getOrderDiscountAmount(order);
@@ -79,13 +80,15 @@ const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShip
         className="flex w-full flex-col gap-4 px-6 py-5 text-left transition hover:bg-cream/70 lg:flex-row lg:items-center lg:justify-between"
       >
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Order #{getOrderIdentifier(order)}</p>
-          <h3 className="font-display text-3xl text-ink">{getCustomerName(order)}</h3>
-          <p className="text-sm text-ink-soft">{cityLabel || 'City not provided'} · {formatDate(order.createdAt)}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">
+            {t('delivery.orderNumber', 'Order #{{id}}', { id: getOrderIdentifier(order, t('orders.status.pending', 'Pending')) })}
+          </p>
+          <h3 className="font-display text-3xl text-ink">{getCustomerName(order, t('delivery.notProvided', 'Not provided'))}</h3>
+          <p className="text-sm text-ink-soft">{cityLabel || t('delivery.cityNotProvided', 'City not provided')} / {formatDate(order.createdAt)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className={`rounded-full px-4 py-2 text-sm font-bold ${statusStyles[order.status] || 'bg-stone-100 text-stone-800'}`}>
-            {order.status}
+            {t(`orders.status.${String(order.status || '').toLowerCase()}`, order.status)}
           </span>
           <PriceText value={orderTotal} className="text-3xl" />
         </div>
@@ -95,21 +98,21 @@ const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShip
         <div className="space-y-4 border-t border-line bg-cream px-6 py-6">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-[22px] bg-white px-5 py-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Customer</p>
-              <p className="mt-2 font-semibold text-ink">{getCustomerName(order)}</p>
-              <p className="mt-1 text-sm text-ink-soft">{order.user?.email || 'Not registered'}</p>
-              <p className="mt-1 text-sm text-ink-soft">{getCustomerPhone(order)}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">{t('delivery.customer', 'Customer')}</p>
+              <p className="mt-2 font-semibold text-ink">{getCustomerName(order, t('delivery.notProvided', 'Not provided'))}</p>
+              <p className="mt-1 text-sm text-ink-soft">{order.user?.email || t('delivery.notRegistered', 'Not registered')}</p>
+              <p className="mt-1 text-sm text-ink-soft">{getCustomerPhone(order, t('delivery.notProvided', 'Not provided'))}</p>
             </div>
 
             <div className="rounded-[22px] bg-white px-5 py-4 lg:col-span-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Shipping address</p>
-              <p className="mt-2 font-semibold text-ink">{getOrderAddressLine(order)}</p>
-              <p className="mt-1 text-sm text-ink-soft">City: {cityLabel || 'Not provided'}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">{t('delivery.shippingAddress', 'Shipping address')}</p>
+              <p className="mt-2 font-semibold text-ink">{getOrderAddressLine(order, t('delivery.notProvided', 'Not provided'))}</p>
+              <p className="mt-1 text-sm text-ink-soft">{t('delivery.cityLabel', 'City:')} {cityLabel || t('delivery.notProvided', 'Not provided')}</p>
             </div>
           </div>
 
           <div className="rounded-[22px] bg-white px-5 py-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Items</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">{t('delivery.items', 'Items')}</p>
             <div className="mt-3 space-y-2">
               {order.items?.map((item, index) => (
                 <div key={`${item.title}-${index}`} className="flex flex-wrap justify-between gap-3 text-sm text-ink">
@@ -120,12 +123,12 @@ const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShip
             </div>
             {discountAmount > 0 ? (
               <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm text-[#54715f]">
-                <span>{rewardTitle || 'Reward applied'}</span>
+                <span>{rewardTitle || t('checkout.rewardUsed', 'Reward applied')}</span>
                 <span>-{formatCurrency(discountAmount)}</span>
               </div>
             ) : null}
             <div className="mt-3 flex justify-between border-t border-line pt-3 font-bold text-ink">
-              <span>Total</span>
+              <span>{t('checkout.total', 'Total')}</span>
               <PriceText value={orderTotal} className="text-2xl" />
             </div>
           </div>
@@ -142,6 +145,7 @@ const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShip
               isProcessing={isProcessing}
               onMarkShipped={onMarkShipped}
               onMarkDelivered={onMarkDelivered}
+              t={t}
             />
           </div>
         </div>
@@ -151,6 +155,7 @@ const DeliveryOrderCard = ({ order, expanded, isProcessing, onToggle, onMarkShip
 };
 
 const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all');
   const [allOrders, setAllOrders] = useState([]);
@@ -186,11 +191,11 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
       setCityOrders(cityOrdersResponse?.data ?? []);
       setRequiresDeliveryCity(Boolean(cityOrdersResponse?.requiresDeliveryCity));
     } catch (loadError) {
-      setError(loadError?.message ?? 'Failed to load delivery orders.');
+      setError(loadError?.message ?? t('delivery.loadOrdersError', 'Failed to load delivery orders.'));
     } finally {
       setIsLoading(false);
     }
-  }, [activeToken]);
+  }, [activeToken, t]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -217,7 +222,7 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
     return (
       <div className="min-h-screen bg-cream">
         <div className="section-shell py-12">
-          <div className="rounded-[28px] bg-white px-6 py-8 text-center shadow-card">Loading delivery dashboard...</div>
+          <div className="rounded-[28px] bg-white px-6 py-8 text-center shadow-card">{t('delivery.loadingDashboard', 'Loading delivery dashboard...')}</div>
         </div>
       </div>
     );
@@ -245,10 +250,10 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
         token: activeToken,
       });
 
-      showToast(response?.message ?? 'Order marked as shipped.');
+      showToast(response?.message ?? t('delivery.orderMarkedShipped', 'Order marked as shipped.'));
       await loadDeliveryData();
     } catch (actionError) {
-      showToast(actionError?.message ?? 'Unable to mark this order as shipped.', 'error');
+      showToast(actionError?.message ?? t('delivery.markShippedError', 'Unable to mark this order as shipped.'), 'error');
     } finally {
       setProcessingOrderId('');
     }
@@ -264,10 +269,10 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
         token: activeToken,
       });
 
-      showToast(response?.message ?? 'Order marked as delivered.');
+      showToast(response?.message ?? t('delivery.orderMarkedDelivered', 'Order marked as delivered.'));
       await loadDeliveryData();
     } catch (actionError) {
-      showToast(actionError?.message ?? 'Unable to mark this order as delivered.', 'error');
+      showToast(actionError?.message ?? t('delivery.markDeliveredError', 'Unable to mark this order as delivered.'), 'error');
     } finally {
       setProcessingOrderId('');
     }
@@ -278,22 +283,22 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
       <header className="border-b border-line bg-white">
         <div className="section-shell flex flex-col gap-5 py-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted">Athar delivery</p>
-            <h1 className="mt-2 font-display text-5xl text-ink">Delivery Dashboard</h1>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted">{t('delivery.atharDelivery', 'Athar delivery')}</p>
+            <h1 className="mt-2 font-display text-5xl text-ink">{t('delivery.dashboard', 'Delivery Dashboard')}</h1>
             <p className="mt-2 text-sm text-ink-soft">
-              Your delivery city: {deliveryCityLabel || 'Not set'}
+              {t('delivery.yourDeliveryCity', 'Your delivery city:')} {deliveryCityLabel || t('delivery.notSet', 'Not set')}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/delivery/profile" className="button-secondary">
-              Delivery Profile
+              {t('delivery.profile', 'Delivery Profile')}
             </Link>
             <button
               onClick={onLogout}
               className="flex items-center gap-2 rounded-full bg-blush px-6 py-3 font-semibold text-ink transition hover:bg-rose/20"
             >
               <LogoutIcon />
-              Logout
+              {t('nav.signOut', 'Logout')}
             </button>
           </div>
         </div>
@@ -301,8 +306,8 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
 
       <main className="section-shell space-y-8 py-8">
         <SectionTitle
-          title="Delivery Orders"
-          description="Move confirmed orders to shipped, then complete them when they reach the customer."
+          title={t('delivery.ordersTitle', 'Delivery Orders')}
+          description={t('delivery.ordersDescription', 'Move confirmed orders to shipped, then complete them when they reach the customer.')}
         />
 
         {error ? (
@@ -318,37 +323,39 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
               onClick={() => setActiveTab('all')}
               className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${activeTab === 'all' ? 'bg-white text-ink shadow-card' : 'text-ink-soft'}`}
             >
-              All Orders ({allOrders.length})
+              {t('delivery.allOrders', 'All Orders')} ({allOrders.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('city')}
               className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${activeTab === 'city' ? 'bg-white text-ink shadow-card' : 'text-ink-soft'}`}
             >
-              My City Orders ({cityOrderCount})
+              {t('delivery.myCityOrders', 'My City Orders')} ({cityOrderCount})
             </button>
           </div>
           <p className="text-sm text-ink-soft">
-            {deliveryCityLabel ? `Filtering city orders by ${deliveryCityLabel}.` : 'Set your delivery city to unlock city-specific filtering.'}
+            {deliveryCityLabel
+              ? t('delivery.filteringCityOrders', 'Filtering city orders by {{city}}.', { city: deliveryCityLabel })
+              : t('delivery.setCityFiltering', 'Set your delivery city to unlock city-specific filtering.')}
           </p>
         </div>
 
         {activeTab === 'city' && requiresDeliveryCity ? (
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-            <h3 className="font-display text-4xl text-ink">Set your delivery city</h3>
+            <h3 className="font-display text-4xl text-ink">{t('delivery.setYourDeliveryCity', 'Set your delivery city')}</h3>
             <p className="mx-auto mt-3 max-w-2xl text-ink-soft">
-              Please set your delivery city in your profile to view city-specific orders.
+              {t('delivery.setCityDescription', 'Please set your delivery city in your profile to view city-specific orders.')}
             </p>
             <Link to="/delivery/profile" className="button-primary mt-6 inline-flex">
-              Open Delivery Profile
+              {t('delivery.openProfile', 'Open Delivery Profile')}
             </Link>
           </div>
         ) : visibleOrders.length === 0 ? (
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
             <h3 className="font-display text-4xl text-ink">
-              {activeTab === 'city' ? 'No orders in your city right now.' : 'No delivery orders right now.'}
+              {activeTab === 'city' ? t('delivery.noCityOrders', 'No orders in your city right now.') : t('delivery.noOrders', 'No delivery orders right now.')}
             </h3>
-            <p className="mt-2 text-ink-soft">New delivery tasks will appear here as orders move through the workflow.</p>
+            <p className="mt-2 text-ink-soft">{t('delivery.noOrdersDescription', 'New delivery tasks will appear here as orders move through the workflow.')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -361,6 +368,7 @@ const DeliveryDashboard = ({ authToken, authUser, authLoading, onLogout }) => {
                 onToggle={() => setExpandedOrderId((current) => (current === order._id ? '' : order._id))}
                 onMarkShipped={handleMarkShipped}
                 onMarkDelivered={handleMarkDelivered}
+                t={t}
               />
             ))}
           </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { resolveApiAssetUrl } from '../../utils/api';
 
@@ -313,6 +314,7 @@ const LoadingState = () => (
 );
 
 const AtharAiRecommendationsSection = ({ analytics, dashboardSnapshot, isLoading, onRefresh }) => {
+  const { t } = useTranslation();
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastRefreshedAt, setLastRefreshedAt] = useState(() => new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -340,7 +342,7 @@ const AtharAiRecommendationsSection = ({ analytics, dashboardSnapshot, isLoading
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Rule-based insights</p>
-          <h2 className="mt-2 font-display text-4xl text-ink">Athar AI Recommendations</h2>
+          <h2 className="mt-2 font-display text-4xl text-ink">{t('admin.aiInventoryRecommendations', 'AI Inventory Recommendations')}</h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-soft">
             Practical admin recommendations from behavior tracking, orders, product performance, and inventory data. No external AI API is called from the frontend.
           </p>

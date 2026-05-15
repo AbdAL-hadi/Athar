@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavigation from './admin/AdminNavigation';
+import LanguageSwitcher from './LanguageSwitcher';
 import { resolveApiAssetUrl } from '../utils/api';
 
 const primaryLinks = [
-  { to: '/products', label: 'Shop' },
-  { to: '/heritage-map', label: 'Heritage Map' },
-  { to: '/visual-match', label: 'Visual Match' },
-  { to: '/order-tracking', label: 'Track Order' },
-  { to: '/about', label: 'About Us' },
+  { to: '/products', labelKey: 'nav.shop', fallback: 'Shop' },
+  { to: '/heritage-map', labelKey: 'nav.heritageMap', fallback: 'Heritage Map' },
+  { to: '/visual-match', labelKey: 'nav.visualMatch', fallback: 'Visual Match' },
+  { to: '/order-tracking', labelKey: 'nav.trackOrder', fallback: 'Track Order' },
+  { to: '/about', labelKey: 'nav.aboutUs', fallback: 'About Us' },
 ];
 
 const quickLinks = [
-  { to: '/search', label: 'Search', icon: 'search' },
-  { to: '/favorites', label: 'Favorites', icon: 'heart' },
-  { to: '/cart', label: 'Cart', icon: 'bag' },
+  { to: '/search', labelKey: 'nav.search', fallback: 'Search', icon: 'search' },
+  { to: '/favorites', labelKey: 'nav.favorites', fallback: 'Favorites', icon: 'heart' },
+  { to: '/cart', labelKey: 'nav.cart', fallback: 'Cart', icon: 'bag' },
 ];
 
 const primaryNavLinkClass = ({ isActive }) =>
@@ -168,6 +170,7 @@ const QuickActionLink = ({ to, label, icon, badge = 0, onClick, className = '' }
 );
 
 const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -177,7 +180,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
   const logo = resolveApiAssetUrl('products/athar.jpg');
   const homeTarget = authUser?.role === 'admin' ? '/admin/dashboard' : '/';
   const isAdmin = authUser?.role === 'admin';
-  const firstName = authUser?.name?.split(' ')[0] || 'Account';
+  const firstName = authUser?.name?.split(' ')[0] || t('nav.account', 'Account');
 
   const closeAllMenus = () => {
     setDropdownOpen(false);
@@ -271,8 +274,8 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
           } ${dropdownOpen && !isScrolled ? 'overflow-visible' : 'overflow-hidden'}`}
         >
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#5f6547]">Palestinian Craft House</p>
-            <p className="mt-1 max-w-xs text-sm text-ink-soft">Heritage-inspired pieces, thoughtful gifting, and signature copper details.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#5f6547]">{t('nav.craftHouse', 'Palestinian Craft House')}</p>
+            <p className="mt-1 max-w-xs text-sm text-ink-soft">{t('nav.tagline', 'Heritage-inspired pieces, thoughtful gifting, and signature copper details.')}</p>
           </div>
 
           <Link to={homeTarget} className="justify-self-center text-center">
@@ -285,20 +288,21 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
               />
             </div>
             <p className="mt-3 font-display text-4xl leading-none text-ink">Athar</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.4em] text-[#5f6547]">Copper & Embroidery</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.4em] text-[#5f6547]">{t('nav.brandLine', 'Copper & Embroidery')}</p>
           </Link>
 
           <div className="flex items-center justify-end gap-3">
+            <LanguageSwitcher className="hidden xl:inline-flex" />
             {!isAdmin ? (
               <>
                 <div className="hidden xl:inline-flex items-center rounded-full border border-line bg-[#fbf8f5] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#5f6547]">
-                  Made in Palestine
+                  {t('nav.madeInPalestine', 'Made in Palestine')}
                 </div>
                 {quickLinks.map((link) => (
                   <QuickActionLink
                     key={link.to}
                     to={link.to}
-                    label={link.label}
+                    label={t(link.labelKey, link.fallback)}
                     icon={link.icon}
                     badge={link.icon === 'bag' ? cartCount : 0}
                   />
@@ -308,7 +312,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
 
             {authLoading ? (
               <div className="rounded-full border border-line bg-[#fbf8f5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
-                Checking...
+                {t('common.checking', 'Checking...')}
               </div>
             ) : authUser ? (
               <div className="relative shrink-0" ref={dropdownRef}>
@@ -334,8 +338,8 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                       </div>
                     </div>
 
-                    <MenuAction icon={<ProfileIcon />} label="Profile" onClick={handleProfileClick} />
-                    <MenuAction icon={<LogoutIcon />} label="Sign Out" onClick={handleLogoutClick} tone="danger" rounded="rounded-b-[26px]" />
+                    <MenuAction icon={<ProfileIcon />} label={t('nav.profile', 'Profile')} onClick={handleProfileClick} />
+                    <MenuAction icon={<LogoutIcon />} label={t('nav.signOut', 'Sign Out')} onClick={handleLogoutClick} tone="danger" rounded="rounded-b-[26px]" />
                   </div>
                 ) : null}
               </div>
@@ -351,7 +355,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7ede6] text-ink">
                     <AccountIcon />
                   </span>
-                  <span className="text-sm font-semibold text-ink">Account</span>
+                  <span className="text-sm font-semibold text-ink">{t('nav.account', 'Account')}</span>
                   <ChevronDownIcon open={dropdownOpen} />
                 </button>
 
@@ -362,13 +366,13 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                         <AccountIcon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-ink">Welcome to Athar</p>
-                        <p className="text-xs text-ink-soft">Log in or create an account to save favorites and track orders.</p>
+                        <p className="text-sm font-semibold text-ink">{t('nav.welcome', 'Welcome to Athar')}</p>
+                        <p className="text-xs text-ink-soft">{t('nav.guestHelper', 'Log in or create an account to save favorites and track orders.')}</p>
                       </div>
                     </div>
 
-                    <MenuAction icon={<LoginIcon />} label="Log In" onClick={handleLoginClick} />
-                    <MenuAction icon={<RegisterIcon />} label="Create Account" onClick={handleRegisterClick} rounded="rounded-b-[26px]" />
+                    <MenuAction icon={<LoginIcon />} label={t('nav.logIn', 'Log In')} onClick={handleLoginClick} />
+                    <MenuAction icon={<RegisterIcon />} label={t('nav.createAccount', 'Create Account')} onClick={handleRegisterClick} rounded="rounded-b-[26px]" />
                   </div>
                 ) : null}
               </div>
@@ -388,7 +392,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                   <NavLink key={link.to} to={link.to} className={primaryNavLinkClass}>
                     {({ isActive }) => (
                       <>
-                        <span>{link.label}</span>
+                        <span>{t(link.labelKey, link.fallback)}</span>
                         {isActive ? <span className={`absolute left-1/2 h-[2px] w-8 -translate-x-1/2 rounded-full bg-[#52603e] ${isScrolled ? '-bottom-3' : '-bottom-4'}`} /> : null}
                       </>
                     )}
@@ -408,7 +412,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:bg-[#faf5f0]"
             aria-expanded={mobileMenuOpen}
             aria-controls="athar-mobile-menu"
-            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-label={mobileMenuOpen ? t('nav.closeMenu', 'Close navigation menu') : t('nav.openMenu', 'Open navigation menu')}
           >
             {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
           </button>
@@ -424,13 +428,13 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
             </div>
             <div className="min-w-0">
               <p className="font-display text-3xl leading-none text-ink">Athar</p>
-              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.28em] text-[#5f6547]">Copper & Embroidery</p>
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.28em] text-[#5f6547]">{t('nav.brandLine', 'Copper & Embroidery')}</p>
             </div>
           </Link>
 
           <QuickActionLink
             to="/cart"
-            label="Cart"
+            label={t('nav.cart', 'Cart')}
             icon="bag"
             badge={cartCount}
             className="h-11 w-11 shrink-0"
@@ -443,12 +447,15 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
             <div className="section-shell space-y-4">
               {!isAdmin ? (
                 <>
+                  <div className="flex justify-end">
+                    <LanguageSwitcher />
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     {quickLinks.map((link) => (
                       <QuickActionLink
                         key={link.to}
                         to={link.to}
-                        label={link.label}
+                        label={t(link.labelKey, link.fallback)}
                         icon={link.icon}
                         badge={link.icon === 'bag' ? cartCount : 0}
                         className="h-12 w-full rounded-[20px]"
@@ -461,7 +468,7 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                     <nav className="space-y-1" aria-label="Mobile navigation">
                       {primaryLinks.map((link) => (
                         <NavLink key={link.to} to={link.to} className={mobileNavLinkClass} onClick={closeAllMenus}>
-                          <span>{link.label}</span>
+                          <span>{t(link.labelKey, link.fallback)}</span>
                           <span className="text-base leading-none text-[#8f5f45]">+</span>
                         </NavLink>
                       ))}
@@ -471,12 +478,15 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
               ) : (
                 <div className="rounded-[28px] border border-line bg-[#fcf8f5] px-4 py-5">
                   <AdminNavigation className="justify-center" />
+                  <div className="mt-4 flex justify-center">
+                    <LanguageSwitcher />
+                  </div>
                 </div>
               )}
 
               {authLoading ? (
                 <div className="rounded-[28px] border border-line bg-[#fcf8f5] px-4 py-5 text-center text-sm font-semibold text-ink-soft">
-                  Checking your account...
+                  {t('nav.checkingAccount', 'Checking your account...')}
                 </div>
               ) : authUser ? (
                 <div className="rounded-[28px] border border-line bg-[#fcf8f5] px-4 py-5">
@@ -489,27 +499,27 @@ const Navbar = ({ cartCount = 0, authUser, authLoading = false, onLogout }) => {
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <button type="button" onClick={handleProfileClick} className="button-secondary justify-center text-sm">
-                      Profile
+                      {t('nav.profile', 'Profile')}
                     </button>
                     <button
                       type="button"
                       onClick={handleLogoutClick}
                       className="inline-flex items-center justify-center rounded-full border border-[#d8b5b2] bg-white px-4 py-3 text-sm font-semibold text-[#8f5f45] transition hover:bg-[#faf0ee]"
                     >
-                      Sign Out
+                      {t('nav.signOut', 'Sign Out')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-[28px] border border-line bg-[#fcf8f5] px-4 py-5">
-                  <p className="text-sm font-semibold text-ink">Welcome to Athar</p>
-                  <p className="mt-1 text-sm text-ink-soft">Sign in to save favorites, track orders, and continue your collection.</p>
+                  <p className="text-sm font-semibold text-ink">{t('nav.welcome', 'Welcome to Athar')}</p>
+                  <p className="mt-1 text-sm text-ink-soft">{t('nav.mobileGuestHelper', 'Sign in to save favorites, track orders, and continue your collection.')}</p>
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <button type="button" onClick={handleLoginClick} className="button-secondary justify-center text-sm">
-                      Log In
+                      {t('nav.logIn', 'Log In')}
                     </button>
                     <button type="button" onClick={handleRegisterClick} className="button-primary justify-center text-sm">
-                      Create Account
+                      {t('nav.createAccount', 'Create Account')}
                     </button>
                   </div>
                 </div>

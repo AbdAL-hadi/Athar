@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import {
@@ -14,10 +15,10 @@ import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
 
 const timeRanges = [
-  { value: 'today', label: 'Today' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: 'all', label: 'All time' },
+  { value: 'today', labelKey: 'analytics.today', fallback: 'Today' },
+  { value: '7d', labelKey: 'analytics.last7Days', fallback: 'Last 7 days' },
+  { value: '30d', labelKey: 'analytics.last30Days', fallback: 'Last 30 days' },
+  { value: 'all', labelKey: 'analytics.allTime', fallback: 'All time' },
 ];
 
 const eventTypes = [
@@ -47,20 +48,20 @@ const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 
 const productSortOptions = [
-  { value: 'sales', label: 'Top Sales' },
-  { value: 'views', label: 'Top Views' },
-  { value: 'cart', label: 'Top Cart Adds' },
-  { value: 'tryOn', label: 'Top Try-On' },
-  { value: 'lowStock', label: 'Low Stock' },
+  { value: 'sales', labelKey: 'analytics.topSales', fallback: 'Top Sales' },
+  { value: 'views', labelKey: 'analytics.topViews', fallback: 'Top Views' },
+  { value: 'cart', labelKey: 'analytics.topCartAdds', fallback: 'Top Cart Adds' },
+  { value: 'tryOn', labelKey: 'analytics.topTryOn', fallback: 'Top Try-On' },
+  { value: 'lowStock', labelKey: 'analytics.lowStock', fallback: 'Low Stock' },
 ];
 
 const dashboardSections = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'funnel', label: 'Funnel' },
-  { id: 'demand', label: 'Demand' },
-  { id: 'marketing', label: 'Marketing' },
-  { id: 'inventory', label: 'Inventory' },
-  { id: 'ai-insights', label: 'AI Insights' },
+  { id: 'overview', labelKey: 'admin.overview', fallback: 'Overview' },
+  { id: 'funnel', labelKey: 'admin.funnel', fallback: 'Funnel' },
+  { id: 'demand', labelKey: 'admin.demand', fallback: 'Demand' },
+  { id: 'marketing', labelKey: 'admin.marketing', fallback: 'Marketing' },
+  { id: 'inventory', labelKey: 'admin.inventory', fallback: 'Inventory' },
+  { id: 'ai-insights', labelKey: 'admin.aiInsights', fallback: 'AI Insights' },
 ];
 
 const getRecommendationId = (recommendation) => recommendation?._id || recommendation?.id;
@@ -91,14 +92,18 @@ const EmptyState = ({ children }) => (
   <div className="rounded-[22px] border border-line/70 bg-[#fffaf8] px-5 py-6 text-sm leading-6 text-ink-soft">{children}</div>
 );
 
-const LoadingBlock = ({ label = 'Loading analytics...' }) => (
-  <div className="animate-pulse rounded-[24px] border border-line/70 bg-white px-5 py-6 shadow-card">
-    <div className="h-3 w-32 rounded-full bg-[#eaded6]" />
-    <div className="mt-5 h-9 w-44 rounded-full bg-[#f2e8e2]" />
-    <div className="mt-4 h-3 w-56 max-w-full rounded-full bg-[#f2e8e2]" />
-    <span className="sr-only">{label}</span>
-  </div>
-);
+const LoadingBlock = ({ label = '' }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="animate-pulse rounded-[24px] border border-line/70 bg-white px-5 py-6 shadow-card">
+      <div className="h-3 w-32 rounded-full bg-[#eaded6]" />
+      <div className="mt-5 h-9 w-44 rounded-full bg-[#f2e8e2]" />
+      <div className="mt-4 h-3 w-56 max-w-full rounded-full bg-[#f2e8e2]" />
+      <span className="sr-only">{label || t('analytics.loadingAnalytics', 'Loading analytics...')}</span>
+    </div>
+  );
+};
 
 const MiniIcon = ({ name }) => {
   const paths = {
@@ -196,6 +201,13 @@ const DashboardHeroStat = ({ label, value, helper, tone = 'neutral' }) => {
 };
 
 const DashboardToolbar = ({ range, onRangeChange }) => (
+  <DashboardToolbarInner range={range} onRangeChange={onRangeChange} />
+);
+
+const DashboardToolbarInner = ({ range, onRangeChange }) => {
+  const { t } = useTranslation();
+
+  return (
   <section className="sticky top-[84px] z-30 rounded-[22px] border border-line/80 bg-white/95 p-3 shadow-card backdrop-blur lg:top-[76px]">
     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1">
@@ -205,13 +217,13 @@ const DashboardToolbar = ({ range, onRangeChange }) => (
             href={`#${section.id}`}
             className="min-h-10 shrink-0 whitespace-nowrap rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink-soft transition hover:bg-blush/60 hover:text-ink"
           >
-            {section.label}
+            {t(section.labelKey, section.fallback)}
           </a>
         ))}
       </div>
 
       <label className="w-full min-w-0 xl:w-[220px] xl:shrink-0">
-        <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Time range</span>
+        <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('admin.timeRange', 'Time range')}</span>
         <select
           value={range}
           onChange={(event) => onRangeChange(event.target.value)}
@@ -219,14 +231,15 @@ const DashboardToolbar = ({ range, onRangeChange }) => (
         >
           {timeRanges.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(option.labelKey, option.fallback)}
             </option>
           ))}
         </select>
       </label>
     </div>
   </section>
-);
+  );
+};
 
 const DataTable = ({ columns, children }) => (
   <div className="overflow-x-auto rounded-[24px] border border-line/80">
@@ -257,22 +270,26 @@ const TabButton = ({ active, children, onClick }) => (
   </button>
 );
 
-const DetailPanel = ({ title, description = '', children, defaultOpen = false }) => (
-  <details className="rounded-[24px] border border-line bg-white p-5" open={defaultOpen}>
-    <summary className="cursor-pointer list-none">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="font-display text-3xl text-ink">{title}</h3>
-          {description ? <p className="mt-1 text-sm leading-6 text-ink-soft">{description}</p> : null}
+const DetailPanel = ({ title, description = '', children, defaultOpen = false }) => {
+  const { t } = useTranslation();
+
+  return (
+    <details className="rounded-[24px] border border-line bg-white p-5" open={defaultOpen}>
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-display text-3xl text-ink">{title}</h3>
+            {description ? <p className="mt-1 text-sm leading-6 text-ink-soft">{description}</p> : null}
+          </div>
+          <span className="rounded-full border border-line bg-[#fffaf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
+            {t('analytics.open', 'Open')}
+          </span>
         </div>
-        <span className="rounded-full border border-line bg-[#fffaf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
-          Open
-        </span>
-      </div>
-    </summary>
-    <div className="mt-5">{children}</div>
-  </details>
-);
+      </summary>
+      <div className="mt-5">{children}</div>
+    </details>
+  );
+};
 
 const ProgressRow = ({ label, value, max, meta = '' }) => {
   const percentage = Math.min((Number(value || 0) / Math.max(Number(max || 0), 1)) * 100, 100);
@@ -510,6 +527,7 @@ const LowStockProductCard = ({ product }) => {
 };
 
 const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [range, setRange] = useState('7d');
   const [eventType, setEventType] = useState('');
@@ -1066,7 +1084,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                     <h3 className="font-display text-3xl text-ink">Demand Leaders</h3>
                     <p className="mt-2 text-sm leading-6 text-ink-soft">Top products by weighted demand score. Open Demand for the full table.</p>
                   </div>
-                  <span className="heritage-pill whitespace-nowrap">{timeRanges.find((option) => option.value === range)?.label || 'Range'}</span>
+                  <span className="heritage-pill whitespace-nowrap">{t(timeRanges.find((option) => option.value === range)?.labelKey, timeRanges.find((option) => option.value === range)?.fallback || 'Range')}</span>
                 </div>
                 <div className="mt-5 space-y-3">
                   {(analytics.products || []).slice(0, 5).length > 0 ? (
@@ -1100,13 +1118,13 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
 
       <SectionCard
         id="demand"
-        title="Demand Intelligence"
+        title={t('admin.productDemand', 'Product Demand')}
         description="Explore product, city, category, and search demand signals."
       >
         <div className="mb-5 flex flex-wrap gap-2">
-          <TabButton active={activeDemandTab === 'products'} onClick={() => setActiveDemandTab('products')}>Products</TabButton>
-          <TabButton active={activeDemandTab === 'cities'} onClick={() => setActiveDemandTab('cities')}>Cities</TabButton>
-          <TabButton active={activeDemandTab === 'search'} onClick={() => setActiveDemandTab('search')}>Search Demand</TabButton>
+          <TabButton active={activeDemandTab === 'products'} onClick={() => setActiveDemandTab('products')}>{t('common.products', 'Products')}</TabButton>
+          <TabButton active={activeDemandTab === 'cities'} onClick={() => setActiveDemandTab('cities')}>{t('admin.cityDemand', 'City Demand')}</TabButton>
+          <TabButton active={activeDemandTab === 'search'} onClick={() => setActiveDemandTab('search')}>{t('admin.searchTrends', 'Search Trends')}</TabButton>
         </div>
 
         {activeDemandTab === 'products' ? (
@@ -1121,20 +1139,20 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
             >
               {productSortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey, option.fallback)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Category</span>
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('common.category', 'Category')}</span>
             <select
               value={productCategoryFilter}
               onChange={(event) => setProductCategoryFilter(event.target.value)}
               className="mt-2 min-h-12 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-ink outline-none focus:border-rose"
             >
-              <option value="">All categories</option>
+              <option value="">{t('inventory.allCategories', 'All categories')}</option>
               {productCategories.map((categoryOption) => (
                 <option key={categoryOption} value={categoryOption}>
                   {categoryOption}
@@ -1171,7 +1189,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         )}
 
         <div className="mt-6">
-          <h3 className="font-display text-3xl text-ink">Detailed Product Demand</h3>
+          <h3 className="font-display text-3xl text-ink">{t('admin.productDemand', 'Product Demand')}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
             Full demand ranking with views, cart intent, purchases, conversion, stock, and status.
           </p>
@@ -1183,8 +1201,8 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                 <table className="min-w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                      <th className="px-4 py-3">Product</th>
-                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">{t('common.product', 'Product')}</th>
+                      <th className="px-4 py-3">{t('common.category', 'Category')}</th>
                       <th className="px-4 py-3">Views</th>
                       <th className="px-4 py-3">Cart Adds</th>
                       <th className="px-4 py-3">Purchases</th>
@@ -1384,7 +1402,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                         <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
                           <th className="px-4 py-3">Warehouse</th>
                           <th className="px-4 py-3">Product</th>
-                          <th className="px-4 py-3">City Demand Score</th>
+                          <th className="px-4 py-3">{t('admin.cityDemand', 'City Demand')}</th>
                           <th className="px-4 py-3">City Stock</th>
                           <th className="px-4 py-3">Total Stock</th>
                           <th className="px-4 py-3">Pressure</th>
@@ -1429,7 +1447,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                 >
                   {timeRanges.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.labelKey, option.fallback)}
                     </option>
                   ))}
                 </select>
@@ -1443,7 +1461,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                 disabled={isGeneratingRecommendations}
                 className="min-h-12 rounded-full bg-ink px-5 py-3 text-sm font-bold text-white transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isGeneratingRecommendations ? 'Generating...' : 'Generate AI Inventory Recommendations'}
+                {isGeneratingRecommendations ? t('admin.generatingRecommendations', 'Generating...') : t('admin.generateInventoryRecommendations', 'Generate AI Inventory Recommendations')}
               </button>
             </div>
 
@@ -1455,7 +1473,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
             ) : null}
 
             {isRecommendationsLoading ? (
-              <EmptyState>Loading inventory recommendations...</EmptyState>
+              <EmptyState>{t('admin.loadingRecommendations', 'Loading inventory recommendations...')}</EmptyState>
             ) : recommendations.length > 0 ? (
               <div className="grid gap-4 lg:grid-cols-2">
                 {recommendations.map((recommendation) => {
@@ -1559,22 +1577,22 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
                 })}
               </div>
             ) : (
-              <EmptyState>No inventory recommendations found for this range.</EmptyState>
+              <EmptyState>{t('admin.noInventoryRecommendations', 'No inventory recommendations found for this range.')}</EmptyState>
             )}
 
             <div className="mt-8">
-              <h3 className="font-display text-3xl text-ink">Movement History</h3>
+              <h3 className="font-display text-3xl text-ink">{t('admin.movementHistory', 'Movement History')}</h3>
               <div className="mt-4 overflow-x-auto rounded-[24px] border border-line">
                 {movements.length > 0 ? (
                   <table className="min-w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-line bg-[#fffaf8] text-xs uppercase tracking-[0.16em] text-muted">
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Product</th>
-                        <th className="px-4 py-3">From</th>
-                        <th className="px-4 py-3">To</th>
-                        <th className="px-4 py-3">Quantity</th>
-                        <th className="px-4 py-3">Reason</th>
+                        <th className="px-4 py-3">{t('admin.date', 'Date')}</th>
+                        <th className="px-4 py-3">{t('admin.product', 'Product')}</th>
+                        <th className="px-4 py-3">{t('admin.from', 'From')}</th>
+                        <th className="px-4 py-3">{t('admin.to', 'To')}</th>
+                        <th className="px-4 py-3">{t('admin.quantity', 'Quantity')}</th>
+                        <th className="px-4 py-3">{t('admin.reason', 'Reason')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1602,7 +1620,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
       </SectionCard>
 
       <SectionCard id="ai-insights" title="AI Insights" description="Optional AI summaries and business explanations generated from analytics data.">
-        <DetailPanel title="AI Tool Usage" description="Usage counters for Visual Search and Try-On. No user images or generated images are shown here.">
+        <DetailPanel title={t('admin.aiToolUsage', 'AI Tool Usage')} description="Usage counters for Visual Search and Try-On. No user images or generated images are shown here.">
         {isAnalyticsLoading ? (
           <EmptyState>Loading AI tool usage...</EmptyState>
         ) : analytics.aiTools && (analytics.aiTools.visualSearchCount > 0 || analytics.aiTools.tryOnCount > 0) ? (
@@ -1655,7 +1673,7 @@ const AdminBehaviorAnalyticsPage = ({ authToken, authUser, authLoading }) => {
         </DetailPanel>
 
         <div className="mt-5">
-          <DetailPanel title="Behavior Events" description="Latest clean demand signals from Phase 2 tracking. Filters share the selected dashboard time range.">
+          <DetailPanel title={t('admin.behaviorEvents', 'Behavior Events')} description="Latest clean demand signals from Phase 2 tracking. Filters share the selected dashboard time range.">
         <div className="mb-5 grid gap-4 rounded-[24px] border border-line bg-[#fffaf8] p-4 md:grid-cols-[220px_220px_1fr]">
           <label>
             <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Event type</span>

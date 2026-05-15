@@ -18,6 +18,10 @@
   a {
     @apply transition-colors;
   }
+
+  html[dir='rtl'] body {
+    text-align: right;
+  }
 }
 
 @layer components {
@@ -153,5 +157,29 @@
     width: 4.5rem;
     border-radius: 999px;
     background: linear-gradient(90deg, #b88746, #dfbd79, #54715f);
+  }
+
+  html[dir='rtl'] .section-shell {
+    direction: rtl;
+  }
+
+  html[dir='rtl'] input,
+  html[dir='rtl'] textarea,
+  html[dir='rtl'] select {
+    text-align: right;
+  }
+
+  html[dir='rtl'] table {
+    text-align: right;
+  }
+
+  html[dir='rtl'] .rtl-flip-x {
+    transform: scaleX(-1);
+  }
+
+  html[dir='rtl'] .space-x-2 > :not([hidden]) ~ :not([hidden]),
+  html[dir='rtl'] .space-x-3 > :not([hidden]) ~ :not([hidden]),
+  html[dir='rtl'] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 1;
   }
 }

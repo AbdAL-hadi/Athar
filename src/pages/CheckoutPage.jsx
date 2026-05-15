@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import CheckoutForm from '../components/CheckoutForm';
 import PriceText from '../components/PriceText';
@@ -39,6 +40,7 @@ const CheckoutPage = ({
   authLoading,
   onCheckoutSuccess,
 }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -71,6 +73,7 @@ const CheckoutPage = ({
   const finalTotal = Math.max(0, subtotal + shippingTotal - discountAmount);
   const cartPoints = estimatedCheckoutPoints;
   const projectedBalanceAfterReward = Math.max(0, projectedBalanceBeforeRedemption - (shouldApplyRewardDiscount ? REWARD_DISCOUNT_POINTS_COST : 0));
+  const formatPoints = (points) => t('productCard.pointsValue', '{{count}} Athar Points', { count: Math.max(0, Math.round(Number(points) || 0)) });
 
   useEffect(() => {
     if (isSuccessRoute || hasTrackedCheckoutStartRef.current || items.length === 0) {
@@ -125,7 +128,7 @@ const CheckoutPage = ({
       } catch (error) {
         if (!isCancelled) {
           setSuccessOrder(null);
-          setSuccessOrderError(error?.message ?? 'We could not reload this order right now.');
+          setSuccessOrderError(error?.message ?? t('errors.loadOrder', 'We could not reload this order right now.'));
         }
       }
     };
@@ -149,20 +152,20 @@ const CheckoutPage = ({
     }
 
     return {
-      title: `Complete this order and earn ${formatAtharPoints(cartPoints)}.`,
+      title: t('checkout.pointsSummaryTitle', 'Complete this order and earn {{points}}.', { points: formatPoints(cartPoints) }),
       description: authUser
-        ? 'These points count toward this checkout reward unlock after the purchase is completed successfully.'
-        : 'Log in before placing this order to save these points to your Athar Points balance.',
+        ? t('checkout.pointsSummaryDescription', 'These points count toward this checkout reward unlock after the purchase is completed successfully.')
+        : t('checkout.pointsLoginDescription', 'Log in before placing this order to save these points to your Athar Points balance.'),
       metrics: authUser
         ? [
-            { label: 'Current balance', value: formatAtharPoints(currentBalance) },
-            { label: 'This checkout', value: formatAtharPoints(cartPoints) },
-            { label: 'Before redemption', value: formatAtharPoints(projectedBalanceBeforeRedemption) },
-            { label: 'After purchase', value: formatAtharPoints(projectedBalanceAfterReward) },
+            { label: t('cart.currentBalance', 'Current balance'), value: formatPoints(currentBalance) },
+            { label: t('checkout.thisCheckoutLabel', 'This checkout'), value: formatPoints(cartPoints) },
+            { label: t('checkout.beforeRedemption', 'Before redemption'), value: formatPoints(projectedBalanceBeforeRedemption) },
+            { label: t('cart.afterPurchase', 'After purchase'), value: formatPoints(projectedBalanceAfterReward) },
           ]
         : [
-            { label: 'This checkout', value: formatAtharPoints(cartPoints) },
-            { label: 'Account status', value: 'Log in to save' },
+            { label: t('checkout.thisCheckoutLabel', 'This checkout'), value: formatPoints(cartPoints) },
+            { label: t('checkout.accountStatus', 'Account status'), value: t('checkout.logInToSave', 'Log in to save') },
           ],
     };
   }, [authUser, cartPoints, currentBalance, items.length, projectedBalanceAfterReward, projectedBalanceBeforeRedemption]);
@@ -191,13 +194,13 @@ const CheckoutPage = ({
   const validate = () => {
     const nextErrors = {};
 
-    if (!formData.fullName.trim()) nextErrors.fullName = 'Full name is required.';
-    if (!formData.phone.trim()) nextErrors.phone = 'Phone number is required.';
-    if (!formData.line1.trim()) nextErrors.line1 = 'Address line is required.';
-    if (!isKnownCityValue(formData.city)) nextErrors.city = 'Please choose a valid Palestinian city.';
-    if (!formData.postalCode.trim()) nextErrors.postalCode = 'Postal code is required.';
-    if (!formData.country.trim()) nextErrors.country = 'Country is required.';
-    if (formData.paymentMethod !== 'Cash on Delivery') nextErrors.paymentMethod = 'Only Cash on Delivery is available.';
+    if (!formData.fullName.trim()) nextErrors.fullName = t('checkout.fullNameRequired', 'Full name is required.');
+    if (!formData.phone.trim()) nextErrors.phone = t('checkout.phoneRequired', 'Phone number is required.');
+    if (!formData.line1.trim()) nextErrors.line1 = t('checkout.addressRequired', 'Address line is required.');
+    if (!isKnownCityValue(formData.city)) nextErrors.city = t('checkout.cityRequired', 'Please choose a valid Palestinian city.');
+    if (!formData.postalCode.trim()) nextErrors.postalCode = t('checkout.postalRequired', 'Postal code is required.');
+    if (!formData.country.trim()) nextErrors.country = t('checkout.countryRequired', 'Country is required.');
+    if (formData.paymentMethod !== 'Cash on Delivery') nextErrors.paymentMethod = t('checkout.cashOnly', 'Only Cash on Delivery is available.');
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -216,7 +219,7 @@ const CheckoutPage = ({
     }
 
     if (items.length === 0) {
-      setToast({ open: true, message: 'Your cart is empty.', variant: 'error' });
+      setToast({ open: true, message: t('checkout.cartEmpty', 'Your cart is empty.'), variant: 'error' });
       return;
     }
 
@@ -284,7 +287,7 @@ const CheckoutPage = ({
         },
       });
     } catch (error) {
-      setToast({ open: true, message: error.message || 'Unable to place the order right now.', variant: 'error' });
+      setToast({ open: true, message: error.message || t('checkout.placedError', 'Unable to place the order right now.'), variant: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -294,58 +297,58 @@ const CheckoutPage = ({
     return (
       <div className="section-shell pb-6 pt-8">
         <section className="rounded-[36px] bg-white px-8 py-16 text-center shadow-soft">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted">Order confirmed</p>
-          <h1 className="mt-4 font-display text-6xl text-ink">Your order has been placed.</h1>
-          <p className="mx-auto mt-5 max-w-3xl text-2xl leading-10 text-ink-soft">Your order is confirmed, and your cart has been cleared so you can keep shopping fresh.</p>
+          <p className="text-sm uppercase tracking-[0.24em] text-muted">{t('checkout.orderConfirmed', 'Order confirmed')}</p>
+          <h1 className="mt-4 font-display text-6xl text-ink">{t('checkout.orderPlaced', 'Your order has been placed.')}</h1>
+          <p className="mx-auto mt-5 max-w-3xl text-2xl leading-10 text-ink-soft">{t('checkout.successDescription', 'Your order is confirmed, and your cart has been cleared so you can keep shopping fresh.')}</p>
 
           <div className="mx-auto mt-8 max-w-md rounded-[28px] bg-blush px-6 py-5">
-            <p className="text-lg text-ink-soft">Order ID</p>
-            <p className="mt-2 break-all font-display text-5xl text-ink">{orderNumberFromUrl || 'Pending'}</p>
+            <p className="text-lg text-ink-soft">{t('checkout.orderId', 'Order ID')}</p>
+            <p className="mt-2 break-all font-display text-5xl text-ink">{orderNumberFromUrl || t('checkout.pending', 'Pending')}</p>
           </div>
 
           {successPointsEarned > 0 || successPointsRedeemed > 0 ? (
             <div className="mx-auto mt-5 max-w-md rounded-[28px] border border-[#dfbd79]/50 bg-[#fff7f0] px-6 py-5">
               <p className="text-lg font-semibold text-ink">
                 {successPointsEarned > 0
-                  ? `Congratulations! You earned ${formatAtharPoints(successPointsEarned)} from this order.`
-                  : 'Your Athar Points balance was updated for this order.'}
+                  ? t('checkout.congratsEarned', 'Congratulations! You earned {{points}} from this order.', { points: formatPoints(successPointsEarned) })
+                  : t('checkout.pointsBalanceUpdated', 'Your Athar Points balance was updated for this order.')}
               </p>
               {successRedeemedReward?.title ? (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
-                  Reward used: {successRedeemedReward.title}
+                  {t('checkout.rewardUsed', 'Reward used:')} {successRedeemedReward.title}
                   {successRedeemedReward?.pointsRedeemed ? ` for ${formatAtharPoints(successRedeemedReward.pointsRedeemed)}` : ''}.
                 </p>
               ) : null}
               {successBalance !== null && successBalance !== undefined ? (
                 <div className="mt-4 grid gap-3 text-left">
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Balance before purchase</p>
-                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(previousBalance)}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.balanceBeforePurchase', 'Balance before purchase')}</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatPoints(previousBalance)}</p>
                   </div>
                   {successPointsRedeemed > 0 ? (
                     <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Points redeemed</p>
-                      <p className="mt-2 text-base font-semibold text-ink">-{formatAtharPoints(successPointsRedeemed)}</p>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.pointsRedeemed', 'Points redeemed')}</p>
+                      <p className="mt-2 text-base font-semibold text-ink">-{formatPoints(successPointsRedeemed)}</p>
                     </div>
                   ) : null}
                   {balanceAfterRedemption !== null && balanceAfterRedemption !== undefined ? (
                     <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Balance after redemption</p>
-                      <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(balanceAfterRedemption)}</p>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.balanceAfterRedemption', 'Balance after redemption')}</p>
+                      <p className="mt-2 text-base font-semibold text-ink">{formatPoints(balanceAfterRedemption)}</p>
                     </div>
                   ) : null}
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Points earned</p>
-                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(successPointsEarned)}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.pointsEarnedShort', 'Points earned')}</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatPoints(successPointsEarned)}</p>
                   </div>
                   <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Updated balance</p>
-                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(successBalance)}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.updatedBalance', 'Updated balance')}</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{formatPoints(successBalance)}</p>
                   </div>
                 </div>
               ) : (
                 <p className="mt-2 text-sm leading-6 text-ink-soft">
-                  Log in before checkout next time to save points to your Athar account.
+                  {t('checkout.loginNextTimePoints', 'Log in before checkout next time to save points to your Athar account.')}
                 </p>
               )}
             </div>
@@ -356,20 +359,20 @@ const CheckoutPage = ({
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to={`/order-tracking?order=${encodeURIComponent(orderNumberFromUrl)}`} className="button-primary">
-              Track this order
+              {t('checkout.trackThisOrder', 'Track this order')}
             </Link>
             <Link to="/products" className="button-secondary">
-              Continue shopping
+              {t('common.continueShopping', 'Continue shopping')}
             </Link>
           </div>
 
           {whatsappNotification?.delivered ? (
             <p className="mt-6 text-sm text-ink-soft">
-              A WhatsApp confirmation with your order code has been sent successfully.
+              {t('checkout.whatsappSent', 'A WhatsApp confirmation with your order code has been sent successfully.')}
             </p>
           ) : whatsappNotification?.channel === 'console' ? (
             <p className="mt-6 text-sm text-ink-soft">
-              WhatsApp delivery is currently running in development mode, so the message preview is printed in the backend console.
+              {t('checkout.whatsappDevMode', 'WhatsApp delivery is currently running in development mode, so the message preview is printed in the backend console.')}
             </p>
           ) : null}
         </section>
@@ -379,11 +382,11 @@ const CheckoutPage = ({
 
   return (
     <div className="section-shell space-y-8 pb-6 pt-8">
-      <SectionTitle title="Checkout" description="Complete your shipping details and confirm your Athar order." />
+      <SectionTitle title={t('checkout.title', 'Checkout')} description={t('checkout.description', 'Complete your shipping details and confirm your Athar order.')} />
 
-      {productsLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest product data before checkout...</div> : null}
+      {productsLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">{t('checkout.loadingProducts', 'Loading the latest product data before checkout...')}</div> : null}
       {productsError ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{productsError}</div> : null}
-      {authLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Checking your account session...</div> : null}
+      {authLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">{t('checkout.checkingSession', 'Checking your account session...')}</div> : null}
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[32px] bg-white p-6 shadow-soft">
@@ -391,9 +394,9 @@ const CheckoutPage = ({
         </section>
 
         <section className="rounded-[32px] bg-white p-6 shadow-soft">
-          <h2 className="font-display text-4xl text-ink">Order summary</h2>
+          <h2 className="font-display text-4xl text-ink">{t('checkout.orderSummary', 'Order summary')}</h2>
           {items.length === 0 ? (
-            <p className="mt-4 text-lg text-ink-soft">Your cart is empty. Add products first before checking out.</p>
+            <p className="mt-4 text-lg text-ink-soft">{t('checkout.cartEmptyCheckout', 'Your cart is empty. Add products first before checking out.')}</p>
           ) : (
             <div className="mt-6 space-y-4">
               {items.map((item) => {
@@ -405,7 +408,7 @@ const CheckoutPage = ({
                       <p className="font-medium text-ink">{item.name}</p>
                       <p className="text-sm text-ink-soft">x{item.quantity}</p>
                       <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                        +{formatAtharPoints(itemPoints)}
+                        +{formatPoints(itemPoints)}
                       </p>
                     </div>
                     <PriceText value={item.price * item.quantity} className="text-xl" />
@@ -414,36 +417,36 @@ const CheckoutPage = ({
               })}
               <div className="space-y-3 border-t border-line pt-4 text-ink-soft">
                 <div className="flex items-center justify-between">
-                  <span>Subtotal</span>
+                  <span>{t('checkout.subtotal', 'Subtotal')}</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Shipping</span>
+                  <span>{t('checkout.shipping', 'Shipping')}</span>
                   <span>{formatCurrency(shippingTotal)}</span>
                 </div>
                 {shouldApplyRewardDiscount ? (
                   <div className="flex items-center justify-between text-[#54715f]">
-                    <span>Rewards discount ({REWARD_DISCOUNT_PERCENT}%)</span>
+                    <span>{t('checkout.rewardsDiscount', 'Rewards discount ({{percent}}%)', { percent: REWARD_DISCOUNT_PERCENT })}</span>
                     <span>-{formatCurrency(discountAmount)}</span>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between font-semibold text-ink">
-                  <span>Total</span>
+                  <span>{t('checkout.total', 'Total')}</span>
                   <PriceText value={finalTotal} className="text-2xl" />
                 </div>
                 {authUser ? (
                   <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-ink">Use your Athar Points</p>
+                        <p className="font-semibold text-ink">{t('checkout.usePoints', 'Use your Athar Points')}</p>
                         <p className="mt-1 text-sm leading-6 text-ink-soft">
-                          Current balance: {formatAtharPoints(currentBalance)}
+                          {t('checkout.currentBalance', 'Current balance: {{points}}', { points: formatPoints(currentBalance) })}
                         </p>
                         <p className="text-sm leading-6 text-ink-soft">
-                          This checkout: +{formatAtharPoints(estimatedCheckoutPoints)}
+                          {t('checkout.thisCheckout', 'This checkout: +{{points}}', { points: formatPoints(estimatedCheckoutPoints) })}
                         </p>
                         <p className="text-sm leading-6 text-ink-soft">
-                          Projected before redemption: {formatAtharPoints(projectedBalanceBeforeRedemption)}
+                          {t('checkout.projectedBefore', 'Projected before redemption: {{points}}', { points: formatPoints(projectedBalanceBeforeRedemption) })}
                         </p>
                       </div>
                     </div>
@@ -451,8 +454,8 @@ const CheckoutPage = ({
                       <>
                         <p className="mt-3 rounded-[18px] bg-[#f1faf0] px-4 py-3 text-sm font-semibold leading-6 text-[#2f6a35]">
                           {currentBalance >= REWARD_DISCOUNT_POINTS_COST
-                            ? `You can use ${formatAtharPoints(REWARD_DISCOUNT_POINTS_COST)} for ${REWARD_DISCOUNT_PERCENT}% off.`
-                            : `Your current order unlocks ${REWARD_DISCOUNT_PERCENT}% off.`}
+                            ? t('checkout.canUseReward', 'You can use {{points}} for {{percent}}% off.', { points: formatPoints(REWARD_DISCOUNT_POINTS_COST), percent: REWARD_DISCOUNT_PERCENT })
+                            : t('checkout.orderUnlocksReward', 'Your current order unlocks {{percent}}% off.', { percent: REWARD_DISCOUNT_PERCENT })}
                         </p>
                         <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[18px] border border-[#d9c2b0] bg-white px-4 py-3 transition hover:border-[#b88746]">
                           <input
@@ -462,62 +465,62 @@ const CheckoutPage = ({
                             onChange={(event) => setUseRewardDiscount(event.target.checked)}
                           />
                           <span>
-                            <span className="block font-semibold text-ink">Use {REWARD_DISCOUNT_POINTS_COST} Athar Points for {REWARD_DISCOUNT_PERCENT}% off this order</span>
+                            <span className="block font-semibold text-ink">{t('checkout.useRewardPoints', 'Use {{points}} Athar Points for {{percent}}% off this order', { points: REWARD_DISCOUNT_POINTS_COST, percent: REWARD_DISCOUNT_PERCENT })}</span>
                             <span className="mt-1 block text-sm leading-6 text-ink-soft">
-                              Save {formatCurrency(subtotal * (REWARD_DISCOUNT_PERCENT / 100))}. Backend validates your projected points and calculates the final discount.
+                              {t('checkout.rewardSaveDescription', 'Save {{amount}}. Backend validates your projected points and calculates the final discount.', { amount: formatCurrency(subtotal * (REWARD_DISCOUNT_PERCENT / 100)) })}
                             </span>
                           </span>
                         </label>
                         {shouldApplyRewardDiscount ? (
                           <div className="mt-3 grid gap-2 text-sm leading-6 text-ink-soft">
                             <div className="flex justify-between gap-3">
-                              <span>Points redeemed</span>
-                              <span>-{formatAtharPoints(REWARD_DISCOUNT_POINTS_COST)}</span>
+                              <span>{t('checkout.pointsRedeemed', 'Points redeemed')}</span>
+                              <span>-{formatPoints(REWARD_DISCOUNT_POINTS_COST)}</span>
                             </div>
                             <div className="flex justify-between gap-3 font-semibold text-ink">
-                              <span>After this order</span>
-                              <span>{formatAtharPoints(projectedBalanceAfterReward)}</span>
+                              <span>{t('cart.afterPurchase', 'After this order')}</span>
+                              <span>{formatPoints(projectedBalanceAfterReward)}</span>
                             </div>
                           </div>
                         ) : null}
                       </>
                     ) : (
                       <p className="mt-3 text-sm leading-6 text-ink-soft">
-                        You need {formatAtharPoints(rewardPointsNeeded)} more to unlock {REWARD_DISCOUNT_PERCENT}% off.
+                        {t('checkout.needMorePoints', 'You need {{points}} more to unlock {{percent}}% off.', { points: formatPoints(rewardPointsNeeded), percent: REWARD_DISCOUNT_PERCENT })}
                       </p>
                     )}
                   </div>
                 ) : (
                   <div className="rounded-[22px] border border-line bg-[#fcfaf7] px-4 py-4">
-                    <p className="font-semibold text-ink">Use your Athar Points</p>
+                    <p className="font-semibold text-ink">{t('checkout.usePoints', 'Use your Athar Points')}</p>
                     <p className="mt-1 text-sm leading-6 text-ink-soft">
-                      Log in to earn and redeem Athar points.
+                      {t('checkout.logInEarnRedeem', 'Log in to earn and redeem Athar points.')}
                     </p>
                   </div>
                 )}
                 <div className="rounded-[22px] border border-[#dfbd79]/50 bg-[#fff7f0] px-4 py-3">
                     <div className="flex items-center justify-between gap-3 font-semibold text-ink">
-                    <span>Athar Points earned</span>
-                    <span>+{formatAtharPoints(cartPoints)}</span>
+                    <span>{t('checkout.pointsEarned', 'Athar Points earned')}</span>
+                    <span>+{formatPoints(cartPoints)}</span>
                   </div>
                   {authUser ? (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
-                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.currentBalance', 'Current balance')}</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatPoints(currentBalance)}</p>
                       </div>
                       <div className="rounded-[18px] bg-white/75 px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Projected before redemption</p>
-                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalanceBeforeRedemption)}</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('checkout.projectedBeforeRedemption', 'Projected before redemption')}</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatPoints(projectedBalanceBeforeRedemption)}</p>
                       </div>
                       <div className="rounded-[18px] bg-white/75 px-4 py-3">
                         <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After this order</p>
-                        <p className="mt-2 text-sm font-semibold text-ink">{formatAtharPoints(projectedBalanceAfterReward)}</p>
+                        <p className="mt-2 text-sm font-semibold text-ink">{formatPoints(projectedBalanceAfterReward)}</p>
                       </div>
                     </div>
                   ) : null}
                   <p className="mt-1 text-xs leading-5 text-ink-soft">
-                    Points are added to your account after the purchase is completed successfully.
+                    {t('checkout.pointsAddedAfterPurchase', 'Points are added to your account after the purchase is completed successfully.')}
                   </p>
                 </div>
               </div>
