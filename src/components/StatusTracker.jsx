@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 const defaultSteps = [
   { label: 'Confirmed', value: 'Confirmed' },
   { label: 'Shipped', value: 'Shipped' },
@@ -5,6 +7,7 @@ const defaultSteps = [
 ];
 
 const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '' }) => {
+  const { t } = useTranslation();
   const normalizedStatus = status === 'Pending' ? 'Confirmed' : status;
 
   // Handle cancelled status
@@ -18,7 +21,7 @@ const StatusTracker = ({ status = 'Pending', steps = defaultSteps, className = '
             return (
               <div key={label} className="flex flex-col items-center gap-3 text-center">
                 <div className="h-6 w-6 rounded-full bg-red-500" />
-                <p className="text-sm text-red-600 font-semibold">Cancelled</p>
+                <p className="text-sm text-red-600 font-semibold">{t('orders.status.cancelled', 'Cancelled')}</p>
               </div>
             );
           })}

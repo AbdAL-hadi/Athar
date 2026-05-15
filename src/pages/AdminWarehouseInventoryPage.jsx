@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNavigation from '../components/admin/AdminNavigation';
+import InventoryAnalysisSection from '../components/admin/InventoryAnalysisSection';
 import SectionTitle from '../components/SectionTitle';
 import { apiRequest } from '../utils/api';
 
@@ -13,8 +14,12 @@ const statusClasses = {
 const AdminWarehouseInventoryPage = ({ authToken, authUser, authLoading }) => {
   const navigate = useNavigate();
   const [inventory, setInventory] = useState({ warehouses: [], rows: [] });
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisRange, setAnalysisRange] = useState('7d');
   const [isLoading, setIsLoading] = useState(true);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(true);
   const [error, setError] = useState('');
+  const [analysisError, setAnalysisError] = useState('');
 
   useEffect(() => {
     if (authLoading) {
@@ -59,6 +64,41 @@ const AdminWarehouseInventoryPage = ({ authToken, authUser, authLoading }) => {
     };
   }, [authToken, authUser?.role]);
 
+  useEffect(() => {
+    if (!authToken || authUser?.role !== 'admin') {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const loadAnalysis = async () => {
+      try {
+        setIsAnalysisLoading(true);
+        setAnalysisError('');
+        const response = await apiRequest(`/api/admin/inventory-analysis?range=${encodeURIComponent(analysisRange)}`, {
+          token: authToken,
+        });
+
+        if (!isCancelled) {
+          setAnalysis(response?.data ?? null);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setAnalysisError(loadError.message || 'Failed to load inventory analysis.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsAnalysisLoading(false);
+        }
+      }
+    };
+
+    loadAnalysis();
+    return () => {
+      isCancelled = true;
+    };
+  }, [analysisRange, authToken, authUser?.role]);
+
   const rows = useMemo(() => (Array.isArray(inventory.rows) ? inventory.rows : []), [inventory.rows]);
   const warehouses = useMemo(() => (Array.isArray(inventory.warehouses) ? inventory.warehouses : []), [inventory.warehouses]);
 
@@ -87,6 +127,14 @@ const AdminWarehouseInventoryPage = ({ authToken, authUser, authLoading }) => {
       {error ? (
         <div className="rounded-[28px] border border-[#e7c8c8] bg-white px-6 py-5 text-[#8c6546] shadow-card">{error}</div>
       ) : null}
+
+      <InventoryAnalysisSection
+        analysis={analysis}
+        isLoading={isAnalysisLoading}
+        errorMessage={analysisError}
+        range={analysisRange}
+        onRangeChange={setAnalysisRange}
+      />
 
       {!isLoading && !error ? (
         <section className="overflow-hidden rounded-[32px] bg-white shadow-card">

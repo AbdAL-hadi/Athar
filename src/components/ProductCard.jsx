@@ -1,10 +1,11 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import FavoriteButton from './FavoriteButton';
 import PriceText from './PriceText';
 import { resolveApiAssetUrl } from '../utils/api';
 import { formatCurrency } from '../utils/format';
-import { calculateProductPoints, formatAtharPoints } from '../utils/loyaltyPoints';
+import { calculateProductPoints } from '../utils/loyaltyPoints';
 import { getProductMainImageUrl } from '../utils/productCatalog';
 
 const MOTION_EASE = [0.22, 1, 0.36, 1];
@@ -19,11 +20,13 @@ const ProductCard = ({
   onAddToCart,
   variant = 'default',
 }) => {
+  const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const hasSale = product.compareAt && product.compareAt > product.price;
   const productHref = `/products/${product.id}`;
   const primaryImage = getProductMainImageUrl(product) || resolveApiAssetUrl('design/logo.jpeg');
-  const productName = product?.name || product?.title || 'Athar product';
+  const productName = product?.name || product?.title || t('productCard.fallbackName', 'Athar product');
+  const resolvedCtaLabel = ctaLabel === 'Buy' ? t('productCard.buy', 'Buy') : ctaLabel;
   const productPoints = calculateProductPoints(product);
   const isHorizontal = variant === 'horizontal';
   const cardMotionProps = prefersReducedMotion
@@ -96,14 +99,16 @@ const ProductCard = ({
               {productPoints > 0 ? (
                 <div className="mt-2 space-y-1.5">
                   <span className="inline-flex rounded-full border border-[#dfbd79]/40 bg-[#fff7f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#8f5f45]">
-                    Earn {formatAtharPoints(productPoints)}
+                    {t('productCard.earn', 'Earn {{points}}', {
+                      points: t('productCard.pointsValue', '{{count}} Athar Points', { count: productPoints }),
+                    })}
                   </span>
                   <p className={`${isHorizontal ? 'max-w-[24rem]' : ''} text-xs leading-5 text-ink-soft`}>
-                    Added to your balance after a successful checkout.
+                    {t('productCard.pointsAfterCheckout', 'Added to your balance after a successful checkout.')}
                   </p>
                 </div>
               ) : null}
-              {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{product.category}</p> : null}
+              {showCategory ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted">{t(`categories.${product.category}`, product.category)}</p> : null}
             </div>
           </div>
         </Link>
@@ -116,14 +121,14 @@ const ProductCard = ({
                 onClick={handleBuyClick}
                 className="button-primary min-h-12 w-full px-5 py-3 text-base shadow-[0_14px_30px_rgba(183,123,111,0.22)]"
               >
-                {ctaLabel}
+                {resolvedCtaLabel}
               </button>
             ) : (
               <Link
                 to={productHref}
                 className="button-primary min-h-12 w-full px-5 py-3 text-base shadow-[0_14px_30px_rgba(183,123,111,0.22)]"
               >
-                {ctaLabel}
+                {resolvedCtaLabel}
               </Link>
             )}
           </motion.div>
@@ -132,7 +137,7 @@ const ProductCard = ({
               to={productHref}
               className="button-secondary min-h-12 w-full px-4 py-3 text-sm"
             >
-              More Details
+              {t('productCard.moreDetails', 'More Details')}
             </Link>
           </motion.div>
         </div>

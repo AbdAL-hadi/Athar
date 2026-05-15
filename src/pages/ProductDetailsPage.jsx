@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
 import FavoriteButton from '../components/FavoriteButton';
@@ -40,6 +41,7 @@ const ProductDetailsPage = ({
   onOpenTryOn,
   onProductLoaded,
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const fallbackProduct = useMemo(() => findProductByReference(products, id), [products, id]);
@@ -125,15 +127,11 @@ const ProductDetailsPage = ({
           if (fallbackProduct) {
             setProduct(fallbackProduct);
             setSelectedMedia(getDefaultMedia(fallbackProduct));
-            setLoadError(
-              error?.status === 404
-                ? ''
-                : error.message || 'Unable to refresh this product right now.',
-            );
+            setLoadError(error?.status === 404 ? '' : error.message || t('productDetails.refreshError', 'Unable to refresh this product right now.'));
           } else {
             setProduct(null);
             setSelectedMedia(getDefaultMedia(null));
-            setLoadError(error.message || 'Unable to load this product right now.');
+            setLoadError(error.message || t('productDetails.loadError', 'Unable to load this product right now.'));
           }
         }
       } finally {
@@ -173,7 +171,7 @@ const ProductDetailsPage = ({
         }
       } catch (error) {
         if (!isCancelled) {
-          setCommentError(error.message || 'We could not load product comments right now.');
+          setCommentError(error.message || t('productDetails.commentsLoadError', 'We could not load product comments right now.'));
         }
       } finally {
         if (!isCancelled) {
@@ -219,7 +217,7 @@ const ProductDetailsPage = ({
       product.material ? `Material: ${product.material}.` : '',
       product.color ? `Color: ${product.color}.` : '',
       preferredDescription,
-      product.stock !== undefined ? `Availability: ${product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}.` : '',
+      product.stock !== undefined ? `Availability: ${product.stock > 0 ? t('common.inStock', '{{count}} in stock', { count: product.stock }) : t('common.outOfStock', 'Out of stock')}.` : '',
     ];
 
     return details.filter(Boolean).join(' ');
@@ -234,7 +232,7 @@ const ProductDetailsPage = ({
     }
 
     if (typeof window === 'undefined' || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
-      setVisualDescriptionError('Audio reading is not available in your browser right now.');
+      setVisualDescriptionError(t('productDetails.audioUnavailable', 'Audio reading is not available in your browser right now.'));
       return;
     }
 
@@ -251,7 +249,7 @@ const ProductDetailsPage = ({
     utterance.onerror = () => {
       speechUtteranceRef.current = null;
       setIsAudioPlaying(false);
-      setVisualDescriptionError('Audio reading is not available in your browser right now.');
+      setVisualDescriptionError(t('productDetails.audioUnavailable', 'Audio reading is not available in your browser right now.'));
     };
 
     speechUtteranceRef.current = utterance;
@@ -272,12 +270,12 @@ const ProductDetailsPage = ({
     const normalizedComment = commentText.replace(/\s+/g, ' ').trim();
 
     if (!normalizedComment) {
-      setCommentError('Please write a comment before submitting.');
+      setCommentError(t('productDetails.commentRequired', 'Please write a comment before submitting.'));
       return;
     }
 
     if (normalizedComment.length > PRODUCT_COMMENT_MAX_LENGTH) {
-      setCommentError(`Comments must stay under ${PRODUCT_COMMENT_MAX_LENGTH} characters.`);
+      setCommentError(t('productDetails.commentMaxError', 'Comments must stay under {{count}} characters.', { count: PRODUCT_COMMENT_MAX_LENGTH }));
       return;
     }
 
@@ -294,7 +292,7 @@ const ProductDetailsPage = ({
         },
       });
 
-      setCommentMessage(response?.message || 'Your comment has been submitted.');
+      setCommentMessage(response?.message || t('productDetails.commentSubmitted', 'Your comment has been submitted.'));
       setCommentText('');
       setCommentRating('');
 
@@ -310,7 +308,7 @@ const ProductDetailsPage = ({
         return;
       }
 
-      setCommentError(error.message || 'We could not submit your comment right now.');
+      setCommentError(error.message || t('productDetails.commentSubmitError', 'We could not submit your comment right now.'));
     } finally {
       setCommentSubmitting(false);
     }
@@ -330,8 +328,8 @@ const ProductDetailsPage = ({
     return (
       <div className="section-shell pt-14">
         <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
-          <h1 className="font-display text-5xl text-ink">Loading product</h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">Preparing the latest details for this piece.</p>
+          <h1 className="font-display text-5xl text-ink">{t('productDetails.loadingProduct', 'Loading product')}</h1>
+          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">{t('productDetails.loadingDescription', 'Preparing the latest details for this piece.')}</p>
         </div>
       </div>
     );
@@ -341,10 +339,10 @@ const ProductDetailsPage = ({
     return (
       <div className="section-shell pt-14">
         <div className="rounded-[32px] bg-white px-7 py-14 text-center shadow-soft">
-          <h1 className="font-display text-5xl text-ink">Product not found</h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">{loadError || 'The product you requested is not available in the current catalog.'}</p>
+          <h1 className="font-display text-5xl text-ink">{t('productDetails.notFound', 'Product not found')}</h1>
+          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-ink-soft">{loadError || t('productDetails.notAvailable', 'The product you requested is not available in the current catalog.')}</p>
           <Link to="/products" className="button-primary mt-8">
-            Browse all products
+            {t('common.browseProducts', 'Browse products')}
           </Link>
         </div>
       </div>
@@ -407,7 +405,7 @@ const ProductDetailsPage = ({
                   to={`/motifs/${patternStoryTarget}?product=${encodeURIComponent(product.id)}`}
                   className="inline-flex min-w-[170px] items-center justify-center rounded-[18px] bg-blush px-6 py-3 text-lg font-semibold text-ink transition hover:bg-rose"
                 >
-                  View pattern story
+                  {t('productDetails.viewPatternStory', 'View pattern story')}
                 </Link>
               ) : null}
               {!patternStoryTarget && product.motifId ? (
@@ -423,25 +421,25 @@ const ProductDetailsPage = ({
           {purchasePoints > 0 ? (
             <div className="mt-5 rounded-[24px] border border-[#dfbd79]/50 bg-[#fff7f0] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
               <p className="text-lg font-semibold leading-8 text-ink">
-                You will earn <span className="text-[#8f5f45]">{formatAtharPoints(purchasePoints)}</span> with this purchase.
+                {t('productDetails.youWillEarnPrefix', 'You will earn')} <span className="text-[#8f5f45]">{t('productCard.pointsValue', '{{count}} Athar Points', { count: purchasePoints })}</span> {t('productDetails.withPurchase', 'with this purchase.')}
               </p>
               <p className="mt-1 text-sm leading-6 text-ink-soft">
-                {formatAtharPoints(unitProductPoints)} per piece will be added to your Athar balance after checkout.
+                {t('productDetails.pointsPerPieceCheckout', '{{points}} per piece will be added to your Athar balance after checkout.', { points: t('productCard.pointsValue', '{{count}} Athar Points', { count: unitProductPoints }) })}
               </p>
               {authUser ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[18px] bg-white/80 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">Current balance</p>
-                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(currentBalance)}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.currentBalance', 'Current balance')}</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{t('productCard.pointsValue', '{{count}} Athar Points', { count: currentBalance })}</p>
                   </div>
                   <div className="rounded-[18px] bg-white/80 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">After this order</p>
-                    <p className="mt-2 text-base font-semibold text-ink">{formatAtharPoints(projectedBalance)}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted">{t('cart.afterPurchase', 'After this order')}</p>
+                    <p className="mt-2 text-base font-semibold text-ink">{t('productCard.pointsValue', '{{count}} Athar Points', { count: projectedBalance })}</p>
                   </div>
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-ink-soft">
-                  Log in before checkout to save these points to your Athar balance.
+                  {t('productDetails.loginSavePoints', 'Log in before checkout to save these points to your Athar balance.')}
                 </p>
               )}
             </div>
@@ -453,10 +451,10 @@ const ProductDetailsPage = ({
                 type="button"
                 onClick={handleListen}
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-[#e6cec6] bg-[#fffaf8] px-5 py-3 text-base font-semibold text-ink transition hover:bg-cream focus:outline-none focus:ring-4 focus:ring-rose/20"
-                aria-label={isAudioPlaying ? 'Stop reading the product description' : 'Listen to product description'}
+                aria-label={isAudioPlaying ? t('productDetails.stopReading', 'Stop reading the product description') : t('productDetails.listenDescription', 'Listen to product description')}
               >
                 <span aria-hidden="true">{isAudioPlaying ? '■' : '♪'}</span>
-                {isAudioPlaying ? 'Stop reading' : 'Listen to product description'}
+                {isAudioPlaying ? t('productDetails.stopReadingShort', 'Stop reading') : t('productDetails.listenDescription', 'Listen to product description')}
               </button>
               {visualDescriptionError ? (
                 <span className="text-sm text-[#8c6546]">{visualDescriptionError}</span>
@@ -466,12 +464,12 @@ const ProductDetailsPage = ({
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <div className="rounded-[24px] bg-cream px-5 py-4">
-              <p className="text-sm text-muted">Material</p>
+              <p className="text-sm text-muted">{t('productDetails.material', 'Material')}</p>
               <p className="mt-1 text-lg text-ink">{product.material}</p>
             </div>
             <div className="rounded-[24px] bg-cream px-5 py-4">
-              <p className="text-sm text-muted">Availability</p>
-              <p className="mt-1 text-lg text-ink">{product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</p>
+              <p className="text-sm text-muted">{t('productDetails.availability', 'Availability')}</p>
+              <p className="mt-1 text-lg text-ink">{product.stock > 0 ? t('common.inStock', '{{count}} in stock', { count: product.stock }) : t('common.outOfStock', 'Out of stock')}</p>
             </div>
           </div>
 
@@ -483,7 +481,7 @@ const ProductDetailsPage = ({
                 onClick={() => onOpenTryOn(product)}
                 className="w-full rounded-[24px] border border-line bg-white px-6 py-4 text-xl font-semibold text-ink transition hover:bg-cream"
               >
-                AI Try-On
+                {t('aiTryOn.tryItOn', 'Try it on')}
               </button>
             ) : null}
             <button
@@ -494,7 +492,7 @@ const ProductDetailsPage = ({
                 product.stock < 1 ? 'cursor-not-allowed bg-cream text-muted' : 'bg-blush text-ink hover:bg-rose'
               }`}
             >
-              Order now
+              {t('productDetails.orderNow', 'Order now')}
             </button>
           </div>
         </div>
@@ -503,15 +501,15 @@ const ProductDetailsPage = ({
       <section className="rounded-[32px] bg-white px-6 py-7 shadow-soft sm:px-8">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-sm uppercase tracking-[0.18em] text-muted">Community reviews</p>
-            <h2 className="mt-2 font-display text-4xl text-ink">Product comments</h2>
+            <p className="text-sm uppercase tracking-[0.18em] text-muted">{t('productDetails.communityReviews', 'Community reviews')}</p>
+            <h2 className="mt-2 font-display text-4xl text-ink">{t('productDetails.productComments', 'Product comments')}</h2>
             <p className="mt-3 max-w-2xl text-base leading-8 text-ink-soft">
-              Comments are checked before publishing to keep the community respectful. AI-assisted moderation may send uncertain comments for admin review.
+              {t('productDetails.commentsDescription', 'Comments are checked before publishing to keep the community respectful. AI-assisted moderation may send uncertain comments for admin review.')}
             </p>
           </div>
           {!authUser ? (
             <Link to="/auth?mode=register" className="button-primary">
-              Log in to comment
+              {t('productDetails.loginToComment', 'Log in to comment')}
             </Link>
           ) : null}
         </div>
@@ -520,29 +518,29 @@ const ProductDetailsPage = ({
           <form onSubmit={handleSubmitComment} className="mt-6 rounded-[28px] border border-line bg-[#fffaf8] p-5">
             <div className="grid gap-4 lg:grid-cols-[1fr_160px]">
               <label className="space-y-2">
-                <span className="text-sm font-semibold text-ink">Your comment</span>
+                <span className="text-sm font-semibold text-ink">{t('productDetails.yourComment', 'Your comment')}</span>
                 <textarea
                   value={commentText}
                   onChange={(event) => setCommentText(event.target.value)}
                   maxLength={PRODUCT_COMMENT_MAX_LENGTH}
                   rows={4}
                   className="w-full rounded-[22px] border border-line bg-white px-4 py-3 text-base text-ink outline-none transition focus:border-rose focus:ring-4 focus:ring-rose/10"
-                  placeholder="Share what you liked about this product..."
+                  placeholder={t('productDetails.commentPlaceholder', 'Share what you liked about this product...')}
                   disabled={commentSubmitting}
                 />
               </label>
               <label className="space-y-2">
-                <span className="text-sm font-semibold text-ink">Rating</span>
+                <span className="text-sm font-semibold text-ink">{t('productDetails.rating', 'Rating')}</span>
                 <select
                   value={commentRating}
                   onChange={(event) => setCommentRating(event.target.value)}
                   className="w-full rounded-[22px] border border-line bg-white px-4 py-3 text-base text-ink outline-none transition focus:border-rose focus:ring-4 focus:ring-rose/10"
                   disabled={commentSubmitting}
                 >
-                  <option value="">Optional</option>
+                  <option value="">{t('productDetails.optional', 'Optional')}</option>
                   {[5, 4, 3, 2, 1].map((ratingValue) => (
                     <option key={ratingValue} value={ratingValue}>
-                      {ratingValue} stars
+                      {t('productDetails.stars', '{{count}} stars', { count: ratingValue })}
                     </option>
                   ))}
                 </select>
@@ -557,7 +555,7 @@ const ProductDetailsPage = ({
                 disabled={commentSubmitting}
                 className="rounded-[18px] bg-blush px-6 py-3 font-semibold text-ink transition hover:bg-rose disabled:cursor-wait disabled:bg-cream disabled:text-muted"
               >
-                {commentSubmitting ? 'Checking comment...' : 'Submit comment'}
+                {commentSubmitting ? t('productDetails.checkingComment', 'Checking comment...') : t('productDetails.submitComment', 'Submit comment')}
               </button>
             </div>
           </form>
@@ -578,12 +576,12 @@ const ProductDetailsPage = ({
 
         <div className="mt-7 space-y-4">
           {commentsLoading ? (
-            <div className="rounded-[24px] bg-cream px-5 py-5 text-ink-soft">Loading comments...</div>
+            <div className="rounded-[24px] bg-cream px-5 py-5 text-ink-soft">{t('productDetails.loadingComments', 'Loading comments...')}</div>
           ) : null}
 
           {!commentsLoading && commentItems.length === 0 ? (
             <div className="rounded-[24px] bg-cream px-5 py-5 text-ink-soft">
-              No approved comments yet. Be the first to share a respectful note.
+              {t('productDetails.noComments', 'No approved comments yet. Be the first to share a respectful note.')}
             </div>
           ) : null}
 
@@ -613,7 +611,7 @@ const ProductDetailsPage = ({
 
       {relatedProducts.length > 0 ? (
         <section>
-          <SectionTitle title="Related products" description="Additional pieces from the same category, kept connected to the reusable logic already in the project." />
+          <SectionTitle title={t('productDetails.relatedProducts', 'Related products')} description={t('productDetails.relatedDescription', 'Additional pieces from the same category.')} />
           <StaggerContainer immediate className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {relatedProducts.map((relatedProduct) => (
               <StaggerItem key={relatedProduct.id}>
@@ -627,12 +625,12 @@ const ProductDetailsPage = ({
       <Toast
         open={Boolean(feedbackMessage)}
         variant="success"
-        title="Added to cart"
+        title={t('productDetails.addedToCart', 'Added to cart')}
         message={feedbackMessage}
         onClose={() => setFeedbackMessage('')}
         action={
           <Link to="/cart" className="button-ghost px-0 py-0 text-sm text-ink">
-            View cart
+            {t('nav.cart', 'Cart')}
           </Link>
         }
       />

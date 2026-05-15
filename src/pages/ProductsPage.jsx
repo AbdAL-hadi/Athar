@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
@@ -14,17 +15,6 @@ import { trackBehavior } from '../utils/behaviorTracking';
 import { getCatalogCategories, isProductFavorite } from '../utils/productCatalog';
 
 const PRODUCTS_PER_PAGE = 6;
-const sortOptions = [
-  { value: 'featured', label: 'Featured' },
-  { value: 'price-asc', label: 'Price: low to high' },
-  { value: 'price-desc', label: 'Price: high to low' },
-  { value: 'name-asc', label: 'Name: A to Z' },
-  { value: 'most-viewed', label: 'Most viewed' },
-  { value: 'best-selling', label: 'Best selling' },
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-];
-
 const getNumberValue = (product, fields) => {
   for (const field of fields) {
     const value = Number(product?.[field] ?? 0);
@@ -71,7 +61,18 @@ const sortProducts = (productList, sortBy) => {
 };
 
 const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, isLoading = false, errorMessage = '', onRefreshProducts }) => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const sortOptions = [
+    { value: 'featured', label: t('products.sort.featured', 'Featured') },
+    { value: 'price-asc', label: t('products.sort.priceAsc', 'Price: low to high') },
+    { value: 'price-desc', label: t('products.sort.priceDesc', 'Price: high to low') },
+    { value: 'name-asc', label: t('products.sort.nameAsc', 'Name: A to Z') },
+    { value: 'most-viewed', label: t('products.sort.mostViewed', 'Most viewed') },
+    { value: 'best-selling', label: t('products.sort.bestSelling', 'Best selling') },
+    { value: 'newest', label: t('products.sort.newest', 'Newest first') },
+    { value: 'oldest', label: t('products.sort.oldest', 'Oldest first') },
+  ];
   const categories = getCatalogCategories(products);
   const query = searchParams.get('q') ?? '';
   const selectedCategory = searchParams.get('category') ?? 'All';
@@ -171,13 +172,13 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
       <ProductPromoAd />
 
       <div className="flex justify-between items-start">
-        <SectionTitle title="All products" description="Browse Athar's curated collection of heritage-inspired accessories." />
+        <SectionTitle title={t('products.allProducts', 'All products')} description={t('products.description', "Browse Athar's curated collection of heritage-inspired accessories.")} />
         {onRefreshProducts && (
           <button
             onClick={onRefreshProducts}
             disabled={isLoading}
             className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-ink-soft hover:border-line hover:bg-blush/60 hover:text-ink transition disabled:opacity-50 mt-2"
-            title="Refresh products"
+            title={t('products.refreshProducts', 'Refresh products')}
           >
             <svg
               aria-hidden="true"
@@ -192,27 +193,27 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
               <path d="M1 4v6h6M23 20v-6h-6" />
               <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
             </svg>
-            <span className="sr-only">Refresh products</span>
+            <span className="sr-only">{t('products.refreshProducts', 'Refresh products')}</span>
           </button>
         )}
       </div>
 
-      {isLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">Loading the latest Athar collection...</div> : null}
-      {errorMessage ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{errorMessage} Showing the last available catalog while the collection refreshes.</div> : null}
+      {isLoading ? <div className="rounded-[24px] bg-white px-5 py-4 text-sm text-ink-soft shadow-card">{t('products.loadingLatest', 'Loading the latest Athar collection...')}</div> : null}
+      {errorMessage ? <div className="rounded-[24px] border border-[#e7c8c8] bg-white px-5 py-4 text-sm text-[#8c6546] shadow-card">{errorMessage} {t('products.showingCached', 'Showing the last available catalog while the collection refreshes.')}</div> : null}
       {selectedCity ? (
         <div className="flex flex-col gap-3 rounded-[24px] border border-line bg-white px-5 py-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">Heritage collection</p>
-            <p className="mt-1 text-base font-semibold text-ink">Showing pieces inspired by {selectedCity.name} / {selectedCity.arabicName}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted">{t('products.heritageCollection', 'Heritage collection')}</p>
+            <p className="mt-1 text-base font-semibold text-ink">{t('products.showingCity', 'Showing pieces inspired by {{city}} / {{arabicCity}}', { city: selectedCity.name, arabicCity: selectedCity.arabicName })}</p>
           </div>
           <button type="button" onClick={() => updateParams({ city: '' })} className="button-secondary w-fit px-5 py-2 text-sm">
-            Clear city
+            {t('products.clearCity', 'Clear city')}
           </button>
         </div>
       ) : null}
 
       <section className="space-y-6 rounded-[32px] bg-white p-5 shadow-soft sm:p-6">
-        <SearchBar value={query} onChange={(event) => updateParams({ q: event.target.value })} placeholder="Search products or materials" showButton={false} />
+        <SearchBar value={query} onChange={(event) => updateParams({ q: event.target.value })} placeholder={t('products.searchPlaceholder', 'Search products or materials')} showButton={false} />
         <Filter
           categories={['All', ...categories.map((category) => category.name)]}
           selectedCategory={selectedCategory}
@@ -224,13 +225,13 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
           maxPrice={maxPrice}
           onMinPriceChange={(min) => updateParams({ min })}
           onMaxPriceChange={(max) => updateParams({ max })}
-          summary={`Showing ${paginatedProducts.length} of ${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'}`}
+          summary={t('products.showingSummary', 'Showing {{shown}} of {{total}} product', { shown: paginatedProducts.length, total: filteredProducts.length, count: filteredProducts.length })}
           onClear={clearFilters}
         />
       </section>
 
       {shouldShowSkeletons ? (
-        <section className="space-y-8" aria-label="Loading products">
+        <section className="space-y-8" aria-label={t('products.loadingProducts', 'Loading products')}>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: PRODUCTS_PER_PAGE }).map((_, index) => (
               <ProductCardSkeleton key={`product-skeleton-${index}`} />
@@ -267,21 +268,21 @@ const ProductsPage = ({ products, favoriteIds, onToggleFavorite, onAddToCart, is
       ) : products.length === 0 && !isLoading && !hasActiveFilters ? (
         <Reveal>
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-            <h3 className="font-display text-4xl text-ink">The catalog is temporarily empty.</h3>
-            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">New heritage-inspired pieces will appear here as soon as the collection is refreshed.</p>
+            <h3 className="font-display text-4xl text-ink">{t('products.catalogEmptyTitle', 'The catalog is temporarily empty.')}</h3>
+            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">{t('products.catalogEmptyDescription', 'New heritage-inspired pieces will appear here as soon as the collection is refreshed.')}</p>
           </div>
         </Reveal>
       ) : (
         <Reveal>
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-            <h3 className="font-display text-4xl text-ink">No products match these filters.</h3>
-            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">Try widening the price range, changing the category, or starting again from the full catalog.</p>
+            <h3 className="font-display text-4xl text-ink">{t('products.noMatchesTitle', 'No products match these filters.')}</h3>
+            <p className="mx-auto mt-3 max-w-2xl text-lg leading-8 text-ink-soft">{t('products.noMatchesDescription', 'Try widening the price range, changing the category, or starting again from the full catalog.')}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={clearFilters} className="button-primary">
-                Reset filters
+                {t('common.resetFilters', 'Reset filters')}
               </button>
               <Link to="/" className="button-secondary">
-                Return home
+                {t('common.returnHome', 'Return home')}
               </Link>
             </div>
           </div>

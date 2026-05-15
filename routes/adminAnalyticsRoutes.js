@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getAdminAnalyticsAiTools,
   getAdminAnalyticsCities,
+  getAdminAnalyticsCustomerFunnel,
   getAdminAnalyticsOverview,
   getAdminAnalyticsProducts,
   getAdminAnalyticsSearches,
@@ -17,5 +18,6 @@ router.get('/cities', protect, requireAdmin, getAdminAnalyticsCities);
 router.get('/warehouses', protect, requireAdmin, getAdminAnalyticsWarehouses);
 router.get('/searches', protect, requireAdmin, getAdminAnalyticsSearches);
 router.get('/ai-tools', protect, requireAdmin, getAdminAnalyticsAiTools);
+router.get('/customer-funnel', protect, requireAdmin, getAdminAnalyticsCustomerFunnel);
 
 export default router;

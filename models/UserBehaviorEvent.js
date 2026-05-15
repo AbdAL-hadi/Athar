@@ -9,6 +9,7 @@ export const BEHAVIOR_EVENT_TYPES = [
   'search',
   'visual_search',
   'try_on_generate',
+  'checkout_started',
   'purchase',
   'review_create',
 ];

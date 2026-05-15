@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
 import { trackBehavior } from '../utils/behaviorTracking';
@@ -18,6 +19,7 @@ const downloadImage = (imageUrl) => {
 };
 
 const AITryOnModal = ({ product, open, onClose }) => {
+  const { t } = useTranslation();
   const [userImage, setUserImage] = useState(null);
   const [userPreviewUrl, setUserPreviewUrl] = useState('');
   const [style, setStyle] = useState('realistic');
@@ -71,14 +73,14 @@ const AITryOnModal = ({ product, open, onClose }) => {
     }
 
     if (!allowedTypes.has(nextFile.type)) {
-      setError('Only JPG, PNG, or WEBP images are allowed.');
+      setError(t('aiTryOn.unsupportedFormatLong', 'Only JPG, PNG, or WEBP images are allowed.'));
       setUserImage(null);
       setUserPreviewUrl('');
       return;
     }
 
     if (nextFile.size > MAX_FILE_SIZE_BYTES) {
-      setError('The image is too large. Please upload a file under 5MB.');
+      setError(t('aiTryOn.fileTooLargeLong', 'The image is too large. Please upload a file under 5MB.'));
       setUserImage(null);
       setUserPreviewUrl('');
       return;
@@ -99,7 +101,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
     setMessage('');
 
     if (!userImage) {
-      setError('Please upload your photo first.');
+      setError(t('aiTryOn.uploadFirst', 'Please upload your photo first.'));
       return;
     }
 
@@ -118,7 +120,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
       const nextImage = response?.data?.image || response?.data?.resultUrl || '';
 
       if (!nextImage) {
-        throw new Error('No preview image was returned.');
+        throw new Error(t('aiTryOn.noPreviewReturned', 'No preview image was returned.'));
       }
 
       setResultImage(resolveApiAssetUrl(nextImage));
@@ -132,7 +134,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
           productType: product.tryOnCategory || product.category || '',
         },
       });
-      setMessage(response?.data?.message || 'AI try-on preview generated successfully.');
+      setMessage(response?.data?.message || t('aiTryOn.success', 'AI try-on preview generated successfully.'));
     } catch (generateError) {
       trackBehavior({
         eventType: 'try_on_generate',
@@ -147,7 +149,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
       });
       setError(
         generateError.message ||
-          "We couldn't generate a try-on preview right now. Please try again.",
+          t('aiTryOn.failed', "We couldn't generate a try-on preview right now. Please try again."),
       );
     } finally {
       setIsGenerating(false);
@@ -168,12 +170,12 @@ const AITryOnModal = ({ product, open, onClose }) => {
       >
         <div className="flex flex-col justify-between gap-4 border-b border-line pb-5 sm:flex-row sm:items-start">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-muted">AI Try-On Preview</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-muted">{t('aiTryOn.title', 'AI Try-On Preview')}</p>
             <h2 id="ai-try-on-title" className="mt-2 font-display text-4xl text-ink">
-              Try {product.name}
+              {t('aiTryOn.tryProduct', 'Try {{productName}}', { productName: product.name })}
             </h2>
             <p className="mt-2 max-w-2xl text-base leading-7 text-ink-soft">
-              Upload a clear front-facing or well-lit photo. This creates an AI preview, not a guaranteed perfect AR fitting.
+              {t('aiTryOn.description', 'Upload a clear front-facing or well-lit photo. This creates an AI preview, not a guaranteed perfect AR fitting.')}
             </p>
           </div>
           <button
@@ -181,7 +183,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
             onClick={onClose}
             className="self-start rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream"
           >
-            Close
+            {t('common.close', 'Close')}
           </button>
         </div>
 
@@ -199,14 +201,14 @@ const AITryOnModal = ({ product, open, onClose }) => {
             </div>
 
             <div className="rounded-[24px] border border-line bg-white px-4 py-4 text-sm leading-7 text-ink-soft">
-              Privacy note: Your uploaded photo is used only to generate your try-on preview.
+              {t('aiTryOn.privacyNote', 'Privacy note: Your uploaded photo is used only to generate your try-on preview.')}
             </div>
           </section>
 
           <section className="space-y-5">
             <div className="rounded-[28px] border border-line bg-white p-5 shadow-card">
               <label className="block">
-                <span className="text-sm font-bold text-ink">Upload your photo</span>
+                <span className="text-sm font-bold text-ink">{t('aiTryOn.uploadPhoto', 'Upload your photo')}</span>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -218,15 +220,15 @@ const AITryOnModal = ({ product, open, onClose }) => {
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-bold text-ink">Framing style</span>
+                  <span className="text-sm font-bold text-ink">{t('aiTryOn.framingStyle', 'Framing style')}</span>
                   <select
                     value={style}
                     onChange={(event) => setStyle(event.target.value)}
                     className="w-full rounded-[18px] border border-line bg-[#fffaf8] px-4 py-3 text-sm text-ink"
                     disabled={isGenerating}
                   >
-                    <option value="realistic">Realistic</option>
-                    <option value="studio-fashion">Studio fashion</option>
+                    <option value="realistic">{t('aiTryOn.realistic', 'Realistic')}</option>
+                    <option value="studio-fashion">{t('aiTryOn.studioFashion', 'Studio fashion')}</option>
                   </select>
                 </label>
                 <button
@@ -235,7 +237,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
                   disabled={isGenerating}
                   className="self-end rounded-[18px] bg-blush px-6 py-3 font-semibold text-ink transition hover:bg-rose disabled:cursor-wait disabled:bg-cream disabled:text-muted"
                 >
-                  {isGenerating ? 'Generating...' : 'Generate Preview'}
+                  {isGenerating ? t('aiTryOn.generating', 'Generating...') : t('aiTryOn.generatePreview', 'Generate preview')}
                 </button>
               </div>
             </div>
@@ -254,7 +256,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[28px] bg-white p-4 shadow-card">
-                <p className="text-sm font-bold text-ink">Your photo</p>
+                <p className="text-sm font-bold text-ink">{t('aiTryOn.yourPhoto', 'Your photo')}</p>
                 {userPreviewUrl ? (
                   <img
                     src={userPreviewUrl}
@@ -263,17 +265,17 @@ const AITryOnModal = ({ product, open, onClose }) => {
                   />
                 ) : (
                   <div className="mt-3 flex h-72 items-center justify-center rounded-[22px] bg-cream px-4 text-center text-sm text-ink-soft">
-                    Your uploaded image preview will appear here.
+                    {t('aiTryOn.uploadedPreviewEmpty', 'Your uploaded image preview will appear here.')}
                   </div>
                 )}
               </div>
 
               <div className="rounded-[28px] bg-white p-4 shadow-card">
-                <p className="text-sm font-bold text-ink">Result</p>
+                <p className="text-sm font-bold text-ink">{t('aiTryOn.result', 'Result')}</p>
                 {isGenerating ? (
                   <div className="mt-3 flex h-72 flex-col items-center justify-center rounded-[22px] bg-cream px-4 text-center text-sm text-ink-soft">
                     <span className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blush border-t-rose" />
-                    Generating your AI try-on preview...
+                    {t('aiTryOn.generatingPreview', 'Generating your AI try-on preview...')}
                   </div>
                 ) : resultImage ? (
                   <img
@@ -283,7 +285,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
                   />
                 ) : (
                   <div className="mt-3 flex h-72 items-center justify-center rounded-[22px] bg-cream px-4 text-center text-sm text-ink-soft">
-                    Your generated preview will appear here.
+                    {t('aiTryOn.generatedPreviewEmpty', 'Your generated preview will appear here.')}
                   </div>
                 )}
               </div>
@@ -296,7 +298,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
                   onClick={() => downloadImage(resultImage)}
                   className="button-primary"
                 >
-                  Download result
+                  {t('aiTryOn.downloadResult', 'Download')}
                 </button>
                 <button
                   type="button"
@@ -304,7 +306,7 @@ const AITryOnModal = ({ product, open, onClose }) => {
                   disabled={isGenerating}
                   className="button-secondary disabled:opacity-60"
                 >
-                  Regenerate once
+                  {t('aiTryOn.regenerateOnce', 'Regenerate')}
                 </button>
               </div>
             ) : null}

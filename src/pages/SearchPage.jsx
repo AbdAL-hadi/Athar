@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Reveal from '../components/animation/Reveal';
 import StaggerContainer from '../components/animation/StaggerContainer';
 import StaggerItem from '../components/animation/StaggerItem';
@@ -12,6 +13,7 @@ import { trackBehavior } from '../utils/behaviorTracking';
 import { isProductFavorite } from '../utils/productCatalog';
 
 const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeQuery = searchParams.get('q') ?? '';
   const [inputValue, setInputValue] = useState(activeQuery);
@@ -64,15 +66,15 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
   return (
     <div className="section-shell space-y-8 pb-6 pt-8">
       <section className="rounded-[32px] bg-white px-5 py-6 shadow-soft sm:px-6">
-        <SectionTitle title="Search for your favorite products" description="This page keeps the URL-driven search logic while following the Athar list view." />
-        <SearchBar value={inputValue} onChange={(event) => setInputValue(event.target.value)} onSubmit={handleSubmit} placeholder="Search Athar products" className="mt-6" />
+        <SectionTitle title={t('search.title', 'Search for your favorite products')} description={t('search.description', 'Find Athar pieces by name, category, material, or description.')} />
+        <SearchBar value={inputValue} onChange={(event) => setInputValue(event.target.value)} onSubmit={handleSubmit} placeholder={t('search.placeholder', 'Search Athar products')} className="mt-6" />
       </section>
 
       {!activeQuery ? (
         <Reveal>
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-            <h2 className="font-display text-4xl text-ink">Start with a search term.</h2>
-            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-ink-soft">Try searching for bracelets, wallets, rings, or heritage-inspired accessories.</p>
+            <h2 className="font-display text-4xl text-ink">{t('search.emptyPromptTitle', 'Start with a search term.')}</h2>
+            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-ink-soft">{t('search.emptyPromptDescription', 'Try searching for bracelets, wallets, rings, or heritage-inspired accessories.')}</p>
           </div>
         </Reveal>
       ) : results.length > 0 ? (
@@ -85,12 +87,12 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-3xl text-ink">{product.name}</p>
                     <p className="flex items-center gap-2 text-sm text-ink-soft">
-                      <span>{product.category}</span>
+                      <span>{t(`categories.${product.category}`, product.category)}</span>
                       <span aria-hidden="true">·</span>
                       <PriceText value={product.price} className="text-xl" />
                     </p>
                   </div>
-                  <span className="hidden rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream sm:inline-flex">More Details</span>
+                  <span className="hidden rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-cream sm:inline-flex">{t('productCard.moreDetails', 'More Details')}</span>
                 </Link>
 
                 <FavoriteButton active={isProductFavorite(favoriteIds, product)} onClick={() => onToggleFavorite(product)} className="h-10 w-10 shrink-0" />
@@ -101,14 +103,14 @@ const SearchPage = ({ products, favoriteIds, onToggleFavorite }) => {
       ) : (
         <Reveal>
           <div className="rounded-[32px] bg-white px-6 py-12 text-center shadow-soft">
-            <h2 className="font-display text-4xl text-ink">No results found.</h2>
-            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-ink-soft">Nothing matched "{activeQuery}" in the catalog. Try a broader term or return to the full catalog.</p>
+            <h2 className="font-display text-4xl text-ink">{t('search.noResultsTitle', 'No results found.')}</h2>
+            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-ink-soft">{t('search.noResultsDescription', 'Nothing matched "{{query}}" in the catalog. Try a broader term or return to the full catalog.', { query: activeQuery })}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={() => setSearchParams({})} className="button-primary">
-                Clear search
+                {t('search.clearSearch', 'Clear search')}
               </button>
               <Link to="/products" className="button-secondary">
-                Browse products
+                {t('common.browseProducts', 'Browse products')}
               </Link>
             </div>
           </div>

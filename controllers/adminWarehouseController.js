@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import Warehouse from '../models/Warehouse.js';
 import WarehouseStock from '../models/WarehouseStock.js';
+import { getInventoryAnalysis } from '../services/inventoryAnalysisService.js';
 import { upsertProductWarehouseStocks } from '../services/inventoryService.js';
 
 const serializeStock = (stock) => ({
@@ -159,5 +160,18 @@ export const getWarehouseInventory = async (_req, res) => {
     return res.status(200).json({ success: true, data: { warehouses, rows } });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch warehouse inventory.', error: error.message });
+  }
+};
+
+export const getWarehouseInventoryAnalysis = async (req, res) => {
+  try {
+    const data = await getInventoryAnalysis({ range: req.query?.range || '7d' });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('[Athar inventory analytics] Analysis fetch failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch inventory analysis.',
+    });
   }
 };

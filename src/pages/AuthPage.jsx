@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Toast from '../components/Toast';
 import { PALESTINIAN_CITIES, isKnownCityValue, normalizeCityValue } from '../data/palestinianCities';
 import { apiRequest, resolveApiAssetUrl } from '../utils/api';
@@ -146,6 +147,7 @@ const FieldError = ({ message }) =>
   message ? <p className="px-1 text-sm text-[#b46a6a]">{message}</p> : null;
 
 const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = searchParams.get('mode') === 'register' ? 'register' : 'login';
   const [loginForm, setLoginForm] = useState(initialLoginForm);
@@ -162,11 +164,11 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
 
   const title = useMemo(() => {
     if (verificationState) {
-      return 'Verify your email';
+      return t('auth.verifyEmail', 'Verify your email');
     }
 
-    return mode === 'register' ? 'Create account' : 'Log in';
-  }, [mode, verificationState]);
+    return mode === 'register' ? t('nav.createAccount', 'Create account') : t('nav.logIn', 'Log in');
+  }, [mode, t, verificationState]);
 
   const selectedCountry = useMemo(
     () => COUNTRY_OPTIONS.find((country) => country.code === registerForm.countryCode) ?? COUNTRY_OPTIONS[0],
@@ -310,7 +312,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
       setVerificationState(null);
       setVerificationCode('');
       onAuthSuccess?.(response.data);
-      showMessage(response.message || 'Email verified successfully.');
+      showMessage(response.message || t('auth.emailVerified', 'Email verified successfully.'));
     } catch (error) {
       setVerificationError(error.message || 'The verification code is not correct.');
     } finally {
@@ -395,12 +397,12 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
               ) : null}
               {verificationState.delivery?.channel === 'console' ? (
                 <p className="mt-3 rounded-[18px] bg-blush px-4 py-3 text-sm text-ink">
-                  Email delivery is not configured yet on the server, so the code is currently printed in the backend console for testing.
+                  {t('auth.emailDevMode', 'Email delivery is not configured yet on the server, so the code is currently printed in the backend console for testing.')}
                 </p>
               ) : null}
               {verificationState.delivery?.channel === 'failed' ? (
                 <p className="mt-3 rounded-[18px] bg-[#fff8f6] px-4 py-3 text-sm text-[#8b5b5b]">
-                  Email delivery failed. {verificationState.delivery.message || 'Please check the SMTP settings and try Resend code.'}
+                  {t('auth.emailDeliveryFailed', 'Email delivery failed.')} {verificationState.delivery.message || 'Please check the SMTP settings and try Resend code.'}
                 </p>
               ) : null}
             </div>
@@ -449,7 +451,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             ) : null}
 
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-ink">Email</span>
+              <span className="text-sm font-semibold text-ink">{t('auth.email', 'Email')}</span>
               <input
                 className={getFieldClassName(false)}
                 placeholder="you@example.com"
@@ -461,7 +463,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-ink">Password</span>
+              <span className="text-sm font-semibold text-ink">{t('auth.password', 'Password')}</span>
               <input
                 className={getFieldClassName(false)}
                 placeholder="Enter your password"
@@ -479,7 +481,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             <p className="text-center text-sm text-ink-soft">
               Don&apos;t have an account?{' '}
               <button type="button" onClick={() => switchMode('register')} className="font-semibold text-ink">
-                Create an account
+                {t('nav.createAccount', 'Create an account')}
               </button>
             </p>
           </form>
@@ -493,7 +495,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Full name</span>
+                <span className="text-sm font-semibold text-ink">{t('checkout.fullName', 'Full name')}</span>
                 <input
                   className={getFieldClassName(Boolean(registerErrors.name))}
                   placeholder="Your full name"
@@ -505,7 +507,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Email</span>
+                <span className="text-sm font-semibold text-ink">{t('auth.email', 'Email')}</span>
                 <input
                   className={getFieldClassName(Boolean(registerErrors.email))}
                   placeholder="you@example.com"
@@ -519,7 +521,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             </div>
 
             <div className="space-y-2">
-              <span className="text-sm font-semibold text-ink">Phone number</span>
+              <span className="text-sm font-semibold text-ink">{t('checkout.phoneNumber', 'Phone number')}</span>
               <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
                 <label className="block space-y-2">
                   <span className="sr-only">Country / dial code</span>
@@ -562,7 +564,7 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Password</span>
+                <span className="text-sm font-semibold text-ink">{t('auth.password', 'Password')}</span>
                 <input
                   className={getFieldClassName(Boolean(registerErrors.password))}
                   placeholder="At least 8 characters"
@@ -630,13 +632,13 @@ const AuthPage = ({ authUser, authLoading, onAuthSuccess, onLogout }) => {
             </div>
 
             <button type="submit" disabled={isSubmitting || authLoading} className="button-primary w-full disabled:cursor-not-allowed disabled:opacity-70">
-              {isSubmitting ? 'Creating account...' : 'Create account'}
+              {isSubmitting ? t('auth.creatingAccount', 'Creating account...') : t('nav.createAccount', 'Create account')}
             </button>
 
             <p className="text-center text-sm text-ink-soft">
               Already have an account?{' '}
               <button type="button" onClick={() => switchMode('login')} className="font-semibold text-ink">
-                Log in
+                {t('nav.logIn', 'Log in')}
               </button>
             </p>
           </form>

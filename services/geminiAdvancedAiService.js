@@ -59,6 +59,7 @@ const normalizeCampaign = (campaign = {}, index = 0) => ({
   message: String(campaign.message || '').trim(),
   cta: String(campaign.cta || 'Shop Athar').trim(),
   reason: String(campaign.reason || '').trim(),
+  campaignType: String(campaign.campaignType || '').trim(),
 });
 
 const parseCampaigns = (text = '') => {
@@ -81,10 +82,13 @@ export const generateCampaignSuggestions = async (context = {}) => {
   }
 
   const prompt = [
-    'Create short marketing campaign ideas for Athar based only on the provided campaignCandidates.',
+    'Create short recovery or activation campaign ideas for Athar based only on the provided campaignCandidates.',
     'Return one campaign for each candidate in the same order, up to 3 campaigns.',
-    'Each campaign must include candidateIndex, title, target city/audience, featuredItems, short message, CTA, and reason.',
+    'Each campaign must include candidateIndex, campaignType, title, target city/audience, featuredItems, short message, CTA, and reason.',
     'Keep it premium, culturally rooted, and suitable for a Palestinian-inspired accessories brand.',
+    'Copy campaignType exactly from each candidate. Do not change the strategy selected by the analytics rules.',
+    'Frame weak cities, low conversion, cart abandonment, stock with low demand, and low visibility as recovery or activation campaigns.',
+    'HIGH_DEMAND_EXPANSION is allowed only when the candidate already has that campaignType.',
     'Use the provided productCategory exactly. Do not infer another product type. Do not invent product details.',
     'If productCategory is Rings, describe the product as a ring. If productCategory is Watches, describe it as a watch. If productCategory is Bags, describe it as a bag.',
     'Set featuredItems to exactly "productTitle — productCategory" for each candidate.',

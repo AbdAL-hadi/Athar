@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const SortDropdown = ({ value, options = [], onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -163,6 +164,8 @@ const Filter = ({
   onClear,
   className = '',
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div className={`space-y-5 ${className}`}>
       <div className="flex flex-wrap gap-2">
@@ -173,7 +176,7 @@ const Filter = ({
             onClick={() => onCategoryChange?.(category)}
             className={`chip-button ${selectedCategory === category ? '!border-transparent !bg-blush !text-ink' : ''}`}
           >
-            {category}
+            {t(`categories.${category}`, category)}
           </button>
         ))}
       </div>
@@ -182,7 +185,7 @@ const Filter = ({
         <input
           type="number"
           inputMode="numeric"
-          placeholder="Minimum price"
+          placeholder={t('filter.minimumPrice', 'Minimum price')}
           value={minPrice}
           onChange={(event) => onMinPriceChange?.(event.target.value)}
           className="field"
@@ -190,7 +193,7 @@ const Filter = ({
         <input
           type="number"
           inputMode="numeric"
-          placeholder="Maximum price"
+          placeholder={t('filter.maximumPrice', 'Maximum price')}
           value={maxPrice}
           onChange={(event) => onMaxPriceChange?.(event.target.value)}
           className="field"
@@ -202,7 +205,7 @@ const Filter = ({
         <p className="text-sm text-ink-soft">{summary}</p>
         {onClear ? (
           <button type="button" onClick={onClear} className="button-ghost px-0">
-            Clear filters
+            {t('filter.clearFilters', 'Clear filters')}
           </button>
         ) : null}
       </div>
