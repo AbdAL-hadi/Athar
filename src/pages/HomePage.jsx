@@ -288,7 +288,7 @@ const HomePage = ({ products, favoriteIds, onToggleFavorite, authUser, authToken
     <div className="space-y-16 pb-6 pt-0">
       <section className="relative left-1/2 right-1/2 -mx-[50vw] min-h-[680px] w-screen overflow-hidden bg-[#251913] py-16 sm:py-20 lg:flex lg:min-h-[calc(100vh-92px)] lg:items-center lg:py-24">
         <img
-          src={resolveApiAssetUrl('products/homeshorouq.jpeg')}
+          src={resolveApiAssetUrl('products/home-hero-heritage.jpeg')}
           alt={t('home.heroImageAlt', 'Athar Palestinian heritage accessories')}
           className="absolute inset-0 h-full w-full object-cover"
         />
